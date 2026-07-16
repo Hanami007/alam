@@ -1,0 +1,257 @@
+// Prisma schema for the Alumni Directory module.
+// This is intentionally designed as a foundation for future expansion.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  name          String?
+  image         String?
+  studentId     String?  @unique
+  roleId        String?
+  role          Role?    @relation(fields: [roleId], references: [id])
+  generationId  String?
+  generation    Generation? @relation(fields: [generationId], references: [id])
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id])
+  provinceId    String?
+  province      Province? @relation(fields: [provinceId], references: [id])
+  occupationId  String?
+  occupation    Occupation? @relation(fields: [occupationId], references: [id])
+  employmentTypeId String?
+  employmentType EmploymentType? @relation(fields: [employmentTypeId], references: [id])
+  isActive      Boolean  @default(true)
+  isDeleted     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  posts         Post[]
+  comments      Comment[]
+  likes         Like[]
+  notifications Notification[]
+  activityLogs  ActivityLog[]
+  votes         Vote[]
+  photoTags     PhotoTag[]
+
+  @@map("users")
+}
+
+model Role {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  users     User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("roles")
+}
+
+model Generation {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  users     User[]
+  posts     Post[]
+  albums    Album[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("generations")
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  users     User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("departments")
+}
+
+model Province {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  users     User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("provinces")
+}
+
+model Occupation {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  users     User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("occupations")
+}
+
+model EmploymentType {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  users     User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("employment_types")
+}
+
+model Post {
+  id          String   @id @default(uuid())
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id])
+  generationId String?
+  generation  Generation? @relation(fields: [generationId], references: [id])
+  title       String
+  body        String
+  category    String
+  imageUrl    String?
+  isPinned    Boolean  @default(false)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  comments    Comment[]
+  likes       Like[]
+
+  @@map("posts")
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id])
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  body      String
+  isDeleted Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("comments")
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@map("likes")
+}
+
+model Album {
+  id            String   @id @default(uuid())
+  name          String
+  generationId  String?
+  generation    Generation? @relation(fields: [generationId], references: [id])
+  year          Int?
+  isDeleted     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  photos        Photo[]
+
+  @@map("albums")
+}
+
+model Photo {
+  id            String   @id @default(uuid())
+  albumId       String
+  album         Album    @relation(fields: [albumId], references: [id])
+  imageUrl      String
+  title         String?
+  description   String?
+  year          Int?
+  generation    String?
+  activity      String?
+  event         String?
+  isDeleted     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  tags          PhotoTag[]
+
+  @@map("photos")
+}
+
+model PhotoTag {
+  id             String   @id @default(uuid())
+  photoId        String
+  photo          Photo    @relation(fields: [photoId], references: [id])
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id])
+  taggedUserId   String?
+  confidence     Float?
+  isConfirmed    Boolean  @default(false)
+  isRejected     Boolean  @default(false)
+  isDeleted      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("photo_tags")
+}
+
+model HallOfFame {
+  id            String   @id @default(uuid())
+  userId        String
+  name          String
+  generation    String?
+  department    String?
+  occupation    String?
+  company       String?
+  achievements  String?
+  bio           String?
+  socialLinks   String?
+  isFeatured    Boolean  @default(false)
+  isDeleted     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("hall_of_fame")
+}
+
+model Vote {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  nomineeId   String
+  nomineeName String
+  voteCount   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("votes")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  entityType String
+  entityId   String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  @@map("activity_logs")
+}
