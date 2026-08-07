@@ -1,16 +1,30 @@
-import { AppShell } from '@/components/layout/app-shell';
+// วางไฟล์นี้ที่ src/app/profile/page.tsx
+import { getUserProfile, getTaggedPhotos, getUnlockedPhotos } from '@/lib/db';
 import { ProfileCard } from '@/modules/profile/components/profile-card';
+import { AppShell } from '@/components/layout/app-shell';
 
-export default function ProfilePage() {
+// TODO: ยังไม่มีระบบ session จริง ใช้ student_id ตัวอย่างจาก seed data ไปก่อน
+const CURRENT_USER_STUDENT_ID = '60010001';
+
+export default async function ProfilePage() {
+  const user = await getUserProfile(CURRENT_USER_STUDENT_ID);
+
+  if (!user) {
+    return (
+      <AppShell>
+        <p className="text-sm text-slate-400">ไม่พบข้อมูลผู้ใช้</p>
+      </AppShell>
+    );
+  }
+
+  const [taggedPhotos, unlockedPhotos] = await Promise.all([
+    getTaggedPhotos(user.id),
+    getUnlockedPhotos(user.id),
+  ]);
+
   return (
     <AppShell>
-      <div className="space-y-4">
-        <div>
-          <p className="text-sm font-medium text-blue-600">My Profile</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Own your profile</h1>
-        </div>
-        <ProfileCard />
-      </div>
+      <ProfileCard user={user} taggedPhotos={taggedPhotos} unlockedPhotos={unlockedPhotos} />
     </AppShell>
   );
 }

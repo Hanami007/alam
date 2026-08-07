@@ -9,7 +9,7 @@ create table lookup_options (
   category      text not null,               -- generation | province | career_type | emoji
   code          text not null,
   label         text not null,
-  extra         jsonb default '{}'::jsonb     -- เช่น {"year_start":2011,"year_end":2015} หรือ {"region":"เหนือ"}
+  extra         jsonb default '{}'::jsonb     -- เช่น {"year_start":2011,"year_end":2015} หรือ {"region":"เหนือ","metro":true}
 );
 
 -- 2) users: ศิษย์เก่า + admin รวมตารางเดียว
@@ -29,8 +29,18 @@ create table users (
   role                text not null default 'alumni',   -- alumni | admin
   status              text not null default 'pending',  -- pending | approved | rejected
   total_points        int not null default 0,
+  hometown_province_id     int references lookup_options(id),
+  work_province_id         int references lookup_options(id),
+  show_hometown_on_map     boolean not null default false,
+  show_workplace_on_map    boolean not null default false,
+  student_status            text not null default 'studying'
+    check (student_status in ('studying', 'alumni')),
+  expected_graduation_year  integer,
   created_at          timestamptz not null default now()
 );
+
+-- Admin ได้แค่ 1 คนเท่านั้นในระบบ
+create unique index one_admin_only on users ((true)) where role = 'admin';
 
 -- 3) user_verifications: รวม registration_approvals + registrar_api_verifications
 create table user_verifications (
@@ -57,15 +67,19 @@ create table media_assets (
   created_at            timestamptz not null default now()
 );
 
--- 5) posts
+-- 5) posts (เพิ่ม requested_by / status / published_at สำหรับระบบ "ร้องขอโพสต์")
 create table posts (
   id            serial primary key,
   admin_id      int references users(id),
+  requested_by  int references users(id),
   category      text,
   title         text not null,
   content       text,
   post_type     text not null default 'normal', -- normal | poll
+  status        text not null default 'published'
+    check (status in ('pending_request', 'published', 'rejected')),
   pinned        boolean default false,
+  published_at  timestamptz,
   created_at    timestamptz not null default now()
 );
 
@@ -135,13 +149,14 @@ create table hof_votes (
   unique (campaign_id, voter_id, vote_category)
 );
 
--- 13) photo_tags
+-- 13) photo_tags (เพิ่ม unique constraint กันแท็กซ้ำคนเดิมในรูปเดิม)
 create table photo_tags (
   id                serial primary key,
   asset_id          int references media_assets(id),
   tagged_user_id    int references users(id),
   tagged_by         int references users(id),
-  tag_source        text not null default 'manual' -- manual | ai
+  tag_source        text not null default 'manual', -- manual | ai
+  unique (asset_id, tagged_user_id)
 );
 
 -- 14) photo_view_verifications (ตอบถูก = ปลดล็อกรูป + ได้คะแนน)
@@ -163,10 +178,97 @@ insert into lookup_options (category, code, label, extra) values
 ('generation', 'gen-43', 'รุ่น 43', '{"year_start":2011,"year_end":2015}'),
 ('generation', 'gen-46', 'รุ่น 46', '{"year_start":2014,"year_end":2018}'),
 ('generation', 'gen-48', 'รุ่น 48', '{"year_start":2016,"year_end":2020}'),
-('province', 'th-bkk', 'กรุงเทพมหานคร', '{"region":"กลาง"}'),
-('province', 'th-cnx', 'เชียงใหม่', '{"region":"เหนือ"}'),
-('province', 'th-kkc', 'ขอนแก่น', '{"region":"อีสาน"}'),
-('province', 'th-cbi', 'ชลบุรี', '{"region":"ตะวันออก"}'),
+
+-- ===== จังหวัดครบ 77 จังหวัด (region = ภาค, metro = อยู่ในกลุ่มกรุงเทพและปริมณฑลหรือไม่) =====
+-- ภาคกลาง
+('province', 'th-bkk', 'กรุงเทพมหานคร', '{"region":"กลาง","metro":true}'),
+('province', 'th-nnt', 'นนทบุรี', '{"region":"กลาง","metro":true}'),
+('province', 'th-ptt', 'ปทุมธานี', '{"region":"กลาง","metro":true}'),
+('province', 'th-skp', 'สมุทรปราการ', '{"region":"กลาง","metro":true}'),
+('province', 'th-sks', 'สมุทรสาคร', '{"region":"กลาง","metro":true}'),
+('province', 'th-nkp', 'นครปฐม', '{"region":"กลาง","metro":true}'),
+('province', 'th-sksg', 'สมุทรสงคราม', '{"region":"กลาง","metro":false}'),
+('province', 'th-ayt', 'พระนครศรีอยุธยา', '{"region":"กลาง","metro":false}'),
+('province', 'th-agt', 'อ่างทอง', '{"region":"กลาง","metro":false}'),
+('province', 'th-lpb', 'ลพบุรี', '{"region":"กลาง","metro":false}'),
+('province', 'th-sib', 'สิงห์บุรี', '{"region":"กลาง","metro":false}'),
+('province', 'th-cnt', 'ชัยนาท', '{"region":"กลาง","metro":false}'),
+('province', 'th-sbr', 'สระบุรี', '{"region":"กลาง","metro":false}'),
+('province', 'th-nyk', 'นครนายก', '{"region":"กลาง","metro":false}'),
+('province', 'th-spb', 'สุพรรณบุรี', '{"region":"กลาง","metro":false}'),
+('province', 'th-uti', 'อุทัยธานี', '{"region":"กลาง","metro":false}'),
+('province', 'th-nsw', 'นครสวรรค์', '{"region":"กลาง","metro":false}'),
+
+-- ภาคเหนือ
+('province', 'th-cnx', 'เชียงใหม่', '{"region":"เหนือ","metro":false}'),
+('province', 'th-crn', 'เชียงราย', '{"region":"เหนือ","metro":false}'),
+('province', 'th-lpn', 'ลำปาง', '{"region":"เหนือ","metro":false}'),
+('province', 'th-lph', 'ลำพูน', '{"region":"เหนือ","metro":false}'),
+('province', 'th-msn', 'แม่ฮ่องสอน', '{"region":"เหนือ","metro":false}'),
+('province', 'th-nan', 'น่าน', '{"region":"เหนือ","metro":false}'),
+('province', 'th-pyo', 'พะเยา', '{"region":"เหนือ","metro":false}'),
+('province', 'th-pre', 'แพร่', '{"region":"เหนือ","metro":false}'),
+('province', 'th-utd', 'อุตรดิตถ์', '{"region":"เหนือ","metro":false}'),
+('province', 'th-tak', 'ตาก', '{"region":"เหนือ","metro":false}'),
+('province', 'th-skt', 'สุโขทัย', '{"region":"เหนือ","metro":false}'),
+('province', 'th-pls', 'พิษณุโลก', '{"region":"เหนือ","metro":false}'),
+('province', 'th-pcb', 'พิจิตร', '{"region":"เหนือ","metro":false}'),
+('province', 'th-kpp', 'กำแพงเพชร', '{"region":"เหนือ","metro":false}'),
+('province', 'th-pnb', 'เพชรบูรณ์', '{"region":"เหนือ","metro":false}'),
+
+-- ภาคอีสาน
+('province', 'th-nma', 'นครราชสีมา', '{"region":"อีสาน","metro":false}'),
+('province', 'th-brm', 'บุรีรัมย์', '{"region":"อีสาน","metro":false}'),
+('province', 'th-srn', 'สุรินทร์', '{"region":"อีสาน","metro":false}'),
+('province', 'th-ssk', 'ศรีสะเกษ', '{"region":"อีสาน","metro":false}'),
+('province', 'th-ubn', 'อุบลราชธานี', '{"region":"อีสาน","metro":false}'),
+('province', 'th-yso', 'ยโสธร', '{"region":"อีสาน","metro":false}'),
+('province', 'th-cpm', 'ชัยภูมิ', '{"region":"อีสาน","metro":false}'),
+('province', 'th-amc', 'อำนาจเจริญ', '{"region":"อีสาน","metro":false}'),
+('province', 'th-nbl', 'หนองบัวลำภู', '{"region":"อีสาน","metro":false}'),
+('province', 'th-kkc', 'ขอนแก่น', '{"region":"อีสาน","metro":false}'),
+('province', 'th-udt', 'อุดรธานี', '{"region":"อีสาน","metro":false}'),
+('province', 'th-loe', 'เลย', '{"region":"อีสาน","metro":false}'),
+('province', 'th-nkh', 'หนองคาย', '{"region":"อีสาน","metro":false}'),
+('province', 'th-msk', 'มหาสารคาม', '{"region":"อีสาน","metro":false}'),
+('province', 'th-ret', 'ร้อยเอ็ด', '{"region":"อีสาน","metro":false}'),
+('province', 'th-kls', 'กาฬสินธุ์', '{"region":"อีสาน","metro":false}'),
+('province', 'th-skn', 'สกลนคร', '{"region":"อีสาน","metro":false}'),
+('province', 'th-nph', 'นครพนม', '{"region":"อีสาน","metro":false}'),
+('province', 'th-mdh', 'มุกดาหาร', '{"region":"อีสาน","metro":false}'),
+('province', 'th-bkn', 'บึงกาฬ', '{"region":"อีสาน","metro":false}'),
+
+-- ภาคตะวันออก
+('province', 'th-cbi', 'ชลบุรี', '{"region":"ตะวันออก","metro":false}'),
+('province', 'th-ryg', 'ระยอง', '{"region":"ตะวันออก","metro":false}'),
+('province', 'th-cnb', 'จันทบุรี', '{"region":"ตะวันออก","metro":false}'),
+('province', 'th-trt', 'ตราด', '{"region":"ตะวันออก","metro":false}'),
+('province', 'th-cch', 'ฉะเชิงเทรา', '{"region":"ตะวันออก","metro":false}'),
+('province', 'th-prc', 'ปราจีนบุรี', '{"region":"ตะวันออก","metro":false}'),
+('province', 'th-skw', 'สระแก้ว', '{"region":"ตะวันออก","metro":false}'),
+
+-- ภาคตะวันตก
+('province', 'th-knb', 'กาญจนบุรี', '{"region":"ตะวันตก","metro":false}'),
+('province', 'th-rbr', 'ราชบุรี', '{"region":"ตะวันตก","metro":false}'),
+('province', 'th-pbi', 'เพชรบุรี', '{"region":"ตะวันตก","metro":false}'),
+('province', 'th-pkk', 'ประจวบคีรีขันธ์', '{"region":"ตะวันตก","metro":false}'),
+
+-- ภาคใต้
+('province', 'th-nst', 'นครศรีธรรมราช', '{"region":"ใต้","metro":false}'),
+('province', 'th-kbi', 'กระบี่', '{"region":"ใต้","metro":false}'),
+('province', 'th-pna', 'พังงา', '{"region":"ใต้","metro":false}'),
+('province', 'th-phk', 'ภูเก็ต', '{"region":"ใต้","metro":false}'),
+('province', 'th-sni', 'สุราษฎร์ธานี', '{"region":"ใต้","metro":false}'),
+('province', 'th-rng', 'ระนอง', '{"region":"ใต้","metro":false}'),
+('province', 'th-cpn', 'ชุมพร', '{"region":"ใต้","metro":false}'),
+('province', 'th-skl', 'สงขลา', '{"region":"ใต้","metro":false}'),
+('province', 'th-stn', 'สตูล', '{"region":"ใต้","metro":false}'),
+('province', 'th-trg', 'ตรัง', '{"region":"ใต้","metro":false}'),
+('province', 'th-plg', 'พัทลุง', '{"region":"ใต้","metro":false}'),
+('province', 'th-ptn', 'ปัตตานี', '{"region":"ใต้","metro":false}'),
+('province', 'th-yla', 'ยะลา', '{"region":"ใต้","metro":false}'),
+('province', 'th-nrt', 'นราธิวาส', '{"region":"ใต้","metro":false}'),
+
 ('career_type', 'career-gov', 'ราชการ', '{}'),
 ('career_type', 'career-private', 'เอกชน', '{}'),
 ('career_type', 'career-own', 'ธุรกิจส่วนตัว', '{}'),
@@ -175,22 +277,26 @@ insert into lookup_options (category, code, label, extra) values
 ('emoji', 'love', '❤️ รักเลย', '{}');
 
 -- users (id 1 = admin)
-insert into users (student_id, citizen_id_hash, email, name, generation_option_id, province_option_id, career_option_id, company, position, bio, avatar_url, role, status, total_points) values
-(null, null, 'admin@uni.ac.th', 'ผู้ดูแลระบบ', null, null, null, null, null, null, null, 'admin', 'approved', 0),
+insert into users (student_id, citizen_id_hash, email, name, generation_option_id, province_option_id, career_option_id, company, position, bio, avatar_url, role, status, total_points, hometown_province_id, work_province_id, show_hometown_on_map, show_workplace_on_map, student_status, expected_graduation_year) values
+(null, null, 'admin@uni.ac.th', 'ผู้ดูแลระบบ', null, null, null, null, null, null, null, 'admin', 'approved', 0, null, null, false, false, 'alumni', null),
 ('60010001', 'hash_60010001', 'somchai.j@example.edu', 'สมชาย ใจดี',
   (select id from lookup_options where code='gen-43'), (select id from lookup_options where code='th-bkk'), (select id from lookup_options where code='career-private'),
   'บริษัท เอบีซี จำกัด', 'Senior Developer', 'ดูแลระบบและพัฒนาโปรดักต์ให้ทีมงานภายใน',
-  'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=600&q=80', 'alumni', 'approved', 16),
+  'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=600&q=80', 'alumni', 'approved', 16,
+  (select id from lookup_options where code='th-cbi'), (select id from lookup_options where code='th-bkk'), true, true, 'alumni', 2015),
 ('61010045', 'hash_61010045', 'somying.r@example.edu', 'สมหญิง รักเรียน',
   (select id from lookup_options where code='gen-46'), (select id from lookup_options where code='th-cnx'), (select id from lookup_options where code='career-gov'),
   'โรงพยาบาลนครพิงค์', 'พยาบาลวิชาชีพ', 'ดูแลผู้ป่วยในพื้นที่ห่างไกลมากว่า 8 ปี',
-  'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=600&q=80', 'alumni', 'approved', 0),
+  'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=600&q=80', 'alumni', 'approved', 0,
+  (select id from lookup_options where code='th-cnx'), (select id from lookup_options where code='th-cnx'), true, true, 'alumni', 2018),
 ('60010099', 'hash_60010099', 'somsak.m@example.edu', 'สมศักดิ์ มั่นคง',
   (select id from lookup_options where code='gen-43'), (select id from lookup_options where code='th-bkk'), (select id from lookup_options where code='career-own'),
   'ร้านกาแฟ Coffee Cool', 'เจ้าของร้าน', 'สร้างงานให้คนในชุมชนกว่า 15 ตำแหน่ง',
-  'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=600&q=80', 'alumni', 'approved', 0),
+  'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=600&q=80', 'alumni', 'approved', 0,
+  (select id from lookup_options where code='th-bkk'), (select id from lookup_options where code='th-bkk'), true, false, 'alumni', 2015),
 ('65010010', 'hash_65010010', 'paweena.t@example.edu', 'ปวีณา ตั้งใจสมัคร',
-  (select id from lookup_options where code='gen-48'), null, null, null, null, null, null, 'alumni', 'pending', 0);
+  (select id from lookup_options where code='gen-48'), null, null, null, null, null, null, 'alumni', 'pending', 0,
+  (select id from lookup_options where code='th-cbi'), null, true, false, 'studying', 2027);
 
 -- user_verifications
 insert into user_verifications (user_id, admin_id, source, status, remark) values
@@ -198,17 +304,22 @@ insert into user_verifications (user_id, admin_id, source, status, remark) value
 ((select id from users where student_id='60010001'), null, 'registrar_api', 'matched', 'ผลตรวจสอบจากสำนักทะเบียนตรงกัน'),
 ((select id from users where student_id='65010010'), 1, 'admin_manual', 'pending', null);
 
--- posts + poll
-insert into posts (admin_id, category, title, content, post_type, pinned) values
+-- posts + poll (status='published' ให้ตรงกับ schema ใหม่)
+insert into posts (admin_id, category, title, content, post_type, status, pinned, published_at) values
 (1, 'ประกาศกิจกรรม', 'ขอเชิญร่วมงานคืนสู่เหย้าประจำปี 2569',
- 'พบกันวันที่ 20 ธันวาคมนี้ ที่ Grand Hall กรุงเทพฯ ร่วมงานเลี้ยงรุ่นและมอบรางวัลศิษย์เก่าดีเด่นประจำปี', 'normal', true),
-(1, 'โพลสำรวจความเห็น', 'อยากได้ธีมงานคืนสู่เหย้าแบบไหน?', 'ร่วมโหวตธีมงานปีนี้ ได้คะแนนสะสมทันทีที่โหวต', 'poll', false);
+ 'พบกันวันที่ 20 ธันวาคมนี้ ที่ Grand Hall กรุงเทพฯ ร่วมงานเลี้ยงรุ่นและมอบรางวัลศิษย์เก่าดีเด่นประจำปี', 'normal', 'published', true, now()),
+(1, 'โพลสำรวจความเห็น', 'อยากได้ธีมงานคืนสู่เหย้าแบบไหน?', 'ร่วมโหวตธีมงานปีนี้ ได้คะแนนสะสมทันทีที่โหวต', 'poll', 'published', false, now());
+
+-- ตัวอย่างคำขอโพสต์ที่ยังรออนุมัติ (สำหรับทดสอบหน้า admin)
+insert into posts (admin_id, requested_by, category, title, content, post_type, status, pinned) values
+(null, (select id from users where student_id='60010001'), 'ขอความช่วยเหลือ', 'ขอเชิญร่วมบริจาคหนังสือให้ห้องสมุด',
+ 'อยากชวนศิษย์เก่าร่วมกันบริจาคหนังสือให้รุ่นน้อง รบกวนแอดมินช่วยเผยแพร่ให้ด้วยครับ', 'normal', 'pending_request', false);
 
 insert into post_interactions (post_id, user_id, type, content, points_earned) values
-((select id from posts where title like 'ขอเชิญ%'), (select id from users where student_id='60010001'), 'comment', 'รอมางานนี้เลยครับ ปีนี้ไม่พลาด!', 1);
+((select id from posts where title like 'ขอเชิญร่วมงาน%'), (select id from users where student_id='60010001'), 'comment', 'รอมางานนี้เลยครับ ปีนี้ไม่พลาด!', 1);
 
 insert into post_interactions (post_id, user_id, type, emoji_option_id) values
-((select id from posts where title like 'ขอเชิญ%'), (select id from users where student_id='61010045' or student_id is null limit 1), 'reaction', (select id from lookup_options where code='love'));
+((select id from posts where title like 'ขอเชิญร่วมงาน%'), (select id from users where student_id='61010045' or student_id is null limit 1), 'reaction', (select id from lookup_options where code='love'));
 
 insert into polls (post_id, question, points_per_vote, status) values
 ((select id from posts where title like 'อยากได้ธีมงาน%'), 'เลือกธีมงานคืนสู่เหย้า', 5, 'active');

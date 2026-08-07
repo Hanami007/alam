@@ -1,16 +1,17 @@
-import { AppShell } from '@/components/layout/app-shell';
+// วางไฟล์นี้ที่ src/app/map/page.tsx
+import { getHometownMapData, getWorkplaceMapData } from '@/lib/db';
 import { MapPanel } from '@/modules/map/components/map-panel';
+import { AppShell } from '@/components/layout/app-shell';
 
-export default function MapPage() {
+export default async function MapPage() {
+  const [hometownData, workplaceData] = await Promise.all([
+    getHometownMapData(),
+    getWorkplaceMapData(),
+  ]);
+
   return (
     <AppShell>
-      <div className="space-y-4">
-        <div>
-          <p className="text-sm font-medium text-blue-600">Alumni Map</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Province-level insights</h1>
-        </div>
-        <MapPanel />
-      </div>
+      <MapPanel hometownData={hometownData} workplaceData={workplaceData} />
     </AppShell>
   );
 }

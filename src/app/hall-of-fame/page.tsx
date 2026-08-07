@@ -1,16 +1,24 @@
-import { AppShell } from '@/components/layout/app-shell';
+import { getAlumniProfiles } from '@/lib/db';
 import { HallOfFameGrid } from '@/modules/hall-of-fame/components/hall-of-fame-grid';
+import { AppShell } from '@/components/layout/app-shell';
 
-export default function HallOfFamePage() {
+export default async function HallOfFamePage() {
+  const profiles = await getAlumniProfiles();
+
+  // แปลงชื่อ field ให้ตรงกับที่ HallOfFameGrid ต้องการ
+  const candidates = profiles.map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    company: p.company,
+    position: p.occupation,
+    avatar_url: p.image,
+    description: p.achievement,
+    generation_label: p.generation,
+  }));
+
   return (
     <AppShell>
-      <div className="space-y-4">
-        <div>
-          <p className="text-sm font-medium text-blue-600">Hall of Fame</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Recognized alumni</h1>
-        </div>
-        <HallOfFameGrid />
-      </div>
+      <HallOfFameGrid initialCandidates={candidates} />
     </AppShell>
   );
 }

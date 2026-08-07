@@ -1,10 +1,6 @@
-import { AppShell } from '@/components/layout/app-shell';
-import { DashboardGrid } from '@/modules/dashboard/components/dashboard-grid';
+// แทนที่เนื้อหาทั้งหมดใน src/app/page.tsx ด้วยไฟล์นี้
+import { redirect } from 'next/navigation';
 
 export default function HomePage() {
-  return (
-    <AppShell>
-      <DashboardGrid />
-    </AppShell>
-  );
+  redirect('/feed');
 }

@@ -1,77 +1,180 @@
-import { MapPin, TrendingUp } from 'lucide-react';
-import { getRegionStats } from '@/lib/db';
-import { THAILAND_PROVINCES, THAILAND_VIEWBOX } from '@/lib/thailand-map-data';
+'use client';
+import { useState, useMemo } from 'react';
+import { THAILAND_PROVINCE_PATHS, THAILAND_MAP_VIEWBOX } from '@/lib/thailand-province-paths';
 
-export async function MapPanel() {
-  const regions = await getRegionStats();
-  const countByRegion = new Map(regions.map((r) => [r.region, r.count]));
-  const maxCount = Math.max(...regions.map((r) => r.count), 1);
-  const topRegion = [...regions].sort((a, b) => b.count - a.count)[0];
+type MapMode = 'hometown' | 'workplace';
+type RegionFilter = 'all' | 'metro' | 'provincial';
+
+interface MapPoint {
+  id: number;
+  name: string;
+  province_id: number;
+  province_name: string;
+  region: string;
+  metro: boolean;
+}
+
+interface MapPanelProps {
+  hometownData: MapPoint[];
+  workplaceData: MapPoint[];
+}
+
+const METRO_PROVINCES = ['กรุงเทพมหานคร', 'นนทบุรี', 'ปทุมธานี', 'สมุทรปราการ', 'สมุทรสาคร', 'นครปฐม'];
+
+// bounding box ของกลุ่มกรุงเทพฯ-ปริมณฑล คำนวณไว้ล่วงหน้าจาก path จริง (มี padding เผื่อขอบ)
+const METRO_VIEWBOX = { x: 140.2, y: 364.5, width: 84.4, height: 66.4 };
+const FULL_VIEWBOX = { x: 0, y: 0, width: THAILAND_MAP_VIEWBOX.width, height: THAILAND_MAP_VIEWBOX.height };
+
+export function MapPanel({ hometownData, workplaceData }: MapPanelProps) {
+  const [mode, setMode] = useState<MapMode>('hometown');
+  const [regionFilter, setRegionFilter] = useState<RegionFilter>('all');
+  const [hovered, setHovered] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+
+  const activeData = mode === 'hometown' ? hometownData : workplaceData;
+
+  const filteredData = useMemo(() => {
+    if (regionFilter === 'all') return activeData;
+    if (regionFilter === 'metro') return activeData.filter((p) => p.metro);
+    return activeData.filter((p) => !p.metro);
+  }, [activeData, regionFilter]);
+
+  // จัดกลุ่มคนตามจังหวัด (สำหรับ list ด้านขวา)
+  const peopleByProvince = useMemo(() => {
+    const map = new Map<string, MapPoint[]>();
+    for (const p of filteredData) {
+      const list = map.get(p.province_name) ?? [];
+      list.push(p);
+      map.set(p.province_name, list);
+    }
+    return map;
+  }, [filteredData]);
+
+  const sortedProvinces = useMemo(
+    () => Array.from(peopleByProvince.entries()).sort((a, b) => b[1].length - a[1].length),
+    [peopleByProvince]
+  );
+
+  const maxCount = Math.max(1, ...Array.from(peopleByProvince.values()).map((v) => v.length));
+
+  function fillColor(count: number) {
+    if (count === 0) return '#F1F5F9';
+    const intensity = Math.min(count / maxCount, 1);
+    if (intensity > 0.66) return '#2563EB';
+    if (intensity > 0.33) return '#60A5FA';
+    return '#BFDBFE';
+  }
+
+  const provinceNames = Object.keys(THAILAND_PROVINCE_PATHS);
+  const viewBox = regionFilter === 'metro' ? METRO_VIEWBOX : FULL_VIEWBOX;
+  const visibleProvinces =
+    regionFilter === 'metro'
+      ? provinceNames.filter((n) => METRO_PROVINCES.includes(n))
+      : regionFilter === 'provincial'
+      ? provinceNames.filter((n) => !METRO_PROVINCES.includes(n))
+      : provinceNames;
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-      <div className="rounded-[28px] border border-white bg-white p-6 shadow-sm">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-[#0099FF]">แผนที่ประเทศไทย</p>
-            <h2 className="text-xl font-semibold text-slate-900">การกระจายตัวศิษย์เก่าตามภูมิภาค</h2>
-          </div>
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0099FF] to-[#1E90FF] text-white shadow-md shadow-[#0099FF]/25">
-            <MapPin className="h-5 w-5" />
-          </div>
-        </div>
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <button onClick={() => setMode('hometown')} className={mode === 'hometown' ? 'btn-primary' : 'btn-secondary'}>
+          ภูมิลำเนา
+        </button>
+        <button onClick={() => setMode('workplace')} className={mode === 'workplace' ? 'btn-primary' : 'btn-secondary'}>
+          ที่ทำงานศิษย์เก่า
+        </button>
+      </div>
 
-        <div className="flex justify-center rounded-[24px] bg-gradient-to-br from-[#F5FAFF] to-[#EAF6FF] p-4">
-          {/* วาดจากรูปทรงจังหวัดจริง แต่ระบายสีตาม "ภาค" ที่จังหวัดนั้นสังกัด ไม่แยกสีรายจังหวัด
-              จึงเห็นเป็นก้อนสีตามภูมิภาค 6 ภาคของประเทศไทยจริง ไม่ใช่กล่องสี่เหลี่ยมจำลอง */}
-          <svg viewBox={THAILAND_VIEWBOX} className="h-[560px] w-full max-w-[380px]">
-            {THAILAND_PROVINCES.map((province) => {
-              const count = countByRegion.get(province.region) ?? 0;
-              const intensity = count / maxCount;
-              const fill = count > 0 ? `rgba(0, 153, 255, ${0.18 + intensity * 0.72})` : '#DCEAF5';
+      <div className="flex gap-2 text-sm">
+        <button onClick={() => setRegionFilter('all')} className={regionFilter === 'all' ? 'font-semibold text-blue-600' : 'text-slate-500'}>
+          ทั้งหมด
+        </button>
+        <button onClick={() => setRegionFilter('metro')} className={regionFilter === 'metro' ? 'font-semibold text-blue-600' : 'text-slate-500'}>
+          กรุงเทพฯ-ปริมณฑล (ซูม)
+        </button>
+        <button onClick={() => setRegionFilter('provincial')} className={regionFilter === 'provincial' ? 'font-semibold text-blue-600' : 'text-slate-500'}>
+          ต่างจังหวัด
+        </button>
+      </div>
+
+      <p className="text-sm text-slate-500">
+        {mode === 'hometown' ? 'แสดงจังหวัดภูมิลำเนา' : 'แสดงจังหวัดที่ทำงาน (เฉพาะศิษย์เก่า)'} · {filteredData.length} คน (เฉพาะคนที่ยินยอมแสดงข้อมูล)
+      </p>
+
+      <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+        {/* แผนที่ */}
+        <div className="relative rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
+          <svg
+            viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
+            className="mx-auto h-auto w-full max-w-md transition-all duration-300"
+          >
+            {visibleProvinces.map((name) => {
+              const count = peopleByProvince.get(name)?.length ?? 0;
+              const isMetro = METRO_PROVINCES.includes(name);
+              const isSelected = selected === name;
               return (
-                <path key={province.name} d={province.d} fill={fill} stroke={fill} strokeWidth={1}>
-                  <title>
-                    ภาค{province.region}: {count.toLocaleString()} คน
-                  </title>
+                <path
+                  key={name}
+                  d={THAILAND_PROVINCE_PATHS[name]}
+                  fill={fillColor(count)}
+                  stroke={isSelected ? '#1D4ED8' : isMetro ? '#F59E0B' : '#94A3B8'}
+                  strokeWidth={isSelected ? 1.5 : isMetro ? 1.2 : 0.4}
+                  onMouseEnter={() => setHovered(name)}
+                  onMouseLeave={() => setHovered(null)}
+                  onClick={() => setSelected(name === selected ? null : name)}
+                  className="cursor-pointer transition-opacity hover:opacity-80"
+                >
+                  <title>{`${name}: ${count} คน`}</title>
                 </path>
               );
             })}
           </svg>
-        </div>
-        <p className="mt-3 text-xs text-slate-400">
-          * สีเข้มขึ้นตามจำนวนศิษย์เก่าในภูมิภาคนั้น แบ่งตาม 6 ภาคของประเทศไทย ชี้ที่แผนที่เพื่อดูจำนวนคน
-        </p>
-      </div>
 
-      <div className="space-y-4">
-        {topRegion ? (
-          <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-[#0099FF] to-[#6495ED] p-5 text-white shadow-lg shadow-[#0099FF]/25">
-            <div className="flex items-center gap-2 text-xs font-semibold text-white/85">
-              <TrendingUp className="h-3.5 w-3.5" /> ภูมิภาคอันดับ 1
+          {hovered && (
+            <div className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white shadow-lg">
+              {hovered} · {peopleByProvince.get(hovered)?.length ?? 0} คน
             </div>
-            <p className="mt-2 text-lg font-bold">ภาค{topRegion.region}</p>
-            <p className="text-sm text-white/85">{topRegion.count.toLocaleString()} คน</p>
-          </div>
-        ) : null}
+          )}
 
-        {[...regions]
-          .sort((a, b) => b.count - a.count)
-          .map((stat) => {
-            const pct = Math.round(((stat.count ?? 0) / maxCount) * 100);
-            return (
-              <div key={stat.region} className="rounded-2xl border border-white bg-white p-5 shadow-sm transition hover:shadow-md">
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-500">
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded" style={{ background: '#F1F5F9' }} /> ไม่มีข้อมูล</span>
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded" style={{ background: '#BFDBFE' }} /> น้อย</span>
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded" style={{ background: '#60A5FA' }} /> ปานกลาง</span>
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded" style={{ background: '#2563EB' }} /> มาก</span>
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded border-2" style={{ borderColor: '#F59E0B' }} /> กรุงเทพฯ-ปริมณฑล</span>
+          </div>
+        </div>
+
+        {/* รายชื่อคนตามจังหวัด */}
+        <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-slate-900">รายชื่อตามจังหวัด</h3>
+          <div className="mt-3 max-h-[480px] space-y-2 overflow-y-auto">
+            {sortedProvinces.length === 0 && (
+              <p className="text-sm text-slate-400">ยังไม่มีข้อมูลในกลุ่มนี้</p>
+            )}
+            {sortedProvinces.map(([province, people]) => (
+              <div
+                key={province}
+                className={`rounded-xl border p-3 cursor-pointer transition-colors ${
+                  selected === province ? 'border-blue-400 bg-blue-50' : 'border-slate-100 hover:bg-slate-50'
+                }`}
+                onClick={() => setSelected(province === selected ? null : province)}
+              >
                 <div className="flex items-center justify-between">
-                  <p className="font-semibold text-slate-900">ภาค{stat.region}</p>
-                  <p className="text-2xl font-bold text-slate-900">{stat.count.toLocaleString()}</p>
+                  <p className="text-sm font-medium text-slate-900">{province}</p>
+                  <span className="text-xs text-slate-500">{people.length} คน</span>
                 </div>
-                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#EAF6FF]">
-                  <div className="h-full rounded-full bg-gradient-to-r from-[#0099FF] to-[#33CCFF]" style={{ width: `${pct}%` }} />
-                </div>
-                <p className="mt-1.5 text-xs text-slate-400">ศิษย์เก่าในภูมิภาคนี้</p>
+                {selected === province && (
+                  <ul className="mt-2 space-y-1 border-t border-slate-100 pt-2">
+                    {people.map((p) => (
+                      <li key={p.id} className="text-sm text-slate-600">{p.name}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
-            );
-          })}
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
