@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: alumni_dev_password
       POSTGRES_DB: alumni_db
     ports:
-      - "5432:5432"
+      - "5435:5432"
     volumes:
       - alumni_db_data:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
