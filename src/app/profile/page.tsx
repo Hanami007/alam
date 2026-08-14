@@ -1,5 +1,5 @@
 // วางไฟล์นี้ที่ src/app/profile/page.tsx
-import { getUserProfile, getTaggedPhotos, getUnlockedPhotos } from '@/lib/db';
+import { getUserProfile, getTaggedPhotos, getUnlockedPhotos, getActivityLog } from '@/lib/db';
 import { ProfileCard } from '@/modules/profile/components/profile-card';
 import { AppShell } from '@/components/layout/app-shell';
 
@@ -17,14 +17,15 @@ export default async function ProfilePage() {
     );
   }
 
-  const [taggedPhotos, unlockedPhotos] = await Promise.all([
+  const [taggedPhotos, unlockedPhotos, activityLog] = await Promise.all([
     getTaggedPhotos(user.id),
     getUnlockedPhotos(user.id),
+    getActivityLog(user.id),
   ]);
 
   return (
     <AppShell>
-      <ProfileCard user={user} taggedPhotos={taggedPhotos} unlockedPhotos={unlockedPhotos} />
+      <ProfileCard user={user} taggedPhotos={taggedPhotos} unlockedPhotos={unlockedPhotos} activityLog={activityLog} />
     </AppShell>
   );
 }
