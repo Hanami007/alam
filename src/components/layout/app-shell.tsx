@@ -26,26 +26,17 @@ import { useState, useRef, useEffect } from 'react';
 import type { ReactNode } from 'react';
 
 const MAIN_NAV = [
-  { href: '/feed', label: 'วอลล์/ฟีด', icon: Bell },
+  { href: '/feed', label: 'วอลล์/ฟีด', icon: Sparkles },
   { href: '/hall-of-fame', label: 'ศิษย์เก่าดีเด่น', icon: Star },
   { href: '/map', label: 'แผนที่ศิษย์เก่า', icon: MapPin },
   { href: '/gallery', label: 'คลังภาพเก่า', icon: ImageIcon },
+  { href: '/search', label: 'ค้นหาศิษย์เก่า', icon: Search },
 ];
 
 const ACCOUNT_NAV = [
   { href: '/profile', label: 'โปรไฟล์', icon: User },
-  { href: '/admin', label: 'Admin', icon: Settings },
+  { href: '/admin', label: 'จัดการระบบ', icon: Settings },
 ];
-
-const PAGE_META: Record<string, { title: string; subtitle: string }> = {
-  '/': { title: 'หน้าแรก', subtitle: 'ภาพรวมของระบบศิษย์เก่า' },
-  '/feed': { title: 'วอลล์ / ฟีดข่าวสาร', subtitle: '' },
-  '/hall-of-fame': { title: 'ศิษย์เก่าดีเด่น', subtitle: 'ยกย่องความสำเร็จของศิษย์เก่า' },
-  '/map': { title: 'แผนที่ศิษย์เก่า', subtitle: 'การกระจายตัวทั่วประเทศ' },
-  '/gallery': { title: 'คลังภาพเก่า', subtitle: 'ความทรงจำแยกตามรุ่น' },
-  '/profile': { title: 'โปรไฟล์', subtitle: 'บัญชีของฉัน' },
-  '/admin': { title: 'Admin', subtitle: 'จัดการระบบ' },
-};
 
 const CURRENT_USER = { name: 'สมชาย ใจดี', generation: 'รุ่น 43', points: 16, level: 2 };
 
@@ -65,7 +56,7 @@ function NavSection({
   return (
     <div>
       {!collapsed && (
-        <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">{title}</p>
+        <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">{title}</p>
       )}
       <div className="relative flex flex-col gap-1">
         {/* Active Tab Sliding Background Pill Animation */}
@@ -126,9 +117,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const meta = PAGE_META[pathname ?? '/'] ?? PAGE_META['/'];
-  const sidebarWidth = collapsed ? 'lg:w-[72px]' : 'lg:w-[240px]';
-  const contentOffset = collapsed ? 'lg:pl-[96px]' : 'lg:pl-[264px]';
+  const sidebarWidth = collapsed ? 'lg:w-[72px]' : 'lg:w-[250px]';
+  const contentOffset = collapsed ? 'lg:pl-[88px]' : 'lg:pl-[266px]';
 
   return (
     <div className="relative min-h-screen bg-background">
@@ -138,6 +128,93 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="decor-blob-secondary fixed -bottom-10 left-10 h-72 w-72 opacity-30" />
         <div className="decor-dot-pattern absolute inset-0 opacity-[0.35]" />
       </div>
+
+      {/* Top-Right Floating Glass Notification Button */}
+      <div className="fixed top-4 right-4 sm:right-6 z-40" ref={notifRef}>
+        <button
+          onClick={() => {
+            setNotifOpen((v) => !v);
+            setAvatarOpen(false);
+          }}
+          className={`relative flex h-11 w-11 items-center justify-center rounded-full border border-border/80 bg-card/90 backdrop-blur-xl shadow-hero text-muted-foreground transition-all hover:bg-card hover:text-primary hover:scale-105 active:scale-95 ${
+            notifOpen ? 'bg-card text-primary ring-2 ring-primary/20' : ''
+          }`}
+          title="การแจ้งเตือน (2 ใหม่)"
+        >
+          <Bell className="h-5 w-5" />
+          <span className="gradient-primary absolute -right-0.5 -top-0.5 flex h-4.5 w-4.5 items-center justify-center rounded-full text-[10px] font-bold text-white shadow-xs">
+            2
+          </span>
+        </button>
+
+        {/* Notification Dropdown Popover */}
+        {notifOpen && (
+          <div className="animate-popover-down fixed sm:absolute right-4 sm:right-0 top-16 sm:top-14 z-50 w-80 overflow-hidden rounded-2xl border border-border bg-card shadow-hero">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3 bg-card">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm text-foreground">การแจ้งเตือน</span>
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">2 ใหม่</span>
+              </div>
+              <button className="text-xs font-medium text-primary hover:underline flex items-center gap-1">
+                <CheckCheck className="h-3.5 w-3.5" />
+                อ่านทั้งหมด
+              </button>
+            </div>
+
+            <div className="max-h-[300px] overflow-y-auto divide-y divide-border/60 text-xs">
+              <div className="flex items-start gap-3 p-3.5 bg-primary-light/40 transition-colors hover:bg-primary-light/70 cursor-pointer">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary mt-0.5">
+                  <Sparkles className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-foreground">มีโพลใหม่ให้โหวต</p>
+                  <p className="text-xs text-muted-foreground truncate">ศิษย์เก่าดีเด่นประจำปี 2569 (+5 แต้ม)</p>
+                  <span className="text-xs text-primary font-medium mt-1 inline-block">10 นาทีที่แล้ว</span>
+                </div>
+                <span className="h-2 w-2 shrink-0 rounded-full bg-primary mt-1.5" />
+              </div>
+
+              <div className="flex items-start gap-3 p-3.5 bg-primary-light/40 transition-colors hover:bg-primary-light/70 cursor-pointer">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 mt-0.5">
+                  <CheckCheck className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-foreground">ยืนยันตัวตนสำเร็จ</p>
+                  <p className="text-xs text-muted-foreground truncate">Admin อนุมัติบัญชีศิษย์เก่าแล้ว</p>
+                  <span className="text-xs text-muted-foreground mt-1 inline-block">1 ชั่วโมงที่แล้ว</span>
+                </div>
+                <span className="h-2 w-2 shrink-0 rounded-full bg-primary mt-1.5" />
+              </div>
+
+              <div className="flex items-start gap-3 p-3.5 transition-colors hover:bg-muted/40 cursor-pointer">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 mt-0.5">
+                  <MessageSquare className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-foreground">ความคิดเห็นใหม่</p>
+                  <p className="text-xs text-muted-foreground truncate">สมพงษ์ ตอบกลับโพสต์ของคุณ</p>
+                  <span className="text-xs text-muted-foreground mt-1 inline-block">เมื่อวานนี้</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-border bg-slate-50/50 p-2.5 text-center">
+              <button className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors">
+                ดูการแจ้งเตือนทั้งหมด
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Floating Mobile Hamburger Menu Toggle Button */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="fixed top-4 left-4 z-30 flex h-11 w-11 items-center justify-center rounded-2xl border border-border/80 bg-card/90 backdrop-blur-xl shadow-md text-foreground transition-all hover:bg-card hover:scale-105 active:scale-95 lg:hidden"
+        title="เปิดเมนู"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
 
       {/* Mobile drawer backdrop */}
       {mobileOpen && (
@@ -150,7 +227,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        <div className="mb-8 flex items-center justify-between px-1">
+        {/* Brand Header */}
+        <div className="mb-6 flex items-center justify-between px-1">
           <div className="flex items-center gap-2.5">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl gradient-primary text-white shadow-blue-glow">
               <GraduationCap className="h-5 w-5" />
@@ -162,25 +240,150 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
         </div>
 
-        <nav className="flex flex-1 flex-col gap-6 overflow-y-auto">
+        {/* Sidebar Nav Sections */}
+        <nav className="flex flex-1 flex-col gap-5 overflow-y-auto pr-0.5">
           <NavSection title="เมนูหลัก" items={MAIN_NAV} pathname={pathname} collapsed={collapsed} />
           <NavSection title="บัญชีของฉัน" items={ACCOUNT_NAV} pathname={pathname} collapsed={collapsed} />
         </nav>
 
-        {/* Points card */}
-        <div className="gradient-primary mt-4 overflow-hidden rounded-2xl p-4 text-white shadow-blue-glow">
-          {collapsed ? (
-            <p className="text-center text-xs font-bold">{CURRENT_USER.points}p</p>
-          ) : (
-            <>
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold">{CURRENT_USER.name}</p>
-                <span className="rounded-full bg-white/25 px-2 py-0.5 text-xs font-bold">Lv.{CURRENT_USER.level}</span>
+        {/* User Card with Inline Accordion Expansion */}
+        <div className="relative mt-auto pt-3" ref={avatarRef}>
+          {/* Collapsed view floating popup */}
+          {avatarOpen && collapsed && (
+            <div className="animate-popover-down fixed left-[84px] bottom-4 z-50 overflow-hidden rounded-2xl border border-border bg-card shadow-hero w-64">
+              <div className="gradient-primary p-4 text-white">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 font-bold text-white text-xs backdrop-blur-xs">
+                    สช
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold">{CURRENT_USER.name}</p>
+                    <p className="text-xs text-white/80">{CURRENT_USER.generation}</p>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center justify-between rounded-xl bg-white/15 px-3 py-1.5 text-xs backdrop-blur-xs">
+                  <span className="font-medium">แต้มสะสม</span>
+                  <span className="font-bold">{CURRENT_USER.points} แต้ม (Lv.{CURRENT_USER.level})</span>
+                </div>
               </div>
-              <p className="text-xs text-white/80">{CURRENT_USER.generation}</p>
-              <p className="mt-2 text-2xl font-extrabold tabular-nums">{CURRENT_USER.points} แต้ม</p>
-            </>
+
+              <div className="p-1.5 divide-y divide-border/50 text-xs">
+                <div className="py-1">
+                  <Link
+                    href="/profile"
+                    onClick={() => setAvatarOpen(false)}
+                    className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
+                  >
+                    <User className="h-4 w-4 text-primary" />
+                    โปรไฟล์ของฉัน
+                  </Link>
+                  <Link
+                    href="/hall-of-fame"
+                    onClick={() => setAvatarOpen(false)}
+                    className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
+                  >
+                    <Award className="h-4 w-4 text-amber-500" />
+                    แต้ม & รางวัลศิษย์เก่า
+                  </Link>
+                  <Link
+                    href="/admin"
+                    onClick={() => setAvatarOpen(false)}
+                    className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
+                  >
+                    <Shield className="h-4 w-4 text-indigo-500" />
+                    จัดการระบบ Admin
+                  </Link>
+                </div>
+
+                <div className="pt-1">
+                  <button
+                    onClick={() => setAvatarOpen(false)}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-rose-600 transition-colors hover:bg-rose-50 font-medium"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    ออกจากระบบ
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
+
+          {/* Integrated User Card with Smooth Slide-Up Inline Expansion */}
+          <div className="gradient-primary overflow-hidden rounded-2xl p-3 text-white shadow-blue-glow transition-all duration-300">
+            <button
+              onClick={() => {
+                setAvatarOpen((v) => !v);
+                setNotifOpen(false);
+              }}
+              className="w-full text-left flex items-center gap-2.5 cursor-pointer"
+              title={collapsed ? `${CURRENT_USER.name} (${CURRENT_USER.points} แต้ม)` : undefined}
+            >
+              {collapsed ? (
+                <div className="flex flex-col items-center gap-1 mx-auto">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/25 text-xs font-bold shadow-xs">
+                    สช
+                  </div>
+                  <p className="text-[10px] font-extrabold">{CURRENT_USER.points}p</p>
+                </div>
+              ) : (
+                <>
+                  <div className="relative shrink-0">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-xs font-bold shadow-xs ring-2 ring-white/40 backdrop-blur-xs">
+                      สช
+                    </div>
+                    <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold truncate">{CURRENT_USER.name}</p>
+                      <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] font-bold shrink-0">
+                        Lv.{CURRENT_USER.level}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-white/80">{CURRENT_USER.generation} • {CURRENT_USER.points} แต้ม</p>
+                  </div>
+                  <ChevronRight className={`h-4 w-4 text-white/80 shrink-0 transition-transform duration-300 ${avatarOpen ? '-rotate-90' : ''}`} />
+                </>
+              )}
+            </button>
+
+            {/* Inline Slide-Up Options inside the SAME Card */}
+            {avatarOpen && !collapsed && (
+              <div className="mt-3 pt-3 border-t border-white/20 text-xs space-y-1 animate-popover-down">
+                <Link
+                  href="/profile"
+                  onClick={() => setAvatarOpen(false)}
+                  className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-white hover:bg-white/20 transition-colors font-medium"
+                >
+                  <User className="h-4 w-4 text-white" />
+                  โปรไฟล์ของฉัน
+                </Link>
+                <Link
+                  href="/hall-of-fame"
+                  onClick={() => setAvatarOpen(false)}
+                  className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-white hover:bg-white/20 transition-colors font-medium"
+                >
+                  <Award className="h-4 w-4 text-amber-300" />
+                  แต้ม & รางวัลศิษย์เก่า
+                </Link>
+                <Link
+                  href="/admin"
+                  onClick={() => setAvatarOpen(false)}
+                  className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-white hover:bg-white/20 transition-colors font-medium"
+                >
+                  <Shield className="h-4 w-4 text-indigo-200" />
+                  จัดการระบบ Admin
+                </Link>
+                <button
+                  onClick={() => setAvatarOpen(false)}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-rose-200 hover:bg-rose-500/30 transition-colors font-medium"
+                >
+                  <LogOut className="h-4 w-4" />
+                  ออกจากระบบ
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Floating Side-Badge Toggle Button (Desktop only) */}
@@ -193,191 +396,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         </button>
       </aside>
 
-      {/* Main Content Area */}
+      {/* Main Content Area (No Topbar Header) */}
       <div className={`flex min-h-screen flex-col transition-[padding] duration-200 ${contentOffset}`}>
-        <header className="sticky top-0 z-20 mx-4 sm:mx-6 flex h-14 items-center justify-between rounded-b-2xl border-x border-b border-border/80 bg-card/90 px-4 backdrop-blur-xl shadow-card transition-all duration-200 sm:px-6">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setMobileOpen(true)} className="text-muted-foreground lg:hidden">
-              <Menu className="h-5 w-5" />
-            </button>
-            <div>
-              <p className="text-base font-bold text-foreground">{meta.title}</p>
-              {meta.subtitle && (
-                <p className="hidden text-xs text-muted-foreground sm:block">{meta.subtitle}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Topbar Right Controls */}
-          <div className="flex items-center gap-3">
-            {/* Notification Popover Button */}
-            <div className="relative" ref={notifRef}>
-              <button
-                onClick={() => {
-                  setNotifOpen((v) => !v);
-                  setAvatarOpen(false);
-                }}
-                className={`relative flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-all hover:bg-primary-light hover:text-primary ${
-                  notifOpen ? 'bg-primary-light text-primary ring-2 ring-primary/20' : ''
-                }`}
-                title="การแจ้งเตือน"
-              >
-                <Bell className="h-5 w-5" />
-                <span className="gradient-primary absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full text-xs font-bold text-white shadow-xs">
-                  2
-                </span>
-              </button>
-
-              {/* Notification Dropdown */}
-              {notifOpen && (
-                <div className="animate-popover-down absolute right-0 mt-2 w-80 overflow-hidden rounded-2xl border border-border bg-card shadow-hero z-50">
-                  <div className="flex items-center justify-between border-b border-border px-4 py-3 bg-card">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm text-foreground">การแจ้งเตือน</span>
-                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">2 ใหม่</span>
-                    </div>
-                    <button className="text-xs font-medium text-primary hover:underline flex items-center gap-1">
-                      <CheckCheck className="h-3.5 w-3.5" />
-                      อ่านทั้งหมด
-                    </button>
-                  </div>
-
-                  <div className="max-h-[320px] overflow-y-auto divide-y divide-border/60">
-                    <div className="flex items-start gap-3 p-3.5 bg-primary-light/40 transition-colors hover:bg-primary-light/70 cursor-pointer">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary mt-0.5">
-                        <Sparkles className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-foreground">มีโพลใหม่ให้โหวต</p>
-                        <p className="text-xs text-muted-foreground truncate">ศิษย์เก่าดีเด่นประจำปี 2569 (+5 แต้ม)</p>
-                        <span className="text-xs text-primary font-medium mt-1 inline-block">10 นาทีที่แล้ว</span>
-                      </div>
-                      <span className="h-2 w-2 shrink-0 rounded-full bg-primary mt-1.5" />
-                    </div>
-
-                    <div className="flex items-start gap-3 p-3.5 bg-primary-light/40 transition-colors hover:bg-primary-light/70 cursor-pointer">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 mt-0.5">
-                        <CheckCheck className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-foreground">ยืนยันตัวตนสำเร็จ</p>
-                        <p className="text-xs text-muted-foreground truncate">Admin อนุมัติบัญชีศิษย์เก่าแล้ว</p>
-                        <span className="text-xs text-muted-foreground mt-1 inline-block">1 ชั่วโมงที่แล้ว</span>
-                      </div>
-                      <span className="h-2 w-2 shrink-0 rounded-full bg-primary mt-1.5" />
-                    </div>
-
-                    <div className="flex items-start gap-3 p-3.5 transition-colors hover:bg-muted/40 cursor-pointer">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 mt-0.5">
-                        <MessageSquare className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-foreground">ความคิดเห็นใหม่</p>
-                        <p className="text-xs text-muted-foreground truncate">สมพงษ์ ตอบกลับโพสต์ของคุณ</p>
-                        <span className="text-xs text-muted-foreground mt-1 inline-block">เมื่อวานนี้</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="border-t border-border bg-slate-50/50 p-2.5 text-center">
-                    <button className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors">
-                      ดูการแจ้งเตือนทั้งหมด
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* User Profile Dropdown Button */}
-            <div className="relative" ref={avatarRef}>
-              <button
-                onClick={() => {
-                  setAvatarOpen((v) => !v);
-                  setNotifOpen(false);
-                }}
-                className={`flex items-center gap-2.5 rounded-full p-1 transition-all hover:bg-slate-100 ${
-                  avatarOpen ? 'bg-slate-100 ring-2 ring-primary/20' : ''
-                }`}
-              >
-                <div className="relative">
-                  <div className="gradient-primary flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm ring-2 ring-white">
-                    สช
-                  </div>
-                  <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
-                </div>
-                <div className="hidden text-left sm:block pr-1">
-                  <p className="text-xs font-bold leading-none text-foreground">{CURRENT_USER.name}</p>
-                  <p className="text-xs leading-tight text-muted-foreground">{CURRENT_USER.generation}</p>
-                </div>
-                <ChevronRight className={`hidden h-3.5 w-3.5 text-muted-foreground transition-transform sm:block ${avatarOpen ? 'rotate-90' : ''}`} />
-              </button>
-
-              {/* Profile Dropdown Menu */}
-              {avatarOpen && (
-                <div className="animate-popover-down absolute right-0 mt-2 w-64 overflow-hidden rounded-2xl border border-border bg-card shadow-hero z-50">
-                  {/* Card Header inside Dropdown */}
-                  <div className="gradient-primary p-4 text-white">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 font-bold text-white backdrop-blur-xs text-xs">
-                        สช
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold">{CURRENT_USER.name}</p>
-                        <p className="text-xs text-white/80">{CURRENT_USER.generation}</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex items-center justify-between rounded-xl bg-white/15 px-3 py-1.5 text-xs backdrop-blur-xs">
-                      <span className="font-medium">แต้มสะสม</span>
-                      <span className="font-bold">{CURRENT_USER.points} แต้ม (Lv.{CURRENT_USER.level})</span>
-                    </div>
-                  </div>
-
-                  {/* Menu Options */}
-                  <div className="p-1.5 divide-y divide-border/50 text-xs">
-                    <div className="py-1">
-                      <Link
-                        href="/profile"
-                        onClick={() => setAvatarOpen(false)}
-                        className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
-                      >
-                        <User className="h-4 w-4 text-primary" />
-                        โปรไฟล์ของฉัน
-                      </Link>
-                      <Link
-                        href="/hall-of-fame"
-                        onClick={() => setAvatarOpen(false)}
-                        className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
-                      >
-                        <Award className="h-4 w-4 text-amber-500" />
-                        แต้ม & รางวัลศิษย์เก่า
-                      </Link>
-                      <Link
-                        href="/admin"
-                        onClick={() => setAvatarOpen(false)}
-                        className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
-                      >
-                        <Shield className="h-4 w-4 text-indigo-500" />
-                        จัดการระบบ Admin
-                      </Link>
-                    </div>
-
-                    <div className="pt-1">
-                      <button
-                        onClick={() => setAvatarOpen(false)}
-                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-rose-600 transition-colors hover:bg-rose-50 font-medium"
-                      >
-                        <LogOut className="h-4 w-4" />
-                        ออกจากระบบ
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </header>
-
-        <main className="flex-1 px-4 py-6 sm:px-6">{children}</main>
+        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
       </div>
     </div>
   );

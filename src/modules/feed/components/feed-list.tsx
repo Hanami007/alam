@@ -27,7 +27,6 @@ import {
   Award,
   Dices,
   Sparkle,
-  Thumbtack,
   Flame,
   Volume2
 } from 'lucide-react';
@@ -360,7 +359,7 @@ export function FeedList({
   const currentRandomAlumnus = RANDOM_ALUMNI_POOL[randomAlumnusIdx];
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[2.2fr_1fr] max-w-6xl mx-auto font-sans items-start px-2 sm:px-4 relative">
+    <div className="grid gap-8 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_380px] max-w-7xl mx-auto font-sans items-start px-2 sm:px-4 relative">
 
       {/* 360 Explosion & Gravity Fall Particle Overlay */}
       {floatingHearts.map((particle) => (
@@ -382,14 +381,14 @@ export function FeedList({
         </div>
       ))}
 
-      {/* ===== LEFT COLUMN: CENTERED & ENLARGED CUTE FEED ===== */}
-      <div className="space-y-6">
+      {/* ===== LEFT COLUMN: ENLARGED & SPACIOUS CUTE FEED ===== */}
+      <div className="space-y-7 min-w-0">
 
         {/* ===== POST CARDS ===== */}
         {feedPosts.length === 0 ? (
-          <div className="rounded-[32px] border border-slate-100 bg-white p-16 text-center text-slate-400 shadow-xs">
-            <Sparkles className="mx-auto h-10 w-10 text-pink-300 animate-pulse" />
-            <p className="mt-3 text-sm font-medium">ยังไม่มีโพสต์บนวอลล์ในขณะนี้</p>
+          <div className="rounded-[32px] border border-slate-100 bg-white p-20 text-center text-slate-400 shadow-xs">
+            <Sparkles className="mx-auto h-12 w-12 text-pink-300 animate-pulse" />
+            <p className="mt-4 text-base font-medium">ยังไม่มีโพสต์บนวอลล์ในขณะนี้</p>
           </div>
         ) : (
           feedPosts.map((post) => {
@@ -403,26 +402,26 @@ export function FeedList({
                 className="rounded-[32px] border border-slate-200/90 bg-white shadow-card transition-all duration-200 overflow-hidden relative"
               >
                 {/* Post Header */}
-                <div className="p-6 sm:p-7">
+                <div className="p-7 sm:p-8">
                   <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3.5">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-purple-100 via-pink-100 to-rose-100 border border-purple-200/50 text-purple-700 font-bold text-sm shadow-2xs">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-purple-100 via-pink-100 to-rose-100 border border-purple-200/50 text-purple-700 font-extrabold text-base shadow-2xs">
                         {post.author ? post.author.substring(0, 2) : 'CS'}
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-slate-800 text-sm sm:text-base">{post.author || 'แอดมินระบบ'}</h4>
+                        <div className="flex items-center gap-2.5">
+                          <h4 className="font-bold text-slate-900 text-base sm:text-lg">{post.author || 'แอดมินระบบ'}</h4>
                           {post.pinned && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-pink-50 px-3 py-0.5 text-xs font-semibold text-pink-600 border border-pink-100">
                               <Pin className="h-3.5 w-3.5" /> ปักหมุด
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5">
+                        <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-400 mt-1">
                           <span>{new Date(post.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                           <span>•</span>
                           {post.category && (
-                            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                            <span className="rounded-full bg-slate-100 px-3 py-0.5 text-xs font-medium text-slate-600">
                               {post.category}
                             </span>
                           )}
@@ -431,30 +430,30 @@ export function FeedList({
                     </div>
 
                     <button className="rounded-full p-2 text-slate-300 hover:bg-slate-50 hover:text-slate-500 transition-colors">
-                      <MoreHorizontal className="h-5 w-5" />
+                      <MoreHorizontal className="h-6 w-6" />
                     </button>
                   </div>
 
                   {/* Post Content Box */}
-                  <div className="mt-5 space-y-2.5 bg-slate-50/70 rounded-2xl p-5 border border-slate-200/70 shadow-xs/30">
+                  <div className="mt-6 space-y-3 bg-slate-50/70 rounded-2xl p-6 sm:p-7 border border-slate-200/70 shadow-xs/30">
                     {post.title && (
-                      <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">{post.title}</h3>
+                      <h3 className="text-lg sm:text-xl font-bold text-slate-900 leading-snug">{post.title}</h3>
                     )}
-                    <p className="text-sm sm:text-base leading-relaxed text-slate-700 whitespace-pre-line">{post.body}</p>
+                    <p className="text-base sm:text-lg leading-relaxed text-slate-700 whitespace-pre-line">{post.body}</p>
                   </div>
 
                   {/* Poll Box (if applicable) */}
                   {post.poll && (
-                    <div className="mt-4 rounded-2xl border border-purple-100 bg-purple-50/40 p-4 sm:p-5">
-                      <p className="text-xs font-bold text-purple-500 uppercase tracking-wider mb-1 flex items-center gap-1">
-                        <Zap className="h-3.5 w-3.5" /> โพลแบบสำรวจ
+                    <div className="mt-5 rounded-2xl border border-purple-100 bg-purple-50/40 p-5 sm:p-6">
+                      <p className="text-xs font-bold text-purple-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                        <Zap className="h-4 w-4" /> โพลแบบสำรวจ
                       </p>
-                      <p className="text-sm font-bold text-slate-800 mb-3">{post.poll.question}</p>
-                      <div className="space-y-2.5">
+                      <p className="text-base font-bold text-slate-800 mb-3.5">{post.poll.question}</p>
+                      <div className="space-y-3">
                         {post.poll.options.map((opt) => (
                           <div
                             key={opt.id}
-                            className="flex items-center justify-between rounded-xl border border-purple-100 bg-white px-4 py-2.5 text-xs sm:text-sm transition-all hover:border-purple-300 shadow-2xs cursor-pointer active:scale-98"
+                            className="flex items-center justify-between rounded-xl border border-purple-100 bg-white px-5 py-3 text-sm sm:text-base transition-all hover:border-purple-300 shadow-2xs cursor-pointer active:scale-98"
                           >
                             <span className="text-slate-700 font-semibold">{opt.text}</span>
                             <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-bold text-purple-700">
@@ -467,12 +466,12 @@ export function FeedList({
                   )}
 
                   {/* Cute Reaction Stats Bar */}
-                  <div className="mt-4 flex items-center justify-between text-xs text-slate-400 px-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 text-rose-500">
-                        <Heart className="h-3 w-3 fill-current" />
+                  <div className="mt-5 flex items-center justify-between text-xs sm:text-sm text-slate-400 px-1">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 text-rose-500">
+                        <Heart className="h-3.5 w-3.5 fill-current" />
                       </span>
-                      <span className="font-medium text-slate-500">
+                      <span className="font-medium text-slate-600">
                         {post.likes > 0 ? `${isLiked ? 'คุณ และอีก ' : ''}${post.likes} คนส่งความรัก` : 'ส่งความรักคนแรก'}
                       </span>
                     </div>
@@ -486,17 +485,17 @@ export function FeedList({
                   </div>
 
                   {/* ===== ACTION BUTTONS & EMOJI REACTION POPUP ===== */}
-                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5 text-xs sm:text-sm font-medium relative">
+                  <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3 text-sm sm:text-base font-medium relative">
 
                     {/* Cute Emoji Reaction Popup Picker */}
                     {activeReactionPicker === post.id && (
-                      <div className="absolute left-0 -top-12 z-20 flex items-center gap-2 rounded-full bg-white px-3 py-1.5 shadow-md border border-pink-100 animate-fade-in">
+                      <div className="absolute left-0 -top-14 z-20 flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-md border border-pink-100 animate-fade-in">
                         {EMOJI_REACTIONS.map((item) => (
                           <button
                             key={item.emoji}
                             onClick={(e) => handleSelectEmojiReaction(post.id, item, e)}
                             title={item.label}
-                            className="text-xl transition-transform hover:scale-135 hover:-translate-y-1 active:scale-100 p-1"
+                            className="text-2xl transition-transform hover:scale-135 hover:-translate-y-1 active:scale-100 p-1"
                           >
                             {item.emoji}
                           </button>
@@ -508,36 +507,36 @@ export function FeedList({
                       <button
                         onClick={(e) => handleToggleLike(post.id, e)}
                         onMouseEnter={() => setActiveReactionPicker(post.id)}
-                        className={`w-full flex items-center justify-center gap-1.5 rounded-full py-2.5 transition-all ${isLiked
+                        className={`w-full flex items-center justify-center gap-2 rounded-full py-3 transition-all ${isLiked
                             ? 'bg-rose-50 text-rose-500 font-bold shadow-2xs'
-                            : 'bg-slate-50 text-slate-500 hover:bg-rose-50/60 hover:text-rose-400'
+                            : 'bg-slate-50 text-slate-600 hover:bg-rose-50/60 hover:text-rose-500'
                           }`}
                       >
-                        <span className="text-base">{currentEmoji}</span>
+                        <span className="text-lg">{currentEmoji}</span>
                         <span>{isLiked ? 'ถูกใจแล้ว' : 'ส่งหัวใจ'}</span>
                       </button>
                     </div>
 
                     <button
                       onClick={() => toggleCommentBox(post.id)}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 bg-slate-50 text-slate-500 hover:bg-purple-50/60 hover:text-purple-600 transition-all"
+                      className="flex flex-1 items-center justify-center gap-2 rounded-full py-3 bg-slate-50 text-slate-600 hover:bg-purple-50/60 hover:text-purple-600 transition-all"
                     >
-                      <MessageCircle className="h-4 w-4" />
+                      <MessageCircle className="h-5 w-5" />
                       <span>คอมเมนต์</span>
                     </button>
 
                     <button
                       onClick={() => handleShare(post.id)}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 bg-slate-50 text-slate-500 hover:bg-sky-50/60 hover:text-sky-600 transition-all"
+                      className="flex flex-1 items-center justify-center gap-2 rounded-full py-3 bg-slate-50 text-slate-600 hover:bg-sky-50/60 hover:text-sky-600 transition-all"
                     >
-                      <Share2 className="h-4 w-4" />
+                      <Share2 className="h-5 w-5" />
                       <span>{copiedId === post.id ? 'ก๊อปแล้ว ✨' : 'แชร์'}</span>
                     </button>
                   </div>
 
                   {/* ===== CUTE COMMENTS BUBBLE SECTION ===== */}
                   {openComments[post.id] && (
-                    <div className="mt-4 border-t border-slate-100 pt-3 space-y-3 bg-slate-50/30 rounded-2xl p-3 sm:p-4">
+                    <div className="mt-5 border-t border-slate-100 pt-4 space-y-4 bg-slate-50/40 rounded-2xl p-4 sm:p-5">
                       {/* Comments List */}
                       <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
                         {post.commentsList && post.commentsList.length > 0 ? (
