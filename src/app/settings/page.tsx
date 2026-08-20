@@ -1,15 +1,33 @@
+import { getUserById } from '@/lib/db';
+import { SettingsPanel } from '@/modules/settings/components/settings-panel';
 import { AppShell } from '@/components/layout/app-shell';
 
-export default function SettingsPage() {
+// TODO: ดึงจาก session จริง — ใช้ id=2 (alumni user จาก seed data) ไปก่อน
+const CURRENT_USER_ID = 2;
+
+export default async function SettingsPage() {
+  const user = await getUserById(CURRENT_USER_ID);
+
+  if (!user) {
+    return (
+      <AppShell>
+        <div className="rounded-[28px] border border-rose-100 bg-rose-50 p-8 text-center">
+          <p className="text-sm font-medium text-rose-600">ไม่พบข้อมูลผู้ใช้</p>
+        </div>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell>
-      <div className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
-        <p className="text-sm font-medium text-blue-600">Settings</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Administration & platform preferences</h1>
-        <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
-          This area is ready for RBAC, notification preferences, privacy controls, and future module toggles.
-        </p>
-      </div>
+      <SettingsPanel
+        userId={user.id}
+        userName={user.name ?? 'ผู้ใช้งาน'}
+        initialPrivacy={{
+          showHometownOnMap: user.show_hometown_on_map ?? false,
+          showWorkplaceOnMap: user.show_workplace_on_map ?? false,
+        }}
+      />
     </AppShell>
   );
 }

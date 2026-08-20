@@ -27,7 +27,6 @@ import {
   Award,
   Dices,
   Sparkle,
-  Thumbtack,
   Flame,
   Volume2
 } from 'lucide-react';
@@ -149,12 +148,47 @@ export function FeedList({
   const [floatingHearts, setFloatingHearts] = useState<BurstParticle[]>([]);
 
   // ─── Comment Like & Reply State ───────────────────────────────────
-  // commentLikes[commentId] = { count, likedByMe, emoji }
   const [commentLikes, setCommentLikes] = useState<Record<number, { count: number; likedByMe: boolean; emoji: string }>>({});
-  // activeCommentReactionPicker = commentId that has emoji picker open
   const [activeCommentReactionPicker, setActiveCommentReactionPicker] = useState<number | null>(null);
-  // replyTarget[postId] = { commentId, authorName } — which comment we are replying to
   const [replyTargets, setReplyTargets] = useState<Record<number, { commentId: number; authorName: string } | null>>({});
+
+  // ─── Post Request Form State ──────────────────────────────────────
+  const [showRequestForm, setShowRequestForm] = useState<boolean>(false);
+  const [requestForm, setRequestForm] = useState({ title: '', content: '', category: '' });
+  const [requestStatus, setRequestStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+
+  async function handleSubmitPostRequest(e: React.FormEvent) {
+    e.preventDefault();
+    if (!requestForm.title.trim() || !requestForm.content.trim()) return;
+    setRequestStatus('submitting');
+    try {
+      const res = await fetch('/api/feed/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestedBy: currentUserId,
+          title: requestForm.title.trim(),
+          content: requestForm.content.trim(),
+          category: requestForm.category.trim() || 'ทั่วไป',
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRequestStatus('success');
+        setRequestForm({ title: '', content: '', category: '' });
+        setTimeout(() => {
+          setRequestStatus('idle');
+          setShowRequestForm(false);
+        }, 2500);
+      } else {
+        setRequestStatus('error');
+        setTimeout(() => setRequestStatus('idle'), 3000);
+      }
+    } catch {
+      setRequestStatus('error');
+      setTimeout(() => setRequestStatus('idle'), 3000);
+    }
+  }
 
   // Spin Fortune Wheel
   function handleSpinFortune() {
@@ -384,6 +418,114 @@ export function FeedList({
 
       {/* ===== LEFT COLUMN: CENTERED & ENLARGED CUTE FEED ===== */}
       <div className="space-y-6">
+
+        {/* ===== POST REQUEST FORM CARD ===== */}
+        <div className="rounded-[32px] border border-indigo-200/80 bg-white shadow-card overflow-hidden">
+          <button
+            onClick={() => setShowRequestForm((v) => !v)}
+            className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-indigo-50/40 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-400 to-purple-500 shadow-sm">
+                <Send className="h-4 w-4 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-800">ร้องขอสร้างโพสต์</p>
+                <p className="text-xs text-slate-400">แอดมินจะรีวิวและอนุมัติให้ภายหลัง</p>
+              </div>
+            </div>
+            <span className={`text-slate-400 transition-transform duration-200 ${showRequestForm ? 'rotate-180' : ''}`}>▾</span>
+          </button>
+
+          {showRequestForm && (
+            <form
+              onSubmit={handleSubmitPostRequest}
+              className="border-t border-indigo-100/60 px-6 py-5 space-y-4 bg-indigo-50/20"
+            >
+              {/* Category */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">หมวดหมู่</label>
+                <div className="flex flex-wrap gap-2">
+                  {['ทั่วไป', 'กิจกรรม', 'ประชาสัมพันธ์', 'ประกาศ', 'ถาม-ตอบ'].map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setRequestForm((f) => ({ ...f, category: cat }))}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold border transition-all ${
+                        requestForm.category === cat
+                          ? 'bg-indigo-500 text-white border-indigo-500 shadow-sm'
+                          : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Title */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">หัวข้อโพสต์ <span className="text-rose-400">*</span></label>
+                <input
+                  type="text"
+                  required
+                  maxLength={100}
+                  value={requestForm.title}
+                  onChange={(e) => setRequestForm((f) => ({ ...f, title: e.target.value }))}
+                  placeholder="ใส่หัวข้อโพสต์..."
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                />
+              </div>
+
+              {/* Content */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">เนื้อหา <span className="text-rose-400">*</span></label>
+                <textarea
+                  required
+                  rows={4}
+                  maxLength={1000}
+                  value={requestForm.content}
+                  onChange={(e) => setRequestForm((f) => ({ ...f, content: e.target.value }))}
+                  placeholder="อธิบายเนื้อหาโพสต์ที่ต้องการให้แอดมินช่วยสร้าง..."
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100 resize-none"
+                />
+                <p className="text-right text-xs text-slate-400 mt-1">{requestForm.content.length}/1000</p>
+              </div>
+
+              {/* Submit */}
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setShowRequestForm(false); setRequestForm({ title: '', content: '', category: '' }); setRequestStatus('idle'); }}
+                  className="rounded-full border border-slate-200 px-5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={requestStatus === 'submitting' || !requestForm.title.trim() || !requestForm.content.trim()}
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-full py-2 text-sm font-bold transition-all shadow-sm ${
+                    requestStatus === 'success'
+                      ? 'bg-emerald-500 text-white'
+                      : requestStatus === 'error'
+                      ? 'bg-rose-500 text-white'
+                      : 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white hover:opacity-90 disabled:opacity-40'
+                  }`}
+                >
+                  {requestStatus === 'submitting' ? (
+                    <><span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" /> กำลังส่ง...</>
+                  ) : requestStatus === 'success' ? (
+                    <><CheckCircle2 className="h-4 w-4" /> ส่งคำขอแล้ว ✨</>
+                  ) : requestStatus === 'error' ? (
+                    '⚠️ เกิดข้อผิดพลาด ลองใหม่'
+                  ) : (
+                    <><Send className="h-4 w-4" /> ส่งคำขอโพสต์</>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
 
         {/* ===== POST CARDS ===== */}
         {feedPosts.length === 0 ? (
