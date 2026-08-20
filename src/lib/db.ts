@@ -135,10 +135,26 @@ export async function getFeedPosts() {
       poll = { question: pollRows[0].question, pointsPerVote: pollRows[0].points_per_vote, options };
     }
 
+    const { rows: commentsList } = await pool.query(
+      `select pi.id, pi.content, pi.created_at, u.name as author, u.avatar_url
+       from post_interactions pi
+       join users u on u.id = pi.user_id
+       where pi.post_id = $1 and pi.type = 'comment'
+       order by pi.created_at asc`,
+      [post.id]
+    );
+
+    const { rows: userLikes } = await pool.query(
+      `select user_id from post_interactions where post_id = $1 and type = 'reaction'`,
+      [post.id]
+    );
+
     postsWithExtras.push({
       ...post,
       likes: counts[0].likes,
       comments: counts[0].comments,
+      commentsList,
+      likedUserIds: userLikes.map((r: any) => r.user_id),
       commentPoints: 1,
       poll,
     });
@@ -504,3 +520,40 @@ export async function getAllApprovedUsers() {
   );
   return rows;
 }
+
+export async function addPostComment(postId: number, userId: number, content: string) {
+  const { rows } = await pool.query(
+    `insert into post_interactions (post_id, user_id, type, content, points_earned)
+     values ($1, $2, 'comment', $3, 1)
+     returning id, content, created_at`,
+    [postId, userId, content]
+  );
+  // ให้พอยท์ผู้ใช้ +1
+  await pool.query(`update users set total_points = total_points + 1 where id = $1`, [userId]);
+  
+  const user = await pool.query(`select name, avatar_url from users where id = $1`, [userId]);
+  return {
+    id: rows[0].id,
+    content: rows[0].content,
+    created_at: rows[0].created_at,
+    author: user.rows[0]?.name || 'ศิษย์เก่า',
+    avatar_url: user.rows[0]?.avatar_url || null,
+  };
+}
+
+export async function togglePostLike(postId: number, userId: number) {
+  const { rows } = await pool.query(
+    `select id from post_interactions where post_id = $1 and user_id = $2 and type = 'reaction'`,
+    [postId, userId]
+  );
+  if (rows.length > 0) {
+    await pool.query(`delete from post_interactions where id = $1`, [rows[0].id]);
+    return { liked: false };
+  } else {
+    await pool.query(
+      `insert into post_interactions (post_id, user_id, type, points_earned) values ($1, $2, 'reaction', 0)`,
+      [postId, userId]
+    );
+    return { liked: true };
+  }
+}

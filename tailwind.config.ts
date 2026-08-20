@@ -25,8 +25,6 @@ const config: Config = {
       }
     },
   },
-  plugins: [
-    require('tailwind-scrollbar-hide') // ถ้ายังไม่ได้ลง plugin นี้ ให้ลบบรรทัดนี้ออกก่อน
-  ],
+  plugins: [],
 };
 export default config;
