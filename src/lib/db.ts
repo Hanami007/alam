@@ -556,4 +556,490 @@ export async function togglePostLike(postId: number, userId: number) {
     );
     return { liked: true };
   }
+}
+
+// ---------------------------------------------------------------
+// Lookup / Dropdown data
+// ---------------------------------------------------------------
+
+/** ดึง generations ทั้งหมดสำหรับ dropdown filter */
+export async function getGenerations() {
+  const { rows } = await pool.query(
+    `SELECT id, code, label, extra FROM lookup_options WHERE category = 'generation' ORDER BY code`
+  );
+  return rows;
+}
+
+/** ดึงจังหวัดทั้งหมด พร้อม region และ metro flag */
+export async function getAllProvinces() {
+  const { rows } = await pool.query(
+    `SELECT id, code, label,
+            extra->>'region' AS region,
+            (extra->>'metro')::boolean AS metro
+     FROM lookup_options WHERE category = 'province' ORDER BY label`
+  );
+  return rows;
+}
+
+/** ดึง career types สำหรับ dropdown */
+export async function getCareerTypes() {
+  const { rows } = await pool.query(
+    `SELECT id, code, label FROM lookup_options WHERE category = 'career_type' ORDER BY label`
+  );
+  return rows;
+}
+
+// ---------------------------------------------------------------
+// User: fetch by id
+// ---------------------------------------------------------------
+
+/** ดึง user ตาม id พร้อม join labels (ใช้ใน middleware / auth) */
+export async function getUserById(userId: number) {
+  const { rows } = await pool.query(
+    `SELECT u.*,
+            gen.label  AS generation,
+            prov.label AS province,
+            ct.label   AS career_type
+     FROM users u
+     LEFT JOIN lookup_options gen  ON gen.id  = u.generation_option_id
+     LEFT JOIN lookup_options prov ON prov.id = u.province_option_id
+     LEFT JOIN lookup_options ct   ON ct.id   = u.career_option_id
+     WHERE u.id = $1`,
+    [userId]
+  );
+  return rows[0] ?? null;
+}
+
+// ---------------------------------------------------------------
+// Profile update
+// ---------------------------------------------------------------
+
+/** อัปเดต profile ของ user (เฉพาะ field ที่ส่งมา) */
+export async function updateUserProfile(
+  userId: number,
+  data: {
+    name?: string;
+    company?: string;
+    position?: string;
+    bio?: string;
+    avatar_url?: string;
+    career_option_id?: number | null;
+    province_option_id?: number | null;
+    hometown_province_id?: number | null;
+    work_province_id?: number | null;
+    show_hometown_on_map?: boolean;
+    show_workplace_on_map?: boolean;
+  }
+) {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  let idx = 1;
+
+  for (const [key, val] of Object.entries(data)) {
+    if (val === undefined) continue;
+    fields.push(`${key} = $${idx++}`);
+    values.push(val);
+  }
+  if (fields.length === 0) return null;
+
+  values.push(userId);
+  const { rows } = await pool.query(
+    `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
+    values
+  );
+  return rows[0] ?? null;
+}
+
+/** อัปเดต map privacy settings เท่านั้น */
+export async function updateMapPrivacy(
+  userId: number,
+  opts: { showHometownOnMap?: boolean; showWorkplaceOnMap?: boolean }
+) {
+  const fields: string[] = [];
+  const params: unknown[] = [];
+  let i = 1;
+
+  if (opts.showHometownOnMap  !== undefined) { fields.push(`show_hometown_on_map = $${i++}`);  params.push(opts.showHometownOnMap); }
+  if (opts.showWorkplaceOnMap !== undefined) { fields.push(`show_workplace_on_map = $${i++}`); params.push(opts.showWorkplaceOnMap); }
+  if (fields.length === 0) return null;
+
+  params.push(userId);
+  const { rows } = await pool.query(
+    `UPDATE users SET ${fields.join(', ')} WHERE id = $${i}
+     RETURNING id, show_hometown_on_map, show_workplace_on_map`,
+    params
+  );
+  return rows[0] ?? null;
+}
+
+/** อัปเดต avatar_url */
+export async function updateAvatar(userId: number, avatarUrl: string) {
+  const { rows } = await pool.query(
+    `UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING id, avatar_url`,
+    [avatarUrl, userId]
+  );
+  return rows[0] ?? null;
+}
+
+// ---------------------------------------------------------------
+// Admin: User management
+// ---------------------------------------------------------------
+
+/** อนุมัติ user pending → approved */
+export async function approveUser(userId: number, adminId: number) {
+  const { rows } = await pool.query(
+    `UPDATE users SET status = 'approved'
+     WHERE id = $1 AND status = 'pending'
+     RETURNING id, name, status`,
+    [userId]
+  );
+  if (rows.length > 0) {
+    await pool.query(
+      `INSERT INTO audit_logs (actor_id, action, target_type, target_id)
+       VALUES ($1, 'approve_user', 'user', $2)`,
+      [adminId, userId]
+    );
+  }
+  return rows[0] ?? null;
+}
+
+/** ปฏิเสธ user */
+export async function rejectUser(userId: number, adminId: number, remark?: string) {
+  const { rows } = await pool.query(
+    `UPDATE users SET status = 'rejected'
+     WHERE id = $1 AND status = 'pending'
+     RETURNING id, name, status`,
+    [userId]
+  );
+  if (rows.length > 0) {
+    await pool.query(
+      `INSERT INTO audit_logs (actor_id, action, target_type, target_id, metadata)
+       VALUES ($1, 'reject_user', 'user', $2, $3)`,
+      [adminId, userId, JSON.stringify({ remark: remark ?? '' })]
+    );
+  }
+  return rows[0] ?? null;
+}
+
+/** ดึงผู้ใช้ทั้งหมด พร้อม optional filter */
+export async function getAllUsers(opts?: {
+  status?: 'pending' | 'approved' | 'rejected';
+  role?: 'alumni' | 'admin';
+  generationId?: number;
+}) {
+  const filters: string[] = [];
+  const params: unknown[] = [];
+  let i = 1;
+
+  if (opts?.status)       { filters.push(`u.status = $${i++}`);               params.push(opts.status); }
+  if (opts?.role)         { filters.push(`u.role = $${i++}`);                 params.push(opts.role); }
+  if (opts?.generationId) { filters.push(`u.generation_option_id = $${i++}`); params.push(opts.generationId); }
+
+  const where = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
+  const { rows } = await pool.query(
+    `SELECT u.id, u.student_id, u.name, u.email, u.role, u.status,
+            u.total_points, u.student_status, u.created_at,
+            gen.label AS generation
+     FROM users u
+     LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
+     ${where}
+     ORDER BY u.created_at DESC`,
+    params
+  );
+  return rows;
+}
+
+// ---------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------
+
+/** ค้นหาศิษย์เก่าแบบ full-text (ชื่อ, บริษัท, ตำแหน่ง, จังหวัด, รุ่น) */
+export async function searchAlumni(
+  query: string,
+  opts?: { generationId?: number; provinceId?: number; careerId?: number; limit?: number }
+) {
+  const searchTerm = `%${query}%`;
+  const params: unknown[] = [searchTerm];
+  const filters: string[] = [
+    `(u.name ILIKE $1 OR u.company ILIKE $1 OR u.position ILIKE $1
+      OR gen.label ILIKE $1 OR prov.label ILIKE $1)`,
+  ];
+
+  let i = 2;
+  if (opts?.generationId) { filters.push(`u.generation_option_id = $${i++}`); params.push(opts.generationId); }
+  if (opts?.provinceId)   { filters.push(`u.province_option_id = $${i++}`);   params.push(opts.provinceId); }
+  if (opts?.careerId)     { filters.push(`u.career_option_id = $${i++}`);     params.push(opts.careerId); }
+
+  const limit = opts?.limit ?? 50;
+  const { rows } = await pool.query(
+    `SELECT u.id, u.name, u.position, u.company, u.avatar_url, u.total_points,
+            gen.label  AS generation,
+            prov.label AS province,
+            ct.label   AS career_type
+     FROM users u
+     LEFT JOIN lookup_options gen  ON gen.id  = u.generation_option_id
+     LEFT JOIN lookup_options prov ON prov.id = u.province_option_id
+     LEFT JOIN lookup_options ct   ON ct.id   = u.career_option_id
+     WHERE u.status = 'approved' AND ${filters.join(' AND ')}
+     ORDER BY u.total_points DESC, u.name
+     LIMIT ${limit}`,
+    params
+  );
+  return rows;
+}
+
+// ---------------------------------------------------------------
+// Voting: Poll
+// ---------------------------------------------------------------
+
+/** โหวต poll — คืน error string ถ้าโหวตแล้ว หรือโพลปิด */
+export async function castPollVote(
+  pollId: number,
+  optionId: number,
+  userId: number
+): Promise<{ success: boolean; error?: string; pointsAwarded?: number }> {
+  const { rows: existing } = await pool.query(
+    `SELECT id FROM poll_votes WHERE poll_id = $1 AND user_id = $2`,
+    [pollId, userId]
+  );
+  if (existing.length > 0) return { success: false, error: 'โหวตแล้ว' };
+
+  const { rows: pollRows } = await pool.query(
+    `SELECT points_per_vote FROM polls WHERE id = $1 AND status = 'active'`,
+    [pollId]
+  );
+  if (pollRows.length === 0) return { success: false, error: 'ไม่พบโพลหรือโพลปิดแล้ว' };
+
+  const points = pollRows[0].points_per_vote as number;
+  await pool.query(
+    `INSERT INTO poll_votes (poll_id, option_id, user_id, points_awarded)
+     VALUES ($1, $2, $3, $4)`,
+    [pollId, optionId, userId, points]
+  );
+  if (points > 0) {
+    await pool.query(
+      `UPDATE users SET total_points = total_points + $1 WHERE id = $2`,
+      [points, userId]
+    );
+  }
+  return { success: true, pointsAwarded: points };
+}
+
+// ---------------------------------------------------------------
+// Voting: Hall of Fame
+// ---------------------------------------------------------------
+
+/** โหวต Hall of Fame (same_generation = 5 คะแนน, other_generation = 10 คะแนน) */
+export async function castHofVote(
+  campaignId: number,
+  voterId: number,
+  candidateId: number,
+  voteCategory: 'same_generation' | 'other_generation'
+): Promise<{ success: boolean; error?: string; points?: number }> {
+  const { rows: existing } = await pool.query(
+    `SELECT id FROM hof_votes
+     WHERE campaign_id = $1 AND voter_id = $2 AND vote_category = $3`,
+    [campaignId, voterId, voteCategory]
+  );
+  if (existing.length > 0) {
+    return { success: false, error: `โหวต ${voteCategory} ในแคมเปญนี้แล้ว` };
+  }
+
+  const points = voteCategory === 'same_generation' ? 5 : 10;
+  await pool.query(
+    `INSERT INTO hof_votes (campaign_id, voter_id, candidate_id, vote_category, points)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [campaignId, voterId, candidateId, voteCategory, points]
+  );
+  await pool.query(
+    `UPDATE users SET total_points = total_points + $1 WHERE id = $2`,
+    [points, voterId]
+  );
+  return { success: true, points };
+}
+
+/** ดึง leaderboard คะแนนรวมของ alumni */
+export async function getLeaderboard(limit = 20) {
+  const { rows } = await pool.query(
+    `SELECT u.id, u.name, u.avatar_url, u.total_points, u.position, u.company,
+            gen.label AS generation
+     FROM users u
+     LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
+     WHERE u.status = 'approved' AND u.role = 'alumni'
+     ORDER BY u.total_points DESC, u.name
+     LIMIT $1`,
+    [limit]
+  );
+  return rows;
+}
+
+// ---------------------------------------------------------------
+// Gallery: Photo unlock (proper version)
+// ---------------------------------------------------------------
+
+/** บันทึกผล unlock รูปภาพ — ทั้งผ่านและไม่ผ่าน
+ *  ใช้ ON CONFLICT DO NOTHING เพื่อกัน insert ซ้ำ
+ *  (photo_view_verifications ยังไม่มี unique constraint — ถ้าเพิ่มใน migration ได้ยิ่งดี)
+ */
+export async function recordPhotoUnlock(
+  assetId: number,
+  userId: number,
+  question: string,
+  isPassed: boolean
+): Promise<{ isPassed: boolean; pointsEarned: number }> {
+  const points = isPassed ? 5 : 0;
+  await pool.query(
+    `INSERT INTO photo_view_verifications (asset_id, user_id, question, is_passed, points_earned)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [assetId, userId, question, isPassed, points]
+  );
+  if (isPassed) {
+    await pool.query(
+      `UPDATE users SET total_points = total_points + $1 WHERE id = $2`,
+      [points, userId]
+    );
+  }
+  return { isPassed, pointsEarned: points };
+}
+
+// ---------------------------------------------------------------
+// Gallery: User gallery
+// ---------------------------------------------------------------
+
+/** ดึง user gallery ของ user นั้น */
+export async function getUserGallery(userId: number) {
+  const { rows } = await pool.query(
+    `SELECT id, image_url, caption, sort_order, created_at
+     FROM media_assets
+     WHERE owner_type = 'user_gallery' AND owner_id = $1
+     ORDER BY sort_order ASC, created_at DESC`,
+    [userId]
+  );
+  return rows;
+}
+
+/** เพิ่มรูปเข้า user gallery */
+export async function addUserGalleryImage(
+  userId: number,
+  imageUrl: string,
+  caption?: string
+) {
+  const { rows } = await pool.query(
+    `INSERT INTO media_assets (owner_type, owner_id, uploaded_by, image_url, caption)
+     VALUES ('user_gallery', $1, $1, $2, $3)
+     RETURNING *`,
+    [userId, imageUrl, caption ?? null]
+  );
+  return rows[0];
+}
+
+// ---------------------------------------------------------------
+// Post: Admin tools
+// ---------------------------------------------------------------
+
+/** ดึง post เดี่ยวตาม id */
+export async function getPostById(postId: number) {
+  const { rows } = await pool.query(
+    `SELECT p.id, p.category, p.title, p.content, p.pinned,
+            p.status, p.post_type, p.created_at, p.published_at,
+            COALESCE(a.name, r.name) AS author
+     FROM posts p
+     LEFT JOIN users a ON a.id = p.admin_id
+     LEFT JOIN users r ON r.id = p.requested_by
+     WHERE p.id = $1`,
+    [postId]
+  );
+  return rows[0] ?? null;
+}
+
+/** สร้างโพสต์โดยตรง (admin only) */
+export async function createPost(
+  adminId: number,
+  data: { category: string; title: string; content: string; pinned?: boolean }
+) {
+  const { rows } = await pool.query(
+    `INSERT INTO posts (admin_id, category, title, content, post_type, status, pinned, published_at)
+     VALUES ($1, $2, $3, $4, 'normal', 'published', $5, now())
+     RETURNING *`,
+    [adminId, data.category, data.title, data.content, data.pinned ?? false]
+  );
+  await pool.query(
+    `INSERT INTO audit_logs (actor_id, action, target_type, target_id)
+     VALUES ($1, 'create_post', 'post', $2)`,
+    [adminId, rows[0].id]
+  );
+  return rows[0];
+}
+
+/** ลบโพสต์ (admin only) */
+export async function deletePost(postId: number, adminId: number) {
+  const { rows } = await pool.query(
+    `DELETE FROM posts WHERE id = $1 RETURNING id, title`,
+    [postId]
+  );
+  if (rows.length > 0) {
+    await pool.query(
+      `INSERT INTO audit_logs (actor_id, action, target_type, target_id)
+       VALUES ($1, 'delete_post', 'post', $2)`,
+      [adminId, postId]
+    );
+  }
+  return rows[0] ?? null;
+}
+
+/** Toggle pin post */
+export async function togglePostPin(postId: number) {
+  const { rows } = await pool.query(
+    `UPDATE posts SET pinned = NOT pinned WHERE id = $1 RETURNING id, pinned`,
+    [postId]
+  );
+  return rows[0] ?? null;
+}
+
+// ---------------------------------------------------------------
+// Map: enriched province count
+// ---------------------------------------------------------------
+
+/** สรุปจำนวน alumni ต่อจังหวัด แยกตาม hometown/workplace
+ *  ใช้ column จริง: hometown_province_id / work_province_id,
+ *                   show_hometown_on_map / show_workplace_on_map
+ */
+export async function getProvinceAlumniCount(type: 'hometown' | 'workplace') {
+  const col     = type === 'hometown' ? 'hometown_province_id'  : 'work_province_id';
+  const showCol = type === 'hometown' ? 'show_hometown_on_map'  : 'show_workplace_on_map';
+
+  const { rows } = await pool.query(
+    `SELECT lo.id AS province_id, lo.code, lo.label AS province_name,
+            lo.extra->>'region'         AS region,
+            (lo.extra->>'metro')::boolean AS metro,
+            COUNT(u.id)::int              AS alumni_count
+     FROM lookup_options lo
+     LEFT JOIN users u
+       ON u.${col} = lo.id
+       AND u.${showCol} = true
+       AND u.status = 'approved'
+     WHERE lo.category = 'province'
+     GROUP BY lo.id, lo.code, lo.label, lo.extra
+     ORDER BY alumni_count DESC`
+  );
+  return rows;
+}
+
+// ---------------------------------------------------------------
+// Audit log
+// ---------------------------------------------------------------
+
+/** ดึง audit logs สำหรับ admin */
+export async function getAuditLogs(limit = 50) {
+  const { rows } = await pool.query(
+    `SELECT al.id, al.action, al.target_type, al.target_id,
+            al.metadata, al.created_at,
+            u.name AS actor_name
+     FROM audit_logs al
+     LEFT JOIN users u ON u.id = al.actor_id
+     ORDER BY al.created_at DESC
+     LIMIT $1`,
+    [limit]
+  );
+  return rows;
 }

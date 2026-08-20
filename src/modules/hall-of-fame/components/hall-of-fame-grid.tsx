@@ -1,23 +1,22 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Trophy,
   Crown,
-  Search,
-  Zap,
-  Heart,
-  Flame,
-  CheckCircle2,
-  Sparkles,
+  Medal,
   Award,
-  Users,
-  Star,
-  Activity,
-  Vote,
+  Search,
+  Sparkles,
+  Heart,
+  Briefcase,
+  GraduationCap,
+  Building2,
+  CheckCircle2,
+  TrendingUp,
 } from 'lucide-react';
 
-interface Candidate {
+export interface Candidate {
   id: number;
   name: string;
   company: string;
@@ -25,7 +24,7 @@ interface Candidate {
   avatar_url: string;
   description: string;
   generation_label: string;
-  votes: number;
+  votes?: number;
 }
 
 interface HallOfFameGridProps {
@@ -96,18 +95,23 @@ const DEFAULT_CANDIDATES: Candidate[] = [
 ];
 
 export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) {
-  const mergedInitial =
-    initialCandidates.length >= 3
-      ? initialCandidates.map((c, i) => ({
-          ...c,
-          votes: c.votes && c.votes > 0 ? c.votes : 184 - i * 28,
-        }))
-      : DEFAULT_CANDIDATES;
+  const mergedInitial = useMemo(() => {
+    const raw =
+      initialCandidates && initialCandidates.length >= 3
+        ? initialCandidates.map((c, i) => ({
+            ...c,
+            votes: c.votes && c.votes > 0 ? c.votes : Math.max(10, 184 - i * 28),
+          }))
+        : DEFAULT_CANDIDATES;
+
+    return [...raw].sort((a, b) => (b.votes || 0) - (a.votes || 0));
+  }, [initialCandidates]);
 
   const [candidates, setCandidates] = useState<Candidate[]>(mergedInitial);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [votedIds, setVotedIds] = useState<Record<number, boolean>>({});
+  const [votingId, setVotingId] = useState<number | null>(null);
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -123,7 +127,8 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
         const res = await fetch(`/api/hof/search?q=${encodeURIComponent(query)}`);
         const data = await res.json();
         if (data.results && data.results.length > 0) {
-          setCandidates(data.results);
+          const sorted = [...data.results].sort((a, b) => (b.votes || 0) - (a.votes || 0));
+          setCandidates(sorted);
         } else {
           const q = query.toLowerCase();
           const filtered = mergedInitial.filter(
@@ -131,7 +136,8 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
               c.name.toLowerCase().includes(q) ||
               c.company?.toLowerCase().includes(q) ||
               c.position?.toLowerCase().includes(q) ||
-              c.generation_label?.toLowerCase().includes(q)
+              c.generation_label?.toLowerCase().includes(q) ||
+              c.description?.toLowerCase().includes(q)
           );
           setCandidates(filtered);
         }
@@ -141,400 +147,379 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
         setLoading(false);
       }
     }, 300);
+
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query]);
+  }, [query, mergedInitial]);
 
-  // Sort strictly by votes descending
-  const sortedCandidates = [...candidates].sort((a, b) => b.votes - a.votes);
-  const totalVotesCast = sortedCandidates.reduce((acc, c) => acc + c.votes, 0);
+  async function handleVote(candidateId: number) {
+    if (votedIds[candidateId]) return;
+    setVotingId(candidateId);
 
-  const firstPlace = sortedCandidates[0] || DEFAULT_CANDIDATES[0];
-  const secondPlace = sortedCandidates[1] || DEFAULT_CANDIDATES[1];
-  const thirdPlace = sortedCandidates[2] || DEFAULT_CANDIDATES[2];
-  const remainingCandidates = sortedCandidates.slice(3);
-
-  // Vote Action
-  function handleVote(id: number) {
-    if (votedIds[id]) return;
-    setVotedIds((prev) => ({ ...prev, [id]: true }));
+    // Optimistic update
     setCandidates((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, votes: c.votes + 1 } : c))
+      prev
+        .map((c) => (c.id === candidateId ? { ...c, votes: (c.votes || 0) + 1 } : c))
+        .sort((a, b) => (b.votes || 0) - (a.votes || 0))
     );
+    setVotedIds((prev) => ({ ...prev, [candidateId]: true }));
+
+    try {
+      await fetch('/api/hof/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidateId }),
+      });
+    } catch (err) {
+      console.error('Vote failed:', err);
+    } finally {
+      setVotingId(null);
+    }
   }
 
-  // Calculate percentages
-  const firstPct = totalVotesCast > 0 ? ((firstPlace.votes / totalVotesCast) * 100).toFixed(1) : '0';
-  const secondPct = totalVotesCast > 0 ? ((secondPlace.votes / totalVotesCast) * 100).toFixed(1) : '0';
-  const thirdPct = totalVotesCast > 0 ? ((thirdPlace.votes / totalVotesCast) * 100).toFixed(1) : '0';
+  // Split top 3 for podium when not filtering or when candidates >= 3
+  const isSearchActive = query.trim().length > 0;
+  const top1 = candidates[0];
+  const top2 = candidates[1];
+  const top3 = candidates[2];
+  const restCandidates = isSearchActive ? candidates : candidates.slice(3);
 
   return (
-    <div className="space-y-8 pb-10 font-sans selection:bg-indigo-500 selection:text-white">
-      {/* ===== TITLE BANNER ===== */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200/90 shadow-card">
-        <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl gradient-primary text-white shadow-blue-glow">
-            <Trophy className="h-6 w-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-primary-light px-2.5 py-0.5 text-xs font-bold text-primary">
-                GLOBAL ALUMNI AWARDS 2026
-              </span>
+    <div className="space-y-10">
+      {/* ===== PODIUM TOP 3 SECTION (Only shown when not actively searching) ===== */}
+      {!isSearchActive && top1 && top2 && top3 && (
+        <section className="relative overflow-hidden rounded-[36px] border border-amber-200/80 bg-gradient-to-b from-amber-50/60 via-white to-orange-50/30 p-6 sm:p-10 shadow-card">
+          {/* Header */}
+          <div className="mb-8 text-center">
+            <div className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-1.5 text-xs font-bold text-white shadow-sm">
+              <Crown className="h-4 w-4" />
+              <span>ทำเนียบเกียรติยศ ศิษย์เก่าดีเด่นประจำปี</span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight mt-0.5">
-              หอเกียรติยศ & อันดับคะแนนโหวตศิษย์เก่าดีเด่น 🏆
-            </h1>
+            <h2 className="mt-3 text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+              Alumni Hall of Fame Top 3 🏆
+            </h2>
+            <p className="mt-2 text-sm text-slate-500">
+              ผู้ได้รับการโหวตสูงสุดและสร้างคุณประโยชน์อันโดดเด่นแก่สังคมและสถาบัน
+            </p>
           </div>
-        </div>
 
-        {/* Search Box */}
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="ค้นหาชื่อผู้ได้รับผลโหวต..."
-            className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-4 text-xs font-medium text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:bg-white transition-all"
-          />
-        </div>
-      </div>
-
-      {/* ===== 1. CENTERPIECE: TOP 3 CURVED RADIAL THEATRE STAGE (เด่นสง่าตรงกลางจอ) ===== */}
-      <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-card relative overflow-hidden flex flex-col items-center justify-center min-h-[480px]">
-        
-        {/* Spotlight Cone Glow Effects */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-[400px] bg-[conic-gradient(from_180deg_at_50%_0%,rgba(245,158,11,0.25)_0deg,transparent_60deg,transparent_300deg,rgba(245,158,11,0.25)_360deg)] pointer-events-none blur-md" />
-
-        {/* Stage Title Tag */}
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-amber-50 border border-amber-200 px-3.5 py-1 text-xs font-extrabold text-amber-800 shadow-2xs">
-          <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-          <span>3 อันดับแรกที่มีคะแนนโหวตสูงสุด</span>
-        </div>
-
-        {/* Top 3 Semicircle Podium Layout */}
-        <div className="w-full max-w-4xl flex items-end justify-center gap-3 sm:gap-8 pt-4">
-          
-          {/* 🥈 #2 RANKING (LEFT - CURVED STAGE) */}
-          {secondPlace && (
-            <div className="relative flex flex-col items-center z-10 w-1/3 max-w-[210px]">
-              {/* Avatar Frame */}
-              <div className="relative mb-2 flex flex-col items-center">
-                <div className="relative h-28 sm:h-36 w-28 sm:w-36 overflow-hidden rounded-full border-4 border-indigo-200 shadow-hero bg-slate-100">
+          {/* Podium layout: 2nd (Left), 1st (Center/Higher), 3rd (Right) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end max-w-5xl mx-auto pt-6">
+            {/* Rank 2 (Silver) */}
+            <div className="order-2 md:order-1 flex flex-col items-center">
+              <div className="w-full rounded-[28px] border-2 border-slate-200 bg-white/95 p-5 text-center shadow-lg transition-transform duration-200 hover:-translate-y-1">
+                <div className="relative mx-auto mb-3 inline-block">
                   <img
-                    src={secondPlace.avatar_url || 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=500'}
-                    alt={secondPlace.name}
-                    className="h-full w-full object-cover"
+                    src={top2.avatar_url}
+                    alt={top2.name}
+                    className="h-24 w-24 rounded-2xl object-cover ring-4 ring-slate-200 shadow-md"
                   />
-                </div>
-              </div>
-
-              {/* Rank Badge #2 */}
-              <div className="mt-1 flex items-center gap-1.5 rounded-full bg-indigo-100 border border-indigo-200 px-3 py-1 text-indigo-700 shadow-xs">
-                <span className="font-black text-xs">🥈 #2</span>
-                <span className="text-xs font-bold truncate max-w-[80px]">{secondPlace.generation_label}</span>
-              </div>
-
-              {/* Name & Vote Count */}
-              <div className="mt-2 text-center w-full">
-                <p className="text-3xl sm:text-4xl font-extrabold text-foreground leading-none tabular-nums tracking-tight">
-                  {secondPlace.votes}
-                </p>
-                <p className="text-[11px] font-semibold text-indigo-600">คะแนนโหวต</p>
-                <p className="text-xs font-bold text-slate-800 mt-1 truncate">{secondPlace.name}</p>
-                <p className="text-[11px] text-muted-foreground truncate">{secondPlace.position}</p>
-
-                {/* Vote Button */}
-                <button
-                  onClick={() => handleVote(secondPlace.id)}
-                  disabled={votedIds[secondPlace.id]}
-                  className={`mt-2 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold transition-all ${
-                    votedIds[secondPlace.id]
-                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                      : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs active:scale-95'
-                  }`}
-                >
-                  {votedIds[secondPlace.id] ? 'โหวตแล้ว ✨' : '🗳️ โหวตคะแนน'}
-                </button>
-              </div>
-
-              {/* Curved Semicircle Podium Base */}
-              <div className="mt-3 w-full h-24 sm:h-32 rounded-t-[50px] bg-gradient-to-b from-indigo-100 via-indigo-200/70 to-slate-200 border-t-4 border-indigo-300 shadow-hero flex flex-col items-center justify-start pt-3 text-indigo-900">
-                <span className="text-2xl font-black">2</span>
-                <span className="text-[10px] font-bold tracking-wider uppercase text-indigo-700">รองอันดับ 1</span>
-              </div>
-            </div>
-          )}
-
-          {/* 👑 #1 RANKING (CENTER HERO - CURVED RADIAL CHAMPION STAGE) */}
-          {firstPlace && (
-            <div className="relative flex flex-col items-center z-20 w-1/3 max-w-[240px] -mt-6">
-              {/* Crown Icon Above Avatar */}
-              <Crown className="h-8 w-8 text-amber-500 drop-shadow-md animate-bounce mb-1" />
-
-              {/* Avatar Frame */}
-              <div className="relative mb-2 flex flex-col items-center">
-                <div className="relative h-32 sm:h-44 w-32 sm:w-44 overflow-hidden rounded-full border-4 border-amber-400 shadow-blue-glow bg-amber-50">
-                  <img
-                    src={firstPlace.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500'}
-                    alt={firstPlace.name}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              </div>
-
-              {/* Rank Badge #1 */}
-              <div className="mt-1 flex items-center gap-1.5 rounded-full gradient-primary px-4 py-1 text-white shadow-md">
-                <span className="font-black text-xs text-amber-300">👑 #1</span>
-                <span className="text-xs font-extrabold truncate max-w-[90px]">{firstPlace.generation_label}</span>
-              </div>
-
-              {/* Name & Vote Count */}
-              <div className="mt-2 text-center w-full">
-                <p className="text-4xl sm:text-5xl font-black text-amber-600 leading-none tabular-nums tracking-tight">
-                  {firstPlace.votes}
-                </p>
-                <p className="text-xs font-extrabold text-amber-700">คะแนนโหวตสูงสุด</p>
-                <p className="text-sm font-extrabold text-foreground mt-1 truncate">{firstPlace.name}</p>
-                <p className="text-xs font-semibold text-muted-foreground truncate">{firstPlace.position}</p>
-
-                {/* Vote Button */}
-                <button
-                  onClick={() => handleVote(firstPlace.id)}
-                  disabled={votedIds[firstPlace.id]}
-                  className={`mt-2 inline-flex items-center gap-1 rounded-full px-3.5 py-1 text-xs font-bold transition-all ${
-                    votedIds[firstPlace.id]
-                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                      : 'gradient-primary text-white shadow-md hover:opacity-90 active:scale-95'
-                  }`}
-                >
-                  {votedIds[firstPlace.id] ? 'โหวตแล้ว ✨' : '🗳️ โหวตคะแนน'}
-                </button>
-              </div>
-
-              {/* Curved Radial Theatre Champion Podium Base */}
-              <div className="mt-3 w-full h-32 sm:h-44 rounded-t-[70px] bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 border-t-4 border-amber-200 shadow-hero flex flex-col items-center justify-start pt-4 text-amber-950">
-                <span className="text-3xl font-black">1</span>
-                <span className="text-xs font-black tracking-wider uppercase bg-white/40 px-3 py-0.5 rounded-full mt-1">ศิษย์เก่าดีเด่น</span>
-              </div>
-            </div>
-          )}
-
-          {/* 🥉 #3 RANKING (RIGHT - CURVED STAGE) */}
-          {thirdPlace && (
-            <div className="relative flex flex-col items-center z-10 w-1/3 max-w-[210px]">
-              {/* Avatar Frame */}
-              <div className="relative mb-2 flex flex-col items-center">
-                <div className="relative h-28 sm:h-36 w-28 sm:w-36 overflow-hidden rounded-full border-4 border-rose-200 shadow-hero bg-rose-50">
-                  <img
-                    src={thirdPlace.avatar_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500'}
-                    alt={thirdPlace.name}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              </div>
-
-              {/* Rank Badge #3 */}
-              <div className="mt-1 flex items-center gap-1.5 rounded-full bg-rose-100 border border-rose-200 px-3 py-1 text-rose-700 shadow-xs">
-                <span className="font-black text-xs">🥉 #3</span>
-                <span className="text-xs font-bold truncate max-w-[80px]">{thirdPlace.generation_label}</span>
-              </div>
-
-              {/* Name & Vote Count */}
-              <div className="mt-2 text-center w-full">
-                <p className="text-3xl sm:text-4xl font-extrabold text-foreground leading-none tabular-nums tracking-tight">
-                  {thirdPlace.votes}
-                </p>
-                <p className="text-[11px] font-semibold text-rose-600">คะแนนโหวต</p>
-                <p className="text-xs font-bold text-slate-800 mt-1 truncate">{thirdPlace.name}</p>
-                <p className="text-[11px] text-muted-foreground truncate">{thirdPlace.position}</p>
-
-                {/* Vote Button */}
-                <button
-                  onClick={() => handleVote(thirdPlace.id)}
-                  disabled={votedIds[thirdPlace.id]}
-                  className={`mt-2 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold transition-all ${
-                    votedIds[thirdPlace.id]
-                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                      : 'bg-rose-600 text-white hover:bg-rose-700 shadow-xs active:scale-95'
-                  }`}
-                >
-                  {votedIds[thirdPlace.id] ? 'โหวตแล้ว ✨' : '🗳️ โหวตคะแนน'}
-                </button>
-              </div>
-
-              {/* Curved Semicircle Podium Base */}
-              <div className="mt-3 w-full h-20 sm:h-28 rounded-t-[50px] bg-gradient-to-b from-rose-200 via-rose-300 to-amber-200 border-t-4 border-rose-300 shadow-hero flex flex-col items-center justify-start pt-3 text-rose-950">
-                <span className="text-2xl font-black">3</span>
-                <span className="text-[10px] font-bold tracking-wider uppercase text-rose-800">รองอันดับ 2</span>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ===== 2. LOWER PANEL: COMMUNITY VOTING STATS (ย้ายลงมาด้านล่างเต็มความกว้าง) ===== */}
-      <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-card space-y-5">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-primary">สถิติคะแนนเสียง</span>
-            <h2 className="text-base font-bold text-foreground mt-0.5">ภาพรวมสัดส่วนคะแนนโหวตประจำปี 2569</h2>
-          </div>
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-light text-primary">
-            <Vote className="h-4 w-4" />
-          </div>
-        </div>
-
-        {/* Real Vote Percentage Breakdown Bar */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
-            <span>สัดส่วนคะแนนโหวต Top 3</span>
-            <span className="font-bold text-foreground">{totalVotesCast} เสียงโหวตทั้งหมด</span>
-          </div>
-          <div className="flex h-4 w-full overflow-hidden rounded-full bg-slate-100 p-0.5">
-            <div className="h-full bg-amber-400 rounded-l-full transition-all duration-500" style={{ width: `${firstPct}%` }} />
-            <div className="h-full bg-indigo-500 transition-all duration-500 mx-0.5" style={{ width: `${secondPct}%` }} />
-            <div className="h-full bg-rose-400 rounded-r-full transition-all duration-500" style={{ width: `${thirdPct}%` }} />
-          </div>
-          <div className="flex justify-between text-xs font-bold">
-            <span className="text-amber-600">อันดับ 1 ({firstPct}%)</span>
-            <span className="text-indigo-600">อันดับ 2 ({secondPct}%)</span>
-            <span className="text-rose-600">อันดับ 3 ({thirdPct}%)</span>
-          </div>
-        </div>
-
-        {/* 3 Metric Cards */}
-        <div className="grid grid-cols-3 gap-3 border-t border-slate-100 pt-4 text-center">
-          <div className="bg-amber-50/60 p-3.5 rounded-2xl border border-amber-100">
-            <p className="text-xs font-bold text-amber-700">คะแนนสูงสุด</p>
-            <p className="mt-1 text-xl font-extrabold text-foreground tabular-nums">{firstPlace.votes}<span className="text-xs font-normal"> โหวต</span></p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">อันดับ 1</p>
-          </div>
-          <div className="bg-primary-light/50 p-3.5 rounded-2xl border border-primary/10">
-            <p className="text-xs font-bold text-primary">ยอดโหวตรวม</p>
-            <p className="mt-1 text-xl font-extrabold text-foreground tabular-nums">{totalVotesCast}<span className="text-xs font-normal"> เสียง</span></p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">จากสมาชิก</p>
-          </div>
-          <div className="bg-emerald-50/60 p-3.5 rounded-2xl border border-emerald-100">
-            <p className="text-xs font-bold text-emerald-600">ความโปร่งใส</p>
-            <p className="mt-1 text-xl font-extrabold text-foreground tabular-nums">100<span className="text-xs font-normal">%</span></p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">โปร่งใส</p>
-          </div>
-        </div>
-      </div>
-
-      {/* ===== LIVE SUMMARY TICKER BANNER ===== */}
-      <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-card flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-2 font-bold text-slate-700">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-ping" />
-            รวมคะแนนโหวตสะสมจากสมาชิกทั้งหมด
-          </span>
-          <span className="text-xl sm:text-2xl font-black text-primary tabular-nums tracking-tight">
-            {totalVotesCast} <span className="text-xs font-normal text-muted-foreground">เสียงโหวต</span>
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium">
-          <Sparkles className="h-4 w-4 text-amber-500" />
-          <span>จัดอันดับแบบเรียลไทม์จากเสียงโหวตของผู้ใช้งานจริง</span>
-        </div>
-      </div>
-
-      {/* ===== LEADERBOARD TABLE (#4 AND BELOW) ===== */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between px-1">
-          <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-            <Award className="h-4 w-4 text-primary" />
-            <span>ตารางสรุปผลคะแนนโหวตศิษย์เก่าทั้งหมด</span>
-          </h3>
-          <span className="text-xs text-muted-foreground">ทั้งหมด {candidates.length} รายการ</span>
-        </div>
-
-        {loading && <p className="text-center text-xs text-muted-foreground py-8">กำลังค้นหาข้อมูล...</p>}
-
-        {!loading && candidates.length === 0 && (
-          <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center text-muted-foreground shadow-card">
-            <p className="text-sm">ไม่พบศิษย์เก่าตามเงื่อนไขที่ค้นหา</p>
-          </div>
-        )}
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          {(query ? sortedCandidates : remainingCandidates).map((c, index) => {
-            const rankNumber = query ? index + 1 : index + 4;
-            const isVoted = votedIds[c.id];
-
-            return (
-              <div
-                key={c.id}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-card transition-all"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  {/* Rank Badge Number */}
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 font-black text-xs text-slate-700">
-                    #{rankNumber}
-                  </span>
-
-                  {/* Avatar */}
-                  <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100">
-                    <img
-                      src={c.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400'}
-                      alt={c.name}
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-
-                  {/* Info */}
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs sm:text-sm font-bold text-foreground truncate">{c.name}</p>
-                      <span className="shrink-0 rounded-full bg-primary-light px-2 py-0.5 text-xs font-semibold text-primary">
-                        {c.generation_label}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {c.position} {c.company ? `· ${c.company}` : ''}
-                    </p>
-                    {c.description && (
-                      <p className="text-xs text-slate-400 truncate mt-0.5">{c.description}</p>
-                    )}
+                  <div className="absolute -bottom-2.5 -right-2.5 flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-slate-400 to-slate-200 text-white font-black text-sm shadow-md border-2 border-white">
+                    🥈
                   </div>
                 </div>
 
-                {/* Real Votes & Vote Action */}
-                <div className="flex flex-col items-end gap-1.5 shrink-0">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-xs font-extrabold text-amber-700">
-                    <Vote className="h-3 w-3 text-amber-500" />
-                    {c.votes} คะแนนโหวต
-                  </span>
+                <span className="inline-block rounded-full bg-slate-100 px-3 py-0.5 text-xs font-bold text-slate-600 mb-1.5">
+                  {top2.generation_label}
+                </span>
+                <h3 className="font-bold text-slate-900 text-base leading-tight truncate">{top2.name}</h3>
+                <p className="text-xs font-medium text-slate-500 mt-1 line-clamp-1">{top2.position}</p>
+                <p className="text-xs text-indigo-600 font-semibold truncate">{top2.company}</p>
 
+                <p className="mt-3 text-xs text-slate-600 line-clamp-2 leading-relaxed bg-slate-50 rounded-xl p-2">
+                  &ldquo;{top2.description}&rdquo;
+                </p>
+
+                <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                  <div className="text-left">
+                    <span className="text-xs text-slate-400 font-medium">คะแนนโหวต</span>
+                    <p className="text-base font-black text-slate-700">{top2.votes || 0}</p>
+                  </div>
                   <button
-                    onClick={() => handleVote(c.id)}
-                    disabled={isVoted}
-                    className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-all ${
-                      isVoted
+                    onClick={() => handleVote(top2.id)}
+                    disabled={votedIds[top2.id]}
+                    className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition-all shadow-sm ${
+                      votedIds[top2.id]
                         ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                        : 'bg-primary-light text-primary hover:bg-primary hover:text-white active:scale-95'
+                        : 'bg-gradient-to-r from-slate-700 to-slate-900 text-white hover:opacity-90 active:scale-95'
                     }`}
                   >
-                    {isVoted ? (
+                    {votedIds[top2.id] ? (
                       <>
-                        <CheckCircle2 className="h-3 w-3" /> โหวตแล้ว ✨
+                        <CheckCircle2 className="h-3.5 w-3.5" /> โหวตแล้ว
                       </>
                     ) : (
                       <>
-                        <Vote className="h-3 w-3" /> ลงคะแนนโหวต (+1)
+                        <Heart className="h-3.5 w-3.5" /> โหวต
                       </>
                     )}
                   </button>
                 </div>
               </div>
-            );
-          })}
+
+              {/* Podium Base 2 */}
+              <div className="hidden md:flex w-full h-16 bg-gradient-to-t from-slate-300 to-slate-200 rounded-t-2xl items-center justify-center font-black text-slate-600 text-lg shadow-inner">
+                อันดับ 2
+              </div>
+            </div>
+
+            {/* Rank 1 (Gold - Center & Elevated) */}
+            <div className="order-1 md:order-2 flex flex-col items-center -mt-4 sm:-mt-8 z-10">
+              <div className="w-full rounded-[32px] border-2 border-amber-400 bg-gradient-to-b from-amber-50/50 to-white p-6 text-center shadow-xl ring-4 ring-amber-100 transition-transform duration-200 hover:-translate-y-1">
+                <div className="mb-2 flex justify-center">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 px-3 py-1 text-xs font-black text-white shadow-sm animate-pulse">
+                    <Crown className="h-3.5 w-3.5" /> อันดับ 1 ยอดนิยม
+                  </span>
+                </div>
+
+                <div className="relative mx-auto mb-3 inline-block">
+                  <img
+                    src={top1.avatar_url}
+                    alt={top1.name}
+                    className="h-28 w-28 rounded-2xl object-cover ring-4 ring-amber-400 shadow-xl"
+                  />
+                  <div className="absolute -bottom-3 -right-3 flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-300 text-white font-black text-base shadow-lg border-2 border-white">
+                    🥇
+                  </div>
+                </div>
+
+                <span className="inline-block rounded-full bg-amber-100 px-3 py-0.5 text-xs font-bold text-amber-800 mb-1.5">
+                  {top1.generation_label}
+                </span>
+                <h3 className="font-extrabold text-slate-900 text-lg leading-tight truncate">{top1.name}</h3>
+                <p className="text-xs font-semibold text-slate-600 mt-1 line-clamp-1">{top1.position}</p>
+                <p className="text-xs text-amber-600 font-bold truncate">{top1.company}</p>
+
+                <p className="mt-3 text-xs text-slate-700 line-clamp-2 leading-relaxed bg-amber-50/70 rounded-xl p-2.5 font-medium border border-amber-100">
+                  &ldquo;{top1.description}&rdquo;
+                </p>
+
+                <div className="mt-4 flex items-center justify-between border-t border-amber-100 pt-3">
+                  <div className="text-left">
+                    <span className="text-xs text-slate-400 font-medium">คะแนนโหวต</span>
+                    <p className="text-xl font-black text-amber-600">{top1.votes || 0}</p>
+                  </div>
+                  <button
+                    onClick={() => handleVote(top1.id)}
+                    disabled={votedIds[top1.id]}
+                    className={`flex items-center gap-1.5 rounded-full px-5 py-2.5 text-xs font-black transition-all shadow-md ${
+                      votedIds[top1.id]
+                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                        : 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white hover:opacity-90 active:scale-95'
+                    }`}
+                  >
+                    {votedIds[top1.id] ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4" /> โหวตแล้ว
+                      </>
+                    ) : (
+                      <>
+                        <Heart className="h-4 w-4" /> โหวตเกียรติยศ
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Podium Base 1 */}
+              <div className="hidden md:flex w-full h-24 bg-gradient-to-t from-amber-400 to-amber-300 rounded-t-2xl items-center justify-center font-black text-amber-900 text-xl shadow-inner">
+                🥇 ชนะเลิศอันดับ 1
+              </div>
+            </div>
+
+            {/* Rank 3 (Bronze) */}
+            <div className="order-3 md:order-3 flex flex-col items-center">
+              <div className="w-full rounded-[28px] border-2 border-orange-200 bg-white/95 p-5 text-center shadow-lg transition-transform duration-200 hover:-translate-y-1">
+                <div className="relative mx-auto mb-3 inline-block">
+                  <img
+                    src={top3.avatar_url}
+                    alt={top3.name}
+                    className="h-24 w-24 rounded-2xl object-cover ring-4 ring-orange-200 shadow-md"
+                  />
+                  <div className="absolute -bottom-2.5 -right-2.5 flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-700 to-orange-400 text-white font-black text-sm shadow-md border-2 border-white">
+                    🥉
+                  </div>
+                </div>
+
+                <span className="inline-block rounded-full bg-orange-100 px-3 py-0.5 text-xs font-bold text-orange-700 mb-1.5">
+                  {top3.generation_label}
+                </span>
+                <h3 className="font-bold text-slate-900 text-base leading-tight truncate">{top3.name}</h3>
+                <p className="text-xs font-medium text-slate-500 mt-1 line-clamp-1">{top3.position}</p>
+                <p className="text-xs text-indigo-600 font-semibold truncate">{top3.company}</p>
+
+                <p className="mt-3 text-xs text-slate-600 line-clamp-2 leading-relaxed bg-slate-50 rounded-xl p-2">
+                  &ldquo;{top3.description}&rdquo;
+                </p>
+
+                <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                  <div className="text-left">
+                    <span className="text-xs text-slate-400 font-medium">คะแนนโหวต</span>
+                    <p className="text-base font-black text-slate-700">{top3.votes || 0}</p>
+                  </div>
+                  <button
+                    onClick={() => handleVote(top3.id)}
+                    disabled={votedIds[top3.id]}
+                    className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition-all shadow-sm ${
+                      votedIds[top3.id]
+                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                        : 'bg-gradient-to-r from-orange-600 to-amber-700 text-white hover:opacity-90 active:scale-95'
+                    }`}
+                  >
+                    {votedIds[top3.id] ? (
+                      <>
+                        <CheckCircle2 className="h-3.5 w-3.5" /> โหวตแล้ว
+                      </>
+                    ) : (
+                      <>
+                        <Heart className="h-3.5 w-3.5" /> โหวต
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Podium Base 3 */}
+              <div className="hidden md:flex w-full h-12 bg-gradient-to-t from-orange-300 to-orange-200 rounded-t-2xl items-center justify-center font-black text-orange-900 text-base shadow-inner">
+                อันดับ 3
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ===== SEARCH & FILTER BAR ===== */}
+      <section className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-amber-500" />
+              <span>รายชื่อศิษย์เก่าในทำเนียบเกียรติยศ</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              ค้นหาและร่วมโหวตสนับสนุนศิษย์เก่าทุกรุ่น
+            </p>
+          </div>
+
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="ค้นหาชื่อ, บริษัท, ตำแหน่ง, รุ่น..."
+              className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100 shadow-2xs"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+
+        {loading && (
+          <div className="flex items-center gap-2 text-xs text-amber-600 py-1">
+            <span className="h-3.5 w-3.5 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" />
+            <span>กำลังค้นหาข้อมูล...</span>
+          </div>
+        )}
+      </section>
+
+      {/* ===== CANDIDATES GRID ===== */}
+      <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {restCandidates.map((c, index) => {
+          const rank = isSearchActive ? index + 1 : index + 4;
+          return (
+            <div
+              key={c.id}
+              className="group flex flex-col justify-between rounded-[28px] border border-slate-200 bg-white p-5 shadow-card transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
+            >
+              <div>
+                {/* Image + Rank badge */}
+                <div className="relative mb-4 overflow-hidden rounded-2xl bg-slate-100 aspect-[4/3]">
+                  <img
+                    src={c.avatar_url}
+                    alt={c.name}
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                  <div className="absolute top-3 left-3 flex h-7 w-7 items-center justify-center rounded-xl bg-slate-900/80 backdrop-blur-sm text-white font-bold text-xs shadow-md">
+                    #{rank}
+                  </div>
+                  {c.generation_label && (
+                    <div className="absolute top-3 right-3">
+                      <span className="rounded-full bg-white/90 backdrop-blur-sm px-2.5 py-1 text-xs font-bold text-slate-700 shadow-sm">
+                        {c.generation_label}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="space-y-1">
+                  <h4 className="font-bold text-slate-900 text-base leading-snug group-hover:text-amber-600 transition-colors">
+                    {c.name}
+                  </h4>
+                  <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                    <Briefcase className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    <span className="truncate">{c.position}</span>
+                  </div>
+                  {c.company && (
+                    <div className="flex items-center gap-1.5 text-xs text-indigo-600 font-semibold">
+                      <Building2 className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{c.company}</span>
+                    </div>
+                  )}
+                  {c.description && (
+                    <p className="mt-2 text-xs text-slate-500 line-clamp-2 leading-relaxed bg-slate-50 rounded-xl p-2.5">
+                      {c.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Vote bar */}
+              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-slate-400 font-medium">คะแนน:</span>
+                  <span className="text-sm font-black text-slate-800">{c.votes || 0}</span>
+                </div>
+
+                <button
+                  onClick={() => handleVote(c.id)}
+                  disabled={votedIds[c.id]}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all shadow-2xs ${
+                    votedIds[c.id]
+                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                      : 'bg-slate-100 text-slate-700 hover:bg-rose-50 hover:text-rose-600 active:scale-95'
+                  }`}
+                >
+                  {votedIds[c.id] ? (
+                    <>
+                      <CheckCircle2 className="h-3.5 w-3.5" /> โหวตแล้ว
+                    </>
+                  ) : (
+                    <>
+                      <Heart className="h-3.5 w-3.5" /> โหวต
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+
+        {restCandidates.length === 0 && !loading && (
+          <div className="col-span-full rounded-[28px] border border-slate-100 bg-white p-12 text-center text-slate-400">
+            <Trophy className="mx-auto h-10 w-10 text-slate-300" />
+            <p className="mt-3 text-sm font-medium">ไม่พบผลลัพธ์ที่ตรงกับคำค้นหา &ldquo;{query}&rdquo;</p>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

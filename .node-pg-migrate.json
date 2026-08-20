@@ -1,0 +1,8 @@
+{
+  "migrationsTable": "pgmigrations",
+  "dir": "migrations",
+  "direction": "up",
+  "count": "Infinity",
+  "verbose": true,
+  "decamelize": true
+}

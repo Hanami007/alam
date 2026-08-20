@@ -370,3 +370,126 @@ insert into photo_tags (asset_id, tagged_user_id, tagged_by, tag_source) values
 insert into photo_view_verifications (asset_id, user_id, question, is_passed, points_earned) values
 ((select id from media_assets where caption='พิธีรับปริญญา รุ่น 43'), (select id from users where student_id='61010045'),
  'อาจารย์ที่ปรึกษาของรุ่นนี้ชื่ออะไร?', true, 5);
+
+ -- ============================================================
+-- เพิ่มข้อมูลจำลอง 10 คน สำหรับ Hall of Fame (มีคะแนนโหวตหลากหลาย)
+-- วางต่อท้ายไฟล์ db/init.sql เดิม (ต่อจาก insert into photo_view_verifications เดิม)
+-- ============================================================
+
+insert into users (student_id, citizen_id_hash, email, name, generation_option_id, province_option_id, career_option_id, company, position, bio, avatar_url, role, status, total_points, hometown_province_id, work_province_id, show_hometown_on_map, show_workplace_on_map, student_status, expected_graduation_year) values
+('62010021', 'hash_62010021', 'wipada.s@example.edu', 'วิภาดา ศรีสุข',
+  (select id from lookup_options where code='gen-43'), (select id from lookup_options where code='th-nma'), (select id from lookup_options where code='career-gov'),
+  'โรงเรียนราชสีมาวิทยาลัย', 'ครูสอนภาษาอังกฤษ', 'พัฒนาหลักสูตรภาษาอังกฤษให้เด็กในพื้นที่ห่างไกลกว่า 10 ปี',
+  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80', 'alumni', 'approved', 9,
+  (select id from lookup_options where code='th-nma'), (select id from lookup_options where code='th-nma'), true, true, 'alumni', 2015),
+
+('62010022', 'hash_62010022', 'thanakorn.p@example.edu', 'ธนากร พงษ์พันธ์',
+  (select id from lookup_options where code='gen-46'), (select id from lookup_options where code='th-cbi'), (select id from lookup_options where code='career-private'),
+  'บริษัท ปตท. จำกัด (มหาชน)', 'วิศวกรปิโตรเลียม', 'ควบคุมดูแลระบบท่อขนส่งก๊าซธรรมชาติภาคตะวันออก',
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80', 'alumni', 'approved', 7,
+  (select id from lookup_options where code='th-cbi'), (select id from lookup_options where code='th-cbi'), true, true, 'alumni', 2018),
+
+('62010023', 'hash_62010023', 'orathai.m@example.edu', 'อรทัย มีสุข',
+  (select id from lookup_options where code='gen-48'), (select id from lookup_options where code='th-cnx'), (select id from lookup_options where code='career-freelance'),
+  'อิสระ', 'นักออกแบบกราฟิก', 'ออกแบบแบรนด์ให้ธุรกิจ SME ในภาคเหนือกว่า 50 ราย',
+  'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=400&q=80', 'alumni', 'approved', 5,
+  (select id from lookup_options where code='th-cnx'), (select id from lookup_options where code='th-cnx'), true, true, 'alumni', 2020),
+
+('62010024', 'hash_62010024', 'prasert.y@example.edu', 'ประเสริฐ ยิ้มแย้ม',
+  (select id from lookup_options where code='gen-43'), (select id from lookup_options where code='th-bkk'), (select id from lookup_options where code='career-private'),
+  'สำนักงานกฎหมาย ยิ้มแย้ม แอนด์ พาร์ทเนอร์ส', 'ทนายความอาวุโส', 'ให้คำปรึกษากฎหมายฟรีแก่ศิษย์เก่าที่เดือดร้อนมากว่า 12 ปี',
+  'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=400&q=80', 'alumni', 'approved', 14,
+  (select id from lookup_options where code='th-bkk'), (select id from lookup_options where code='th-bkk'), true, true, 'alumni', 2015),
+
+('62010025', 'hash_62010025', 'kamonchanok.s@example.edu', 'กมลชนก แสงทอง',
+  (select id from lookup_options where code='gen-46'), (select id from lookup_options where code='th-bkk'), (select id from lookup_options where code='career-private'),
+  'สถานีข่าวไทยพีบีเอส', 'ผู้สื่อข่าวสายสิ่งแวดล้อม', 'รายงานข่าวเชิงลึกด้านสิ่งแวดล้อมที่ได้รับรางวัลระดับประเทศ',
+  'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&w=400&q=80', 'alumni', 'approved', 4,
+  (select id from lookup_options where code='th-bkk'), (select id from lookup_options where code='th-bkk'), true, true, 'alumni', 2018),
+
+('62010026', 'hash_62010026', 'chaiwat.r@example.edu', 'ชัยวัฒน์ รุ่งเรือง',
+  (select id from lookup_options where code='gen-48'), (select id from lookup_options where code='th-phk'), (select id from lookup_options where code='career-own'),
+  'ร้านอาหาร Rung Ruang Kitchen', 'เชฟเจ้าของร้าน', 'ร้านอาหารได้รับดาวมิชลินไกด์ 2 ปีซ้อน สร้างงานให้คนในพื้นที่กว่า 30 ตำแหน่ง',
+  'https://images.unsplash.com/photo-1583195764036-6dc248ac07d9?auto=format&fit=crop&w=400&q=80', 'alumni', 'approved', 18,
+  (select id from lookup_options where code='th-phk'), (select id from lookup_options where code='th-phk'), true, true, 'alumni', 2020),
+
+('62010027', 'hash_62010027', 'napassorn.j@example.edu', 'นภัสสร ใจงาม',
+  (select id from lookup_options where code='gen-43'), (select id from lookup_options where code='th-kkc'), (select id from lookup_options where code='career-private'),
+  'บริษัท ใจงาม สถาปนิก จำกัด', 'สถาปนิกอาวุโส', 'ออกแบบอาคารประหยัดพลังงานให้หน่วยงานราชการในภาคอีสาน',
+  'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80', 'alumni', 'approved', 6,
+  (select id from lookup_options where code='th-kkc'), (select id from lookup_options where code='th-kkc'), true, true, 'alumni', 2015),
+
+('62010028', 'hash_62010028', 'piyapong.p@example.edu', 'ปิยะพงษ์ เพชรดี',
+  (select id from lookup_options where code='gen-46'), (select id from lookup_options where code='th-bkk'), (select id from lookup_options where code='career-private'),
+  'บริษัท Petch Games Studio', 'ผู้ก่อตั้งและนักพัฒนาเกม', 'พัฒนาเกมมือถือที่มียอดดาวน์โหลดกว่า 2 ล้านครั้งทั่วโลก',
+  'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=400&q=80', 'alumni', 'approved', 8,
+  (select id from lookup_options where code='th-bkk'), (select id from lookup_options where code='th-bkk'), true, true, 'alumni', 2018),
+
+('62010029', 'hash_62010029', 'sunisa.t@example.edu', 'สุนิสา ทองแท้',
+  (select id from lookup_options where code='gen-48'), (select id from lookup_options where code='th-sni'), (select id from lookup_options where code='career-own'),
+  'สวนผลไม้ทองแท้ ออร์แกนิค', 'เจ้าของธุรกิจเกษตรอินทรีย์', 'ส่งออกผลไม้อินทรีย์ไปยัง 5 ประเทศ สร้างรายได้ให้เกษตรกรในพื้นที่',
+  'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=400&q=80', 'alumni', 'approved', 11,
+  (select id from lookup_options where code='th-sni'), (select id from lookup_options where code='th-sni'), true, true, 'alumni', 2020),
+
+('62010030', 'hash_62010030', 'anucha.s@example.edu', 'อนุชา ศักดิ์สิทธิ์',
+  (select id from lookup_options where code='gen-43'), (select id from lookup_options where code='th-nkp'), (select id from lookup_options where code='career-gov'),
+  'สมาคมกีฬาแห่งประเทศไทย', 'อดีตนักกีฬาทีมชาติ', 'เหรียญทองซีเกมส์ 2 สมัย ปัจจุบันเป็นผู้ฝึกสอนเยาวชน',
+  'https://images.unsplash.com/photo-1552058544-f2b08422138a?auto=format&fit=crop&w=400&q=80', 'alumni', 'approved', 2,
+  (select id from lookup_options where code='th-nkp'), (select id from lookup_options where code='th-nkp'), true, false, 'alumni', 2015);
+
+-- เพิ่มเป็นผู้เข้าชิง Hall of Fame แคมเปญเดิม
+insert into hof_candidates (campaign_id, user_id, description) values
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010021'), 'พัฒนาหลักสูตรภาษาอังกฤษให้เด็กในพื้นที่ห่างไกลกว่า 10 ปี'),
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010022'), 'ควบคุมดูแลระบบท่อขนส่งก๊าซธรรมชาติภาคตะวันออก'),
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010023'), 'ออกแบบแบรนด์ให้ธุรกิจ SME ในภาคเหนือกว่า 50 ราย'),
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010024'), 'ให้คำปรึกษากฎหมายฟรีแก่ศิษย์เก่าที่เดือดร้อนมากว่า 12 ปี'),
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010025'), 'รายงานข่าวเชิงลึกด้านสิ่งแวดล้อมที่ได้รับรางวัลระดับประเทศ'),
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010026'), 'ร้านอาหารได้รับดาวมิชลินไกด์ 2 ปีซ้อน สร้างงานให้คนในพื้นที่กว่า 30 ตำแหน่ง'),
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010027'), 'ออกแบบอาคารประหยัดพลังงานให้หน่วยงานราชการในภาคอีสาน'),
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010028'), 'พัฒนาเกมมือถือที่มียอดดาวน์โหลดกว่า 2 ล้านครั้งทั่วโลก'),
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010029'), 'ส่งออกผลไม้อินทรีย์ไปยัง 5 ประเทศ สร้างรายได้ให้เกษตรกรในพื้นที่'),
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010030'), 'เหรียญทองซีเกมส์ 2 สมัย ปัจจุบันเป็นผู้ฝึกสอนเยาวชน');
+
+-- โหวตให้คะแนนหลากหลาย (ผลลัพธ์: ชัยวัฒน์ 30, ประเสริฐ 25, วิภาดา/ธนากร 20, อรทัย/ปิยะพงษ์ 10, กมลชนก/นภัสสร/สุนิสา 5, อนุชา 0)
+insert into hof_votes (campaign_id, voter_id, candidate_id, vote_category, points) values
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010021'),
+  (select id from hof_candidates where user_id=(select id from users where student_id='62010026')), 'other_generation', 10),
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010021'),
+  (select id from hof_candidates where user_id=(select id from users where student_id='62010024')), 'same_generation', 5),
+
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010022'),
+  (select id from hof_candidates where user_id=(select id from users where student_id='62010026')), 'other_generation', 10),
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010022'),
+  (select id from hof_candidates where user_id=(select id from users where student_id='62010025')), 'same_generation', 5),
+
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010023'),
+  (select id from hof_candidates where user_id=(select id from users where student_id='62010024')), 'other_generation', 10),
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010023'),
+  (select id from hof_candidates where user_id=(select id from users where student_id='62010029')), 'same_generation', 5),
+
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010024'),
+  (select id from hof_candidates where user_id=(select id from users where student_id='62010021')), 'other_generation', 10),
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010024'),
+  (select id from hof_candidates where user_id=(select id from users where student_id='62010027')), 'same_generation', 5),
+
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010025'),
+  (select id from hof_candidates where user_id=(select id from users where student_id='62010024')), 'other_generation', 10),
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010025'),
+  (select id from hof_candidates where user_id=(select id from users where student_id='62010022')), 'same_generation', 5),
+
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010026'),
+  (select id from hof_candidates where user_id=(select id from users where student_id='62010021')), 'other_generation', 10),
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010026'),
+  (select id from hof_candidates where user_id=(select id from users where student_id='62010025')), 'same_generation', 5),
+
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010027'),
+  (select id from hof_candidates where user_id=(select id from users where student_id='62010022')), 'other_generation', 10),
+
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010028'),
+  (select id from hof_candidates where user_id=(select id from users where student_id='62010023')), 'other_generation', 10),
+
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010029'),
+  (select id from hof_candidates where user_id=(select id from users where student_id='62010026')), 'other_generation', 10),
+
+((select id from hof_campaigns limit 1), (select id from users where student_id='62010030'),
+  (select id from hof_candidates where user_id=(select id from users where student_id='62010028')), 'other_generation', 10);
