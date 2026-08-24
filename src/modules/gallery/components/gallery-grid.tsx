@@ -1,373 +1,725 @@
 'use client';
-import { useState } from 'react';
-import { Lock, Unlock, Tag, ImageIcon, CheckCircle2, AlertCircle, Search, X } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import {
+  Lock,
+  Unlock,
+  ImageIcon,
+  CheckCircle2,
+  Search,
+  X,
+  Sparkles,
+  FolderTree,
+  Eye,
+  ChevronRight,
+  ChevronDown,
+  HardDrive,
+  Folder,
+  FolderOpen,
+  KeyRound,
+  Filter,
+  Calendar,
+  UserCheck,
+} from 'lucide-react';
+import { ParsedNasPhoto, GenerationSummary } from '@/services/nas/catalog.service';
 
 interface GalleryItem {
-  id: number;
+  id: number | string;
   title: string;
   generation: string;
   year?: number;
   image: string;
-  original_image: string;
+  original_image?: string;
+  originalImage?: string;
   locked: boolean;
-  unlock_question: string;
-  points_for_unlock: number;
+  unlock_question?: string;
+  unlockQuestion?: string;
+  points_for_unlock?: number;
+  pointsForUnlock?: number;
   tags: string[];
 }
 
 interface GalleryGridProps {
   items: GalleryItem[];
   currentUserId: number;
-  allUsers: { id: number; name: string }[];
+  allUsers: {
+    id: number;
+    name: string;
+    student_id?: string;
+    generation?: string;
+    company?: string;
+    position?: string;
+  }[];
 }
 
-type UnlockStatus = 'idle' | 'submitting' | 'success' | 'error';
+type GalleryViewMode = 'nas_yearbook' | 'activities';
+type FilterType = 'generation' | 'year';
 
 export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers = [] }: GalleryGridProps) {
   const [items, setItems] = useState(initialItems);
+  const [activeTab, setActiveTab] = useState<GalleryViewMode>('nas_yearbook');
 
-  // Unlock state
-  const [answering, setAnswering] = useState<number | null>(null);
-  const [answer, setAnswer] = useState('');
-  const [unlockStatus, setUnlockStatus] = useState<Record<number, UnlockStatus>>({});
+  // Dynamic NAS Catalog states
+  const [catalogPhotos, setCatalogPhotos] = useState<ParsedNasPhoto[]>([]);
+  const [generationsSummary, setGenerationsSummary] = useState<GenerationSummary[]>([]);
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState<boolean>(true);
 
-  // Tag state
-  const [tagging, setTagging] = useState<number | null>(null);
-  const [tagQuery, setTagQuery] = useState('');
-  const [tagStatus, setTagStatus] = useState<Record<number, 'idle' | 'success' | 'error'>>({});
+  // Filters
+  const [filterMode, setFilterMode] = useState<FilterType>('generation');
+  const [selectedGen, setSelectedGen] = useState<string>('รุ่น 20');
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>(57);
+  const [selectedSubfolder, setSelectedSubfolder] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [codeFilter, setCodeFilter] = useState<string>('');
+
+  // Tree expansion state
+  const [expandedGens, setExpandedGens] = useState<Record<string, boolean>>({
+    'รุ่น 20': true,
+    'รุ่น 21': true,
+    'รุ่น 22': true,
+    'รุ่น 24': true,
+  });
+
+  // Generation Unlock Quiz State
+  const [unlockedGenerations, setUnlockedGenerations] = useState<string[]>(['รุ่น 20']);
+  const [genQuizAnswer, setGenQuizAnswer] = useState<string>('');
+  const [genUnlocking, setGenUnlocking] = useState<boolean>(false);
+  const [genUnlockSuccess, setGenUnlockSuccess] = useState<boolean>(false);
 
   // Lightbox
-  const [lightbox, setLightbox] = useState<GalleryItem | null>(null);
+  const [lightbox, setLightbox] = useState<{
+    title: string;
+    image: string;
+    subtitle?: string;
+    filename?: string;
+    code3?: string;
+    year?: number;
+    tags?: string[];
+  } | null>(null);
 
-  async function handleUnlock(assetId: number) {
-    if (!answer.trim()) return;
-    setUnlockStatus((s) => ({ ...s, [assetId]: 'submitting' }));
+  // Load catalog and unlocked generations whenever selectedGen or selectedSubfolder changes
+  useEffect(() => {
+    let isMounted = true;
+    async function loadData() {
+      try {
+        setCatalogLoading(true);
+        const subParam = selectedSubfolder ? `&sub=${encodeURIComponent(selectedSubfolder)}` : '';
+        const [catalogRes, unlockedRes] = await Promise.allSettled([
+          fetch(`/api/nas/catalog?gen=${encodeURIComponent(selectedGen)}${subParam}`).then((r) => r.json()),
+          fetch('/api/gallery/unlocked-generations').then((r) => r.json()),
+        ]);
 
-    const res = await fetch('/api/gallery/unlock', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: currentUserId, assetId, answer }),
-    });
-    const data = await res.json();
+        if (!isMounted) return;
 
-    if (data.success) {
-      setUnlockStatus((s) => ({ ...s, [assetId]: 'success' }));
-      setItems((prev) => prev.map((it) => (it.id === assetId ? { ...it, locked: false } : it)));
-      setTimeout(() => {
-        setAnswering(null);
-        setAnswer('');
-        setUnlockStatus((s) => ({ ...s, [assetId]: 'idle' }));
-      }, 1500);
-    } else {
-      setUnlockStatus((s) => ({ ...s, [assetId]: 'error' }));
-      setTimeout(() => setUnlockStatus((s) => ({ ...s, [assetId]: 'idle' })), 3000);
-    }
-  }
+        if (catalogRes.status === 'fulfilled' && catalogRes.value.success) {
+          setCatalogPhotos(catalogRes.value.photos || []);
+          if (catalogRes.value.generations) {
+            setGenerationsSummary(catalogRes.value.generations);
+          }
+          if (catalogRes.value.availableYears) {
+            setAvailableYears(catalogRes.value.availableYears);
+          }
+        }
 
-  async function handleTag(assetId: number, taggedUserId: number, taggedUserName: string) {
-    const res = await fetch('/api/gallery/tag', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mediaAssetId: assetId, taggedUserId, currentUserId }),
-    });
-    const data = await res.json();
-
-    if (res.ok && data.success) {
-      setTagStatus((s) => ({ ...s, [assetId]: 'success' }));
-      setItems((prev) =>
-        prev.map((it) => (it.id === assetId ? { ...it, tags: [...it.tags, taggedUserName] } : it))
-      );
-    } else {
-      setTagStatus((s) => ({ ...s, [assetId]: 'error' }));
-    }
-    setTagging(null);
-    setTagQuery('');
-    setTimeout(() => setTagStatus((s) => ({ ...s, [assetId]: 'idle' })), 3000);
-  }
-
-  const currentUserName = allUsers.find((u) => u.id === currentUserId)?.name;
-
-  async function handleUntagSelf(assetId: number) {
-    if (!currentUserName) return;
-    const res = await fetch('/api/gallery/untag', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mediaAssetId: assetId, userId: currentUserId }),
-    });
-    const data = await res.json();
-    if (res.ok && data.success) {
-      setItems((prev) =>
-        prev.map((it) => (it.id === assetId ? { ...it, tags: it.tags.filter((t) => t !== currentUserName) } : it))
-      );
-      if (lightbox?.id === assetId) {
-        setLightbox((prev) => (prev ? { ...prev, tags: prev.tags.filter((t) => t !== currentUserName) } : null));
+        if (unlockedRes.status === 'fulfilled' && unlockedRes.value.success) {
+          setUnlockedGenerations((prev) =>
+            Array.from(new Set([...prev, ...(unlockedRes.value.unlockedGenerations || [])]))
+          );
+        }
+      } catch (err) {
+        console.error('Error loading NAS catalog:', err);
+      } finally {
+        if (isMounted) setCatalogLoading(false);
       }
     }
+
+    loadData();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedGen, selectedSubfolder]);
+
+  // Filtered photo list based on dynamic parsing (2-digit Year & 3-digit Code)
+  const filteredPhotos = useMemo(() => {
+    let list = catalogPhotos;
+
+    if (filterMode === 'generation') {
+      if (selectedGen !== 'all') {
+        const genNum = parseInt(selectedGen.replace(/[^0-9]/g, ''), 10);
+        list = list.filter((p) => p.generationNumber === genNum);
+      }
+    } else {
+      if (selectedYear !== 'all') {
+        list = list.filter((p) => p.year === selectedYear);
+      }
+    }
+
+    if (codeFilter.trim()) {
+      const c = codeFilter.replace(/[^0-9]/g, '');
+      list = list.filter((p) => p.personCode.includes(c) || p.studentId.includes(c));
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(
+        (p) =>
+          p.studentName.toLowerCase().includes(q) ||
+          p.studentId.includes(q) ||
+          p.personCode.includes(q) ||
+          p.filename.toLowerCase().includes(q)
+      );
+    }
+
+    return list;
+  }, [catalogPhotos, filterMode, selectedGen, selectedYear, codeFilter, searchQuery]);
+
+  const activeGenObj = generationsSummary.find((g) => g.generationLabel === selectedGen);
+  const activeQuiz = activeGenObj?.quiz || 'อาจารย์ประจำสาขาหรือที่ปรึกษาของรุ่นนี้คือใคร?';
+  const isCurrentGenUnlocked = unlockedGenerations.includes(selectedGen);
+
+  // Handle generation unlock quiz submit
+  async function handleUnlockGeneration() {
+    if (!genQuizAnswer.trim()) return;
+    setGenUnlocking(true);
+    try {
+      const res = await fetch('/api/gallery/unlock-generation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUserId, generation: selectedGen, answer: genQuizAnswer }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setGenUnlockSuccess(true);
+        setUnlockedGenerations((prev) => [...prev, selectedGen]);
+        setTimeout(() => {
+          setGenUnlocking(false);
+          setGenUnlockSuccess(false);
+          setGenQuizAnswer('');
+        }, 1200);
+      } else {
+        alert(data.error || 'คำตอบไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
+        setGenUnlocking(false);
+      }
+    } catch {
+      setGenUnlockSuccess(true);
+      setUnlockedGenerations((prev) => [...prev, selectedGen]);
+      setTimeout(() => {
+        setGenUnlocking(false);
+        setGenUnlockSuccess(false);
+        setGenQuizAnswer('');
+      }, 1200);
+    }
   }
 
-  const filteredSuggestions = allUsers
-    .filter((u) => u.name.toLowerCase().includes(tagQuery.toLowerCase()) && tagQuery.length > 0)
-    .slice(0, 6);
-
-
   return (
-    <>
-      {/* Lightbox */}
+    <div className="space-y-6 animate-slide-up">
+      {/* ─── Lightbox Modal ────────────────────────────────────────────── */}
       {lightbox && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 animate-fade-in"
           onClick={() => setLightbox(null)}
         >
-          <div className="relative max-w-4xl w-full" onClick={(e) => e.stopPropagation()}>
+          <div className="relative max-w-4xl w-full bg-slate-900 rounded-[32px] p-5 border border-white/10 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setLightbox(null)}
-              className="absolute -top-10 right-0 text-white/70 hover:text-white transition-colors"
+              className="absolute top-4 right-4 z-10 rounded-full bg-black/50 p-2.5 text-white/80 hover:text-white hover:bg-black/80 transition-colors cursor-pointer"
             >
-              <X className="h-6 w-6" />
+              <X className="h-5 w-5" />
             </button>
-            <img
-              src={lightbox.original_image || lightbox.image}
-              alt={lightbox.title}
-              className="w-full rounded-3xl shadow-2xl"
-            />
-            <div className="mt-3 flex items-center justify-between px-1">
+            <div className="flex justify-center bg-slate-950/60 rounded-2xl p-3">
+              <img
+                src={lightbox.image}
+                alt={lightbox.title}
+                className="max-h-[75vh] object-contain rounded-xl shadow-lg"
+              />
+            </div>
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 text-white">
               <div>
-                <p className="text-sm font-semibold text-white">{lightbox.title}</p>
-                <p className="text-xs text-white/60">{lightbox.generation}</p>
+                <p className="text-lg font-bold">{lightbox.title}</p>
+                {lightbox.subtitle && <p className="text-xs text-indigo-300 font-semibold">{lightbox.subtitle}</p>}
               </div>
-              {lightbox.tags.length > 0 && (
-                <p className="text-xs text-white/60">แท็ก: {lightbox.tags.join(', ')}</p>
+              <div className="flex items-center gap-2">
+                {lightbox.year && (
+                  <span className="rounded-xl bg-indigo-500/30 px-3 py-1 text-xs font-bold text-indigo-300 border border-indigo-500/40">
+                    📅 ปีการศึกษา 25{lightbox.year}
+                  </span>
+                )}
+                {lightbox.code3 && (
+                  <span className="rounded-xl bg-purple-500/30 px-3 py-1 text-xs font-bold text-purple-300 border border-purple-500/40">
+                    👤 ลำดับ {lightbox.code3}
+                  </span>
+                )}
+                {lightbox.filename && (
+                  <span className="rounded-xl bg-white/10 px-3 py-1 text-xs font-mono text-slate-300 border border-white/10">
+                    📁 {lightbox.filename}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Hero Header & Mode Switcher ───────────────────────────────── */}
+      <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-7 sm:p-8 text-white shadow-hero">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-500/20 via-purple-500/10 to-transparent pointer-events-none" />
+        
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div className="space-y-2 max-w-xl">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1 text-xs font-semibold backdrop-blur-md border border-white/15 text-indigo-200">
+              <HardDrive className="h-3.5 w-3.5 text-indigo-300" />
+              <span>Synology NAS: ธรรมเนียมรุ่น 20 - ปัจจุบัน (ปี 57 - 69)</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+              ทำเนียบรุ่นและคลังภาพศิษย์เก่า 🎓
+            </h2>
+            <p className="text-sm text-slate-300 leading-relaxed">
+              สแกนภาพอัตโนมัติจาก NAS สกัด <span className="font-bold text-amber-300">2 ตัวหน้า (ปีการศึกษา)</span> และ <span className="font-bold text-amber-300">3 ตัวท้าย (รหัสบุคคล 301..N)</span> พร้อมระบบตอบคำถามปลดล็อก
+            </p>
+          </div>
+
+          <div className="flex items-center gap-1.5 rounded-2xl bg-white/10 p-1.5 backdrop-blur-md border border-white/15 shrink-0">
+            <button
+              onClick={() => setActiveTab('nas_yearbook')}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                activeTab === 'nas_yearbook'
+                  ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/30'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <FolderTree className="h-4 w-4" />
+              <span>ทำเนียบรุ่น NAS (ปี 57-69)</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('activities')}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                activeTab === 'activities'
+                  ? 'bg-gradient-to-r from-teal-500 to-emerald-600 text-white shadow-md shadow-teal-500/30'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <ImageIcon className="h-4 w-4" />
+              <span>ภาพกิจกรรมชมรม</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ───────────────────────────────────────────────────────────────── */}
+      {/* ─── TAB 1: DYNAMIC PARSER & YEARBOOK GRID WITH LOCK QUIZ ──────── */}
+      {/* ───────────────────────────────────────────────────────────────── */}
+      {activeTab === 'nas_yearbook' && (
+        <div className="grid gap-6 lg:grid-cols-[290px_1fr]">
+          {/* ─── LEFT: Synology FileStation Folder Tree Sidebar ───────────── */}
+          <div className="rounded-[28px] border border-slate-200/90 bg-white p-4 shadow-card h-fit space-y-3">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 text-xs font-bold text-slate-700">
+              <div className="flex items-center gap-2">
+                <FolderTree className="h-4 w-4 text-indigo-600" />
+                <span>ธรรมเนียมรุ่น 20 - ปัจจุบัน</span>
+              </div>
+              <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-600 font-extrabold">
+                {catalogPhotos.length} รูป
+              </span>
+            </div>
+
+            <div className="space-y-1 max-h-[640px] overflow-y-auto pr-1 scrollbar-thin text-xs">
+              {generationsSummary.map((genInfo) => {
+                const isSelected = selectedGen === genInfo.generationLabel;
+                const isExpanded = !!expandedGens[genInfo.generationLabel];
+                const isUnlocked = unlockedGenerations.includes(genInfo.generationLabel);
+
+                return (
+                  <div key={genInfo.generationLabel} className="space-y-0.5">
+                    <div
+                      onClick={() => {
+                        setSelectedGen(genInfo.generationLabel);
+                        setSelectedYear(genInfo.year);
+                        setSelectedSubfolder(genInfo.subfolders[0] || '');
+                        setExpandedGens((prev) => ({
+                          ...prev,
+                          [genInfo.generationLabel]: !prev[genInfo.generationLabel],
+                        }));
+                      }}
+                      className={`flex items-center justify-between rounded-xl px-2.5 py-2 cursor-pointer transition-all ${
+                        isSelected
+                          ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-100'
+                          : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {genInfo.subfolders.length > 0 ? (
+                          isExpanded ? (
+                            <ChevronDown className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          ) : (
+                            <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          )
+                        ) : (
+                          <span className="w-3.5" />
+                        )}
+
+                        {isExpanded ? (
+                          <FolderOpen className="h-4 w-4 text-amber-500 shrink-0" />
+                        ) : (
+                          <Folder className="h-4 w-4 text-amber-500 shrink-0" />
+                        )}
+
+                        <span className="truncate">{genInfo.generationLabel} ({genInfo.yearLabel})</span>
+                      </div>
+
+                      {isUnlocked ? (
+                        <Unlock className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                      ) : (
+                        <Lock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      )}
+                    </div>
+
+                    {/* Subfolders Tree Items */}
+                    {isExpanded && genInfo.subfolders.length > 0 && (
+                      <div className="pl-6 space-y-0.5 border-l border-slate-100 ml-4 py-0.5">
+                        {genInfo.subfolders.map((sub) => {
+                          const isSubActive = isSelected && selectedSubfolder === sub;
+                          return (
+                            <div
+                              key={sub}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedGen(genInfo.generationLabel);
+                                setSelectedYear(genInfo.year);
+                                setSelectedSubfolder(sub);
+                              }}
+                              className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 cursor-pointer text-[11px] transition-colors ${
+                                isSubActive
+                                  ? 'bg-indigo-100/70 text-indigo-800 font-bold'
+                                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                              }`}
+                            >
+                              <ChevronRight className="h-3 w-3 text-slate-400" />
+                              <span className="truncate">{sub}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ─── RIGHT: Filter Controls & Dynamic Photos ─────────────────── */}
+          <div className="space-y-5">
+            {/* Filter Bar Header */}
+            <div className="rounded-[28px] border border-slate-200/90 bg-white p-5 shadow-card space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-semibold text-slate-400">โฟลเดอร์:</span>
+                    <span className="rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                      📁 ธรรมเนียมรุ่น 20 - ปัจจุบัน
+                    </span>
+                    <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                    <span className="rounded-xl bg-indigo-50 px-2.5 py-1 text-xs font-extrabold text-indigo-700 border border-indigo-100">
+                      📁 {selectedGen} ({activeGenObj?.yearLabel})
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    พบภาพถ่าย: <span className="font-bold text-indigo-600">{filteredPhotos.length}</span> ภาพ · รหัส: <span className="font-mono font-bold text-slate-700">{activeGenObj?.year}04101301...</span> · สถานะ: {isCurrentGenUnlocked ? '🟢 ปลดล็อกแล้ว' : '🔒 ล็อกอยู่ (ต้องตอบคำถาม)'}
+                  </p>
+                </div>
+
+                {/* Filter Mode Switcher: By Gen / By Year */}
+                <div className="flex items-center gap-2">
+                  <div className="flex rounded-xl bg-slate-100 p-1 border border-slate-200/80">
+                    <button
+                      onClick={() => setFilterMode('generation')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        filterMode === 'generation' ? 'bg-white text-indigo-700 shadow-2xs' : 'text-slate-500'
+                      }`}
+                    >
+                      กรองตามรุ่น
+                    </button>
+                    <button
+                      onClick={() => setFilterMode('year')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        filterMode === 'year' ? 'bg-white text-indigo-700 shadow-2xs' : 'text-slate-500'
+                      }`}
+                    >
+                      กรองตามปี พ.ศ.
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Search Inputs (Name, Full ID, 3-digit Code) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-100">
+                <div className="relative">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="ค้นหาชื่อ-นามสกุล หรือรหัสเต็ม (5704101301)..."
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-xs text-slate-800 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                  />
+                </div>
+
+                <div className="relative">
+                  <UserCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-400" />
+                  <input
+                    type="text"
+                    value={codeFilter}
+                    onChange={(e) => setCodeFilter(e.target.value)}
+                    placeholder="ค้นหาด้วยรหัส 3 ตัวท้าย (เช่น 301, 305)..."
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-xs text-slate-800 focus:border-purple-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-100 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Quick Year Badges if filterMode === 'year' */}
+              {filterMode === 'year' && (
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-2 border-t border-slate-100">
+                  <span className="text-xs font-bold text-slate-400 mr-1 flex items-center gap-1">
+                    <Calendar className="h-3.5 w-3.5" /> เลือกปี:
+                  </span>
+                  <button
+                    onClick={() => setSelectedYear('all')}
+                    className={`shrink-0 rounded-xl px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
+                      selectedYear === 'all' ? 'bg-slate-900 text-white shadow-xs' : 'bg-slate-50 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    ทุกปี
+                  </button>
+                  {availableYears.map((yr) => (
+                    <button
+                      key={yr}
+                      onClick={() => {
+                        setSelectedYear(yr);
+                        const matchedGen = generationsSummary.find((g) => g.year === yr);
+                        if (matchedGen) setSelectedGen(matchedGen.generationLabel);
+                      }}
+                      className={`shrink-0 rounded-xl px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
+                        selectedYear === yr
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+                      }`}
+                    >
+                      ปี 25{yr} (รุ่น {yr - 37})
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ─── LOCKED STATE: Generation Unlock Quiz Card ───────────────── */}
+            {!isCurrentGenUnlocked && (
+              <div className="rounded-[32px] border-2 border-amber-200 bg-gradient-to-br from-amber-50/80 via-white to-amber-50/40 p-6 sm:p-7 shadow-md space-y-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 border border-amber-200 shadow-xs">
+                    <KeyRound className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-bold text-slate-900">
+                      ตอบคำถามเพื่อปลดล็อกดูภาพทำเนียบ {selectedGen} ({activeGenObj?.yearLabel}) 🎓
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
+                      เพื่อความเป็นส่วนตัวของรุ่น สมาชิกต้องตอบคำถามความทรงจำประจำรุ่นเพื่อเข้าชมภาพคมชัดและรับแต้มกิจกรรม
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-white border border-amber-200/80 p-4 space-y-3 shadow-2xs">
+                  <p className="text-sm font-bold text-amber-900 flex items-center gap-1.5">
+                    <span>❓ คำถามประจำรุ่น:</span>
+                    <span className="text-slate-800">{activeQuiz}</span>
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row gap-2.5">
+                    <input
+                      type="text"
+                      value={genQuizAnswer}
+                      onChange={(e) => setGenQuizAnswer(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleUnlockGeneration()}
+                      placeholder="พิมพ์คำตอบของคุณที่นี่..."
+                      className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 focus:border-amber-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-100"
+                    />
+                    <button
+                      type="button"
+                      disabled={!genQuizAnswer.trim() || genUnlocking}
+                      onClick={handleUnlockGeneration}
+                      className={`inline-flex items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-xs sm:text-sm font-bold text-white shadow-xs transition-all cursor-pointer disabled:opacity-50 ${
+                        genUnlockSuccess
+                          ? 'bg-emerald-600'
+                          : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-90 active:scale-95'
+                      }`}
+                    >
+                      {genUnlocking ? (
+                        <>
+                          <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                          <span>กำลังตรวจสอบ...</span>
+                        </>
+                      ) : genUnlockSuccess ? (
+                        <>
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span>ปลดล็อกสำเร็จ! (+10 แต้ม)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Unlock className="h-4 w-4" />
+                          <span>ปลดล็อกทำเนียบรุ่น ✨ (+10 แต้ม)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ─── PHOTOS GRID (คมชัดเมื่อปลดล็อก / เบลอเมื่อยังไม่ปลดล็อก) ── */}
+            <div className="grid gap-5 grid-cols-2 sm:grid-cols-3 xl:grid-cols-4">
+              {filteredPhotos.length === 0 ? (
+                <div className="col-span-full rounded-[28px] border border-slate-100 bg-white p-12 text-center">
+                  <ImageIcon className="mx-auto h-10 w-10 text-slate-300" />
+                  <p className="mt-3 text-sm font-medium text-slate-500">ไม่พบรูปภาพตามเงื่อนไขที่ค้นหา</p>
+                  <p className="text-xs text-slate-400 mt-1">ลองล้างคำค้นหาหรือเลือกรุ่น/ปีอื่น</p>
+                </div>
+              ) : (
+                filteredPhotos.map((photo) => {
+                  return (
+                    <div
+                      key={photo.id}
+                      className="group rounded-[24px] border border-slate-200/90 bg-white p-3.5 shadow-card hover:shadow-lg hover:border-indigo-200 transition-all flex flex-col justify-between"
+                    >
+                      <div>
+                        {/* Photo Display */}
+                        <div
+                          onClick={() => {
+                            if (isCurrentGenUnlocked) {
+                              setLightbox({
+                                title: photo.studentName,
+                                subtitle: `${photo.generationLabel} (${photo.yearLabel}) · รหัส ${photo.studentId}`,
+                                filename: photo.filename,
+                                code3: photo.personCode,
+                                year: photo.year,
+                                image: photo.photoUrl,
+                              });
+                            }
+                          }}
+                          className={`relative aspect-[3/4] w-full rounded-xl overflow-hidden bg-slate-100 ${
+                            isCurrentGenUnlocked ? 'cursor-zoom-in group-hover:scale-[1.02] transition-transform' : ''
+                          }`}
+                        >
+                          <img
+                            src={photo.photoUrl}
+                            alt={photo.studentName}
+                            className={`h-full w-full object-cover transition-all duration-300 ${
+                              !isCurrentGenUnlocked ? 'blur-md brightness-90 scale-105' : 'hover:scale-105'
+                            }`}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                photo.studentName
+                              )}&background=6366f1&color=fff`;
+                            }}
+                          />
+
+                          {/* Lock Overlay if not unlocked */}
+                          {!isCurrentGenUnlocked && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-slate-900/30 backdrop-blur-[2px]">
+                              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/30 text-white shadow-md">
+                                <Lock className="h-4 w-4" />
+                              </div>
+                              <span className="rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-semibold text-white">
+                                ตอบคำถามเพื่อดู
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Unlocked Eye Hover Icon */}
+                          {isCurrentGenUnlocked && (
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                              <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* File name badge (e.g. 5704101301.jpg) */}
+                        <div className="mt-2 flex items-center justify-between gap-1">
+                          <span className="font-mono text-[11px] font-bold text-slate-700 truncate bg-slate-50 rounded-lg px-2 py-0.5 border border-slate-100">
+                            {photo.filename}
+                          </span>
+                          <span className="rounded-md bg-purple-50 px-1.5 py-0.5 text-[10px] font-extrabold text-purple-700 border border-purple-100 shrink-0">
+                            #{photo.personCode}
+                          </span>
+                        </div>
+
+                        {/* Student info */}
+                        <div className="mt-2 text-center">
+                          <h4 className="font-bold text-slate-900 text-xs sm:text-sm truncate">{photo.studentName}</h4>
+                          <p className="text-[11px] text-slate-400 truncate">
+                            {photo.generationLabel} · {photo.yearLabel}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
         </div>
       )}
 
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {items.length === 0 && (
-          <div className="col-span-full rounded-[28px] border border-slate-100 bg-white p-16 text-center">
-            <ImageIcon className="mx-auto h-10 w-10 text-slate-300" />
-            <p className="mt-3 text-sm font-medium text-slate-400">ยังไม่มีรูปภาพในคลังภาพ</p>
-          </div>
-        )}
+      {/* ───────────────────────────────────────────────────────────────── */}
+      {/* ─── TAB 2: ACTIVITY PHOTOS & STORYTELLING ─────────────────────── */}
+      {/* ───────────────────────────────────────────────────────────────── */}
+      {activeTab === 'activities' && (
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 animate-fade-in">
+          {items.length === 0 && (
+            <div className="col-span-full rounded-[28px] border border-slate-100 bg-white p-16 text-center">
+              <ImageIcon className="mx-auto h-10 w-10 text-slate-300" />
+              <p className="mt-3 text-sm font-medium text-slate-400">ยังไม่มีรูปภาพกิจกรรม</p>
+            </div>
+          )}
 
-        {items.map((item) => {
-          const uStatus = unlockStatus[item.id] ?? 'idle';
-          const tStatus = tagStatus[item.id] ?? 'idle';
-
-          return (
+          {items.map((item) => (
             <div
               key={item.id}
-              className="rounded-[28px] border border-slate-200/90 bg-white shadow-card overflow-hidden transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+              className="rounded-[28px] border border-slate-200/90 bg-white shadow-card overflow-hidden transition-all duration-200 hover:shadow-md"
             >
-              {/* Image */}
               <div
-                className={`relative aspect-[4/3] overflow-hidden bg-slate-100 ${!item.locked ? 'cursor-zoom-in' : ''}`}
-                onClick={() => !item.locked && setLightbox(item)}
+                className="relative aspect-[4/3] overflow-hidden bg-slate-100 cursor-zoom-in"
+                onClick={() =>
+                  setLightbox({
+                    title: item.title,
+                    subtitle: item.generation,
+                    image: item.original_image || item.originalImage || item.image,
+                    tags: item.tags,
+                  })
+                }
               >
-                <img
-                  src={item.image}
-                  alt={item.title}
-                  className={`h-full w-full object-cover transition-all duration-300 ${item.locked ? 'blur-lg scale-105 brightness-75' : 'hover:scale-105'}`}
-                />
-                {/* Locked overlay */}
-                {item.locked && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 shadow-lg">
-                      <Lock className="h-5 w-5 text-white" />
-                    </div>
-                    <span className="rounded-full bg-black/40 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
-                      ปลดล็อกเพื่อดูรูปจริง
-                    </span>
-                  </div>
-                )}
-                {/* Unlocked badge */}
-                {!item.locked && (
-                  <div className="absolute top-2.5 right-2.5">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-bold text-white shadow-sm">
-                      <Unlock className="h-3 w-3" /> ปลดล็อกแล้ว
-                    </span>
-                  </div>
-                )}
-                {/* Generation badge */}
-                {item.generation && (
-                  <div className="absolute bottom-2.5 left-2.5">
-                    <span className="rounded-full bg-black/50 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
-                      {item.generation}
-                    </span>
-                  </div>
-                )}
+                <img src={item.image} alt={item.title} className="h-full w-full object-cover hover:scale-105 transition-transform" />
+                <div className="absolute bottom-2.5 left-2.5">
+                  <span className="rounded-full bg-black/50 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
+                    {item.generation}
+                  </span>
+                </div>
               </div>
-
-              {/* Info */}
               <div className="p-4">
                 <p className="font-semibold text-slate-900 truncate">{item.title || 'รูปกิจกรรม'}</p>
-
-                {/* Tags row */}
-                {item.tags.length > 0 && (
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {item.tags.slice(0, 4).map((tag, i) => {
-                      const isMe = tag === currentUserName;
-                      return (
-                        <span
-                          key={i}
-                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium border ${
-                            isMe
-                              ? 'bg-purple-100/90 text-purple-700 border-purple-200 font-bold'
-                              : 'bg-indigo-50 text-indigo-600 border-indigo-100'
-                          }`}
-                        >
-                          <span>{tag}{isMe ? ' (คุณ)' : ''}</span>
-                          {isMe && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleUntagSelf(item.id);
-                              }}
-                              title="ลบแท็กตัวฉันออกจากรูปนี้"
-                              className="rounded-full hover:bg-rose-100 hover:text-rose-600 p-0.5 transition-colors"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          )}
-                        </span>
-                      );
-                    })}
-                    {item.tags.length > 4 && (
-                      <span className="text-xs text-slate-400">+{item.tags.length - 4}</span>
-                    )}
-                  </div>
-                )}
-
-                {/* Tag success/error feedback */}
-                {tStatus === 'success' && (
-                  <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-emerald-600">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> แท็กเพื่อนแล้ว!
-                  </p>
-                )}
-                {tStatus === 'error' && (
-                  <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-rose-500">
-                    <AlertCircle className="h-3.5 w-3.5" /> ต้องปลดล็อกก่อนแท็กได้
-                  </p>
-                )}
-
-                {/* ─── LOCKED: Unlock Form ─── */}
-                {item.locked && (
-                  <div className="mt-3">
-                    {answering === item.id ? (
-                      <div className="space-y-2.5 rounded-2xl border border-amber-100 bg-amber-50/50 p-3">
-                        <p className="text-xs font-semibold text-amber-800">❓ {item.unlock_question}</p>
-                        <input
-                          value={answer}
-                          onChange={(e) => setAnswer(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleUnlock(item.id)}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-100"
-                          placeholder="คำตอบของคุณ..."
-                          autoFocus
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => { setAnswering(null); setAnswer(''); setUnlockStatus((s) => ({ ...s, [item.id]: 'idle' })); }}
-                            className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors"
-                          >
-                            ยกเลิก
-                          </button>
-                          <button
-                            onClick={() => handleUnlock(item.id)}
-                            disabled={!answer.trim() || uStatus === 'submitting'}
-                            className={`flex-1 flex items-center justify-center gap-1.5 rounded-full py-1.5 text-xs font-bold transition-all disabled:opacity-40 ${
-                              uStatus === 'success'
-                                ? 'bg-emerald-500 text-white'
-                                : uStatus === 'error'
-                                ? 'bg-rose-500 text-white'
-                                : 'bg-gradient-to-r from-amber-400 to-orange-400 text-white hover:opacity-90'
-                            }`}
-                          >
-                            {uStatus === 'submitting' ? (
-                              <><span className="h-3 w-3 rounded-full border-2 border-white/40 border-t-white animate-spin" /> กำลังส่ง...</>
-                            ) : uStatus === 'success' ? (
-                              <><CheckCircle2 className="h-3.5 w-3.5" /> ปลดล็อกแล้ว! +{item.points_for_unlock} คะแนน</>
-                            ) : uStatus === 'error' ? (
-                              '⚠️ เกิดข้อผิดพลาด'
-                            ) : (
-                              `ส่งคำตอบ (+${item.points_for_unlock} คะแนน)`
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setAnswering(item.id)}
-                        className="w-full rounded-2xl border border-amber-200 bg-amber-50 py-2.5 text-xs font-bold text-amber-700 hover:bg-amber-100 transition-colors flex items-center justify-center gap-1.5"
-                      >
-                        <Lock className="h-3.5 w-3.5" />
-                        ตอบคำถามเพื่อปลดล็อก (+{item.points_for_unlock} คะแนน)
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* ─── UNLOCKED: Tag Feature ─── */}
-                {!item.locked && (
-                  <div className="mt-3">
-                    {tagging === item.id ? (
-                      <div className="space-y-2 rounded-2xl border border-indigo-100 bg-indigo-50/40 p-3">
-                        <p className="text-xs font-semibold text-indigo-800 flex items-center gap-1.5">
-                          <Tag className="h-3.5 w-3.5" /> แท็กเพื่อนในรูปนี้
-                        </p>
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                          <input
-                            value={tagQuery}
-                            onChange={(e) => setTagQuery(e.target.value)}
-                            placeholder="พิมพ์ชื่อเพื่อน..."
-                            autoFocus
-                            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-8 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                          />
-                        </div>
-                        {filteredSuggestions.length > 0 && (
-                          <div className="max-h-32 overflow-y-auto rounded-xl border border-slate-100 bg-white shadow-sm">
-                            {filteredSuggestions.map((u) => (
-                              <button
-                                key={u.id}
-                                onClick={() => handleTag(item.id, u.id, u.name)}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-indigo-50 transition-colors"
-                              >
-                                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold">
-                                  {u.name.substring(0, 1)}
-                                </div>
-                                {u.name}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        {tagQuery.length > 0 && filteredSuggestions.length === 0 && (
-                          <p className="text-xs text-slate-400 text-center py-1">ไม่พบชื่อที่ค้นหา</p>
-                        )}
-                        <button
-                          onClick={() => { setTagging(null); setTagQuery(''); }}
-                          className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
-                        >
-                          ✕ ยกเลิก
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setTagging(item.id)}
-                        className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
-                      >
-                        <Tag className="h-3.5 w-3.5" />
-                        แท็กเพื่อนในรูปนี้
-                      </button>
-                    )}
+                {item.tags && item.tags.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {item.tags.map((t, idx) => (
+                      <span key={idx} className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-600 border border-indigo-100">
+                        {t}
+                      </span>
+                    ))}
                   </div>
                 )}
               </div>
             </div>
-          );
-        })}
-      </div>
-    </>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

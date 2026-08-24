@@ -7,10 +7,11 @@ const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/auth/logout'];
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // ข้ามไฟล์ static และ Next.js internal
+  // ข้ามไฟล์ static และ Next.js internal รวมถึง API รูปภาพ NAS
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/api/nas') ||
     pathname === '/favicon.ico' ||
     pathname.includes('.')
   ) {

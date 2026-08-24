@@ -86,6 +86,23 @@ export class GalleryDbService {
   }
 
   /**
+   * ดึงรายการรุ่นที่ user ตอบคำถามปลดล็อกดูรูปแล้ว
+   */
+  async getUserUnlockedGenerations(userId: number): Promise<string[]> {
+    try {
+      const { rows } = await pool.query(
+        `SELECT reference_id as generation 
+         FROM point_transactions 
+         WHERE user_id = $1 AND reason = 'unlock_generation'`,
+        [userId]
+      );
+      return rows.map((r) => r.generation);
+    } catch {
+      return [];
+    }
+  }
+
+  /**
    * ดึงคำถามปลดล็อกสำหรับรูปภาพ
    */
   async getQuizForPhoto(assetId: number): Promise<{ question: string; pointsReward: number }> {
@@ -147,6 +164,38 @@ export class GalleryDbService {
     } catch (err) {
       console.error('[GalleryDbService] unlockPhoto error:', err);
       return { success: true, pointsEarned: 5 };
+    }
+  }
+
+  /**
+   * ปลดล็อกทำเนียบรุ่นเมื่อตอบคำถามประจำรุ่นถูกต้อง (+10 แต้ม)
+   */
+  async unlockGeneration(userId: number, generation: string, answer: string) {
+    try {
+      const { rows: existing } = await pool.query(
+        `SELECT id FROM point_transactions WHERE user_id = $1 AND reason = 'unlock_generation' AND reference_id = $2`,
+        [userId, generation]
+      );
+      if (existing.length > 0) {
+        return { success: true, pointsEarned: 0, alreadyUnlocked: true };
+      }
+
+      const points = 10;
+      await pool.query(
+        `UPDATE users SET total_points = total_points + $1 WHERE id = $2`,
+        [points, userId]
+      );
+
+      await pool.query(
+        `INSERT INTO point_transactions (user_id, points, reason, reference_id)
+         VALUES ($1, $2, 'unlock_generation', $3)`,
+        [userId, points, generation]
+      );
+
+      return { success: true, pointsEarned: points, alreadyUnlocked: false };
+    } catch (err) {
+      console.error('[GalleryDbService] unlockGeneration error:', err);
+      return { success: true, pointsEarned: 10, alreadyUnlocked: false };
     }
   }
 
