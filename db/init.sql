@@ -17,6 +17,7 @@ create table users (
   id                  serial primary key,
   student_id          text unique,
   citizen_id_hash     text,
+  password_hash       text,
   email               text unique,
   name                text not null,
   generation_option_id int references lookup_options(id),
@@ -168,6 +169,14 @@ create table photo_view_verifications (
   is_passed       boolean default false,
   points_earned   int default 0,
   verified_at     timestamptz default now()
+);
+
+-- 15) sessions
+create table sessions (
+  id          text primary key,
+  user_id     int not null references users(id) on delete cascade,
+  expires_at  timestamptz not null,
+  created_at  timestamptz not null default now()
 );
 
 -- ============================================================
