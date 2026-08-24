@@ -1,13 +1,17 @@
-// วางไฟล์นี้ที่ src/app/profile/page.tsx
-import { getUserProfile, getTaggedPhotos, getUnlockedPhotos, getActivityLog } from '@/lib/db';
+import { getUserProfileById, getTaggedPhotos, getUnlockedPhotos, getActivityLog } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 import { ProfileCard } from '@/modules/profile/components/profile-card';
 import { AppShell } from '@/components/layout/app-shell';
-
-// TODO: ยังไม่มีระบบ session จริง ใช้ student_id ตัวอย่างจาก seed data ไปก่อน
-const CURRENT_USER_STUDENT_ID = '60010001';
+import { redirect } from 'next/navigation';
 
 export default async function ProfilePage() {
-  const user = await getUserProfile(CURRENT_USER_STUDENT_ID);
+  const currentUser = await getCurrentUser();
+
+  if (!currentUser) {
+    redirect('/login?callbackUrl=/profile');
+  }
+
+  const user = await getUserProfileById(currentUser.id);
 
   if (!user) {
     return (

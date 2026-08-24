@@ -85,9 +85,30 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
     setTimeout(() => setTagStatus((s) => ({ ...s, [assetId]: 'idle' })), 3000);
   }
 
+  const currentUserName = allUsers.find((u) => u.id === currentUserId)?.name;
+
+  async function handleUntagSelf(assetId: number) {
+    if (!currentUserName) return;
+    const res = await fetch('/api/gallery/untag', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mediaAssetId: assetId, userId: currentUserId }),
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      setItems((prev) =>
+        prev.map((it) => (it.id === assetId ? { ...it, tags: it.tags.filter((t) => t !== currentUserName) } : it))
+      );
+      if (lightbox?.id === assetId) {
+        setLightbox((prev) => (prev ? { ...prev, tags: prev.tags.filter((t) => t !== currentUserName) } : null));
+      }
+    }
+  }
+
   const filteredSuggestions = allUsers
     .filter((u) => u.name.toLowerCase().includes(tagQuery.toLowerCase()) && tagQuery.length > 0)
     .slice(0, 6);
+
 
   return (
     <>
@@ -185,11 +206,34 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
                 {/* Tags row */}
                 {item.tags.length > 0 && (
                   <div className="mt-1.5 flex flex-wrap gap-1">
-                    {item.tags.slice(0, 4).map((tag, i) => (
-                      <span key={i} className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600 border border-indigo-100">
-                        {tag}
-                      </span>
-                    ))}
+                    {item.tags.slice(0, 4).map((tag, i) => {
+                      const isMe = tag === currentUserName;
+                      return (
+                        <span
+                          key={i}
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium border ${
+                            isMe
+                              ? 'bg-purple-100/90 text-purple-700 border-purple-200 font-bold'
+                              : 'bg-indigo-50 text-indigo-600 border-indigo-100'
+                          }`}
+                        >
+                          <span>{tag}{isMe ? ' (คุณ)' : ''}</span>
+                          {isMe && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUntagSelf(item.id);
+                              }}
+                              title="ลบแท็กตัวฉันออกจากรูปนี้"
+                              className="rounded-full hover:bg-rose-100 hover:text-rose-600 p-0.5 transition-colors"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </span>
+                      );
+                    })}
                     {item.tags.length > 4 && (
                       <span className="text-xs text-slate-400">+{item.tags.length - 4}</span>
                     )}

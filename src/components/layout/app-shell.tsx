@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Bell,
   ChevronLeft,
@@ -21,6 +21,7 @@ import {
   CheckCheck,
   MessageSquare,
   Sparkles,
+  BookOpen,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import type { ReactNode } from 'react';
@@ -30,7 +31,7 @@ const MAIN_NAV = [
   { href: '/hall-of-fame', label: 'ศิษย์เก่าดีเด่น', icon: Star },
   { href: '/map', label: 'แผนที่ศิษย์เก่า', icon: MapPin },
   { href: '/gallery', label: 'คลังภาพเก่า', icon: ImageIcon },
-  { href: '/search', label: 'ค้นหาศิษย์เก่า', icon: Search },
+  { href: '/search', label: 'หนังสือรุ่น', icon: BookOpen },
 ];
 
 const ACCOUNT_NAV = [
@@ -95,13 +96,47 @@ function NavSection({
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(CURRENT_USER);
 
   const notifRef = useRef<HTMLDivElement>(null);
   const avatarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Fetch logged in user data
+    fetch('/api/auth/me')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.user) {
+          const u = data.user;
+          const points = u.total_points ?? 0;
+          const level = Math.floor(points / 20) + 1;
+          setCurrentUser({
+            name: u.name || 'ศิษย์เก่า',
+            generation: u.generation || 'CS MJU',
+            points: points,
+            level: level,
+            avatar_url: u.avatar_url,
+            role: u.role,
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  async function handleLogout() {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/login');
+      router.refresh();
+    } catch {
+      router.push('/login');
+    }
+  }
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -253,17 +288,25 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="animate-popover-down fixed left-[84px] bottom-4 z-50 overflow-hidden rounded-2xl border border-border bg-card shadow-hero w-64">
               <div className="gradient-primary p-4 text-white">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 font-bold text-white text-xs backdrop-blur-xs">
-                    สช
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold">{CURRENT_USER.name}</p>
-                    <p className="text-xs text-white/80">{CURRENT_USER.generation}</p>
+                  {currentUser.avatar_url ? (
+                    <img
+                      src={currentUser.avatar_url}
+                      alt={currentUser.name}
+                      className="h-10 w-10 rounded-full object-cover ring-2 ring-white/40"
+                    />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 font-bold text-white text-xs backdrop-blur-xs">
+                      {currentUser.name?.substring(0, 2) || 'CS'}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold truncate">{currentUser.name}</p>
+                    <p className="text-xs text-white/80">{currentUser.generation}</p>
                   </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between rounded-xl bg-white/15 px-3 py-1.5 text-xs backdrop-blur-xs">
                   <span className="font-medium">แต้มสะสม</span>
-                  <span className="font-bold">{CURRENT_USER.points} แต้ม (Lv.{CURRENT_USER.level})</span>
+                  <span className="font-bold">{currentUser.points} แต้ม (Lv.{currentUser.level})</span>
                 </div>
               </div>
 
@@ -278,6 +321,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                     โปรไฟล์ของฉัน
                   </Link>
                   <Link
+                    href="/settings"
+                    onClick={() => setAvatarOpen(false)}
+                    className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
+                  >
+                    <Settings className="h-4 w-4 text-slate-500" />
+                    การตั้งค่าความเป็นส่วนตัว
+                  </Link>
+                  <Link
                     href="/hall-of-fame"
                     onClick={() => setAvatarOpen(false)}
                     className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
@@ -285,20 +336,25 @@ export function AppShell({ children }: { children: ReactNode }) {
                     <Award className="h-4 w-4 text-amber-500" />
                     แต้ม & รางวัลศิษย์เก่า
                   </Link>
-                  <Link
-                    href="/admin"
-                    onClick={() => setAvatarOpen(false)}
-                    className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
-                  >
-                    <Shield className="h-4 w-4 text-indigo-500" />
-                    จัดการระบบ Admin
-                  </Link>
+                  {currentUser.role === 'admin' && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setAvatarOpen(false)}
+                      className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
+                    >
+                      <Shield className="h-4 w-4 text-indigo-500" />
+                      จัดการระบบ Admin
+                    </Link>
+                  )}
                 </div>
 
                 <div className="pt-1">
                   <button
-                    onClick={() => setAvatarOpen(false)}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-rose-600 transition-colors hover:bg-rose-50 font-medium"
+                    onClick={() => {
+                      setAvatarOpen(false);
+                      handleLogout();
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-rose-600 transition-colors hover:bg-rose-50 font-medium cursor-pointer"
                   >
                     <LogOut className="h-4 w-4" />
                     ออกจากระบบ
@@ -316,31 +372,47 @@ export function AppShell({ children }: { children: ReactNode }) {
                 setNotifOpen(false);
               }}
               className="w-full text-left flex items-center gap-2.5 cursor-pointer"
-              title={collapsed ? `${CURRENT_USER.name} (${CURRENT_USER.points} แต้ม)` : undefined}
+              title={collapsed ? `${currentUser.name} (${currentUser.points} แต้ม)` : undefined}
             >
               {collapsed ? (
                 <div className="flex flex-col items-center gap-1 mx-auto">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/25 text-xs font-bold shadow-xs">
-                    สช
-                  </div>
-                  <p className="text-[10px] font-extrabold">{CURRENT_USER.points}p</p>
+                  {currentUser.avatar_url ? (
+                    <img
+                      src={currentUser.avatar_url}
+                      alt={currentUser.name}
+                      className="h-8 w-8 rounded-full object-cover ring-1 ring-white/40"
+                    />
+                  ) : (
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/25 text-xs font-bold shadow-xs">
+                      {currentUser.name?.substring(0, 2) || 'CS'}
+                    </div>
+                  )}
+                  <p className="text-[10px] font-extrabold">{currentUser.points}p</p>
                 </div>
               ) : (
                 <>
                   <div className="relative shrink-0">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-xs font-bold shadow-xs ring-2 ring-white/40 backdrop-blur-xs">
-                      สช
-                    </div>
+                    {currentUser.avatar_url ? (
+                      <img
+                        src={currentUser.avatar_url}
+                        alt={currentUser.name}
+                        className="h-9 w-9 rounded-full object-cover ring-2 ring-white/40"
+                      />
+                    ) : (
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-xs font-bold shadow-xs ring-2 ring-white/40 backdrop-blur-xs">
+                        {currentUser.name?.substring(0, 2) || 'CS'}
+                      </div>
+                    )}
                     <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-white" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold truncate">{CURRENT_USER.name}</p>
+                      <p className="text-xs font-bold truncate">{currentUser.name}</p>
                       <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] font-bold shrink-0">
-                        Lv.{CURRENT_USER.level}
+                        Lv.{currentUser.level}
                       </span>
                     </div>
-                    <p className="text-[11px] text-white/80">{CURRENT_USER.generation} • {CURRENT_USER.points} แต้ม</p>
+                    <p className="text-[11px] text-white/80">{currentUser.generation} • {currentUser.points} แต้ม</p>
                   </div>
                   <ChevronRight className={`h-4 w-4 text-white/80 shrink-0 transition-transform duration-300 ${avatarOpen ? '-rotate-90' : ''}`} />
                 </>
@@ -359,6 +431,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                   โปรไฟล์ของฉัน
                 </Link>
                 <Link
+                  href="/settings"
+                  onClick={() => setAvatarOpen(false)}
+                  className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-white hover:bg-white/20 transition-colors font-medium"
+                >
+                  <Settings className="h-4 w-4 text-white/80" />
+                  การตั้งค่าความเป็นส่วนตัว
+                </Link>
+                <Link
                   href="/hall-of-fame"
                   onClick={() => setAvatarOpen(false)}
                   className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-white hover:bg-white/20 transition-colors font-medium"
@@ -366,17 +446,22 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <Award className="h-4 w-4 text-amber-300" />
                   แต้ม & รางวัลศิษย์เก่า
                 </Link>
-                <Link
-                  href="/admin"
-                  onClick={() => setAvatarOpen(false)}
-                  className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-white hover:bg-white/20 transition-colors font-medium"
-                >
-                  <Shield className="h-4 w-4 text-indigo-200" />
-                  จัดการระบบ Admin
-                </Link>
+                {currentUser.role === 'admin' && (
+                  <Link
+                    href="/admin"
+                    onClick={() => setAvatarOpen(false)}
+                    className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-white hover:bg-white/20 transition-colors font-medium"
+                  >
+                    <Shield className="h-4 w-4 text-indigo-200" />
+                    จัดการระบบ Admin
+                  </Link>
+                )}
                 <button
-                  onClick={() => setAvatarOpen(false)}
-                  className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-rose-200 hover:bg-rose-500/30 transition-colors font-medium"
+                  onClick={() => {
+                    setAvatarOpen(false);
+                    handleLogout();
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-rose-200 hover:bg-rose-500/30 transition-colors font-medium cursor-pointer"
                 >
                   <LogOut className="h-4 w-4" />
                   ออกจากระบบ

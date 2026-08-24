@@ -19,8 +19,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="th">
-      <body className={`${promptFont.variable} font-sans antialiased`}>{children}</body>
+    <html lang="th" suppressHydrationWarning>
+      <body className={`${promptFont.variable} font-sans antialiased`} suppressHydrationWarning>
+        {children}
+      </body>
     </html>
   );
 }

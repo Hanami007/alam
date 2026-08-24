@@ -123,6 +123,7 @@ export async function getFeedPosts() {
 
     let poll = null;
     if (pollRows.length > 0) {
+      const pollId = pollRows[0].id;
       const { rows: options } = await pool.query(
         `select po.id, po.option_text as text, count(pv.id)::int as votes
          from poll_options po
@@ -130,9 +131,20 @@ export async function getFeedPosts() {
          where po.poll_id = $1
          group by po.id, po.option_text
          order by po.id`,
-        [pollRows[0].id]
+        [pollId]
       );
-      poll = { question: pollRows[0].question, pointsPerVote: pollRows[0].points_per_vote, options };
+      const { rows: allVotes } = await pool.query(
+        `select user_id, option_id from poll_votes where poll_id = $1`,
+        [pollId]
+      );
+      poll = {
+        id: pollId,
+        question: pollRows[0].question,
+        pointsPerVote: pollRows[0].points_per_vote,
+        options,
+        votedUserIds: allVotes.map((v) => v.user_id),
+        userVotes: allVotes,
+      };
     }
 
     const { rows: commentsList } = await pool.query(
@@ -162,26 +174,81 @@ export async function getFeedPosts() {
   return postsWithExtras;
 }
 
-// สำหรับ Admin: ดูคำขอโพสต์ที่ยังรออนุมัติ
+// สำหรับ Admin: ดูคำขอโพสต์ที่ยังรออนุมัติ (รวมข้อมูลโพล)
 export async function getPostRequests() {
-  const { rows } = await pool.query(`
+  const { rows: posts } = await pool.query(`
     select p.*, u.name as requester_name
     from posts p
     join users u on u.id = p.requested_by
     where p.status = 'pending_request'
     order by p.created_at asc
   `);
-  return rows;
+
+  const withPolls = [];
+  for (const post of posts) {
+    if (post.post_type === 'poll') {
+      const { rows: pollRows } = await pool.query(
+        `select id, question, points_per_vote from polls where post_id = $1`,
+        [post.id]
+      );
+      if (pollRows.length > 0) {
+        const { rows: options } = await pool.query(
+          `select id, option_text as text from poll_options where poll_id = $1 order by id`,
+          [pollRows[0].id]
+        );
+        withPolls.push({
+          ...post,
+          poll: {
+            id: pollRows[0].id,
+            question: pollRows[0].question,
+            pointsPerVote: pollRows[0].points_per_vote,
+            options,
+          },
+        });
+        continue;
+      }
+    }
+    withPolls.push(post);
+  }
+  return withPolls;
 }
 
-export async function createPostRequest(requestedBy: number, title: string, content: string, category: string) {
+export async function createPostRequest(
+  requestedBy: number,
+  title: string,
+  content: string,
+  category: string,
+  postType: 'normal' | 'poll' = 'normal',
+  pollData?: { question: string; options: string[]; pointsPerVote?: number }
+) {
   const { rows } = await pool.query(
     `insert into posts (requested_by, category, title, content, post_type, status)
-     values ($1, $2, $3, $4, 'normal', 'pending_request')
+     values ($1, $2, $3, $4, $5, 'pending_request')
      returning *`,
-    [requestedBy, category, title, content]
+    [requestedBy, category, title, content, postType]
   );
-  return rows[0];
+  const newPost = rows[0];
+
+  if (postType === 'poll' && pollData && pollData.question) {
+    const pointsPerVote = pollData.pointsPerVote || 5;
+    const { rows: pollRows } = await pool.query(
+      `insert into polls (post_id, question, points_per_vote, status)
+       values ($1, $2, $3, 'active')
+       returning *`,
+      [newPost.id, pollData.question, pointsPerVote]
+    );
+    const newPoll = pollRows[0];
+
+    const validOptions = (pollData.options || []).filter((opt) => opt && opt.trim().length > 0);
+    for (const opt of validOptions) {
+      await pool.query(
+        `insert into poll_options (poll_id, option_text) values ($1, $2)`,
+        [newPoll.id, opt.trim()]
+      );
+    }
+  }
+
+  return newPost;
 }
 
 export async function approvePostRequest(postId: number, adminId: number) {
@@ -200,6 +267,53 @@ export async function rejectPostRequest(postId: number) {
     `update posts set status = 'rejected' where id = $1 and status = 'pending_request' returning *`,
     [postId]
   );
+  return rows[0] ?? null;
+}
+
+
+/** ลบโพสต์พร้อมข้อมูลที่เกี่ยวข้อง (Admin only) */
+export async function deletePost(postId: number, adminId: number) {
+  // ตรวจสอบสิทธิ์ Admin จากฐานข้อมูล
+  const { rows: adminUser } = await pool.query(
+    `select id, role from users where id = $1`,
+    [adminId]
+  );
+  if (!adminUser.length || adminUser[0].role !== 'admin') {
+    throw new Error('เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่สามารถลบโพสต์ได้');
+  }
+
+  // ลบข้อมูลที่เชื่อมโยงกับโพสต์นี้เพื่อป้องกัน foreign key error
+  await pool.query(`delete from post_interactions where post_id = $1`, [postId]);
+  await pool.query(
+    `delete from poll_votes where poll_id in (select id from polls where post_id = $1)`,
+    [postId]
+  );
+  await pool.query(
+    `delete from poll_options where poll_id in (select id from polls where post_id = $1)`,
+    [postId]
+  );
+  await pool.query(`delete from polls where post_id = $1`, [postId]);
+  await pool.query(
+    `delete from media_assets where owner_type = 'post' and owner_id = $1`,
+    [postId]
+  );
+
+  const { rows } = await pool.query(
+    `delete from posts where id = $1 returning id, title`,
+    [postId]
+  );
+
+  if (rows.length > 0) {
+    try {
+      await pool.query(
+        `insert into audit_logs (actor_id, action, target_type, target_id) values ($1, 'delete_post', 'post', $2)`,
+        [adminId, postId]
+      );
+    } catch {
+      // audit_logs table optional
+    }
+  }
+
   return rows[0] ?? null;
 }
 
@@ -323,14 +437,19 @@ export async function getRegionCareerBreakdown() {
 export async function getHometownMapData() {
   const { rows } = await pool.query(`
     select
-      u.id, u.name, u.student_status,
+      u.id, u.name, u.student_status, u.avatar_url, u.position, u.company,
+      gen.label as generation,
+      ct.label as career_type,
       lo.id as province_id, lo.label as province_name,
       lo.extra->>'region' as region,
       (lo.extra->>'metro')::boolean as metro
     from users u
     join lookup_options lo on lo.id = u.hometown_province_id
+    left join lookup_options gen on gen.id = u.generation_option_id
+    left join lookup_options ct on ct.id = u.career_option_id
     where u.show_hometown_on_map = true
       and lo.category = 'province'
+    order by u.name asc
   `);
   return rows;
 }
@@ -339,15 +458,20 @@ export async function getHometownMapData() {
 export async function getWorkplaceMapData() {
   const { rows } = await pool.query(`
     select
-      u.id, u.name,
+      u.id, u.name, u.student_status, u.avatar_url, u.position, u.company,
+      gen.label as generation,
+      ct.label as career_type,
       lo.id as province_id, lo.label as province_name,
       lo.extra->>'region' as region,
       (lo.extra->>'metro')::boolean as metro
     from users u
     join lookup_options lo on lo.id = u.work_province_id
+    left join lookup_options gen on gen.id = u.generation_option_id
+    left join lookup_options ct on ct.id = u.career_option_id
     where u.show_workplace_on_map = true
       and u.student_status = 'alumni'
       and lo.category = 'province'
+    order by u.name asc
   `);
   return rows;
 }
@@ -376,16 +500,47 @@ export async function getUserProfile(studentId: string) {
   return { ...user, galleryImages: gallery.map((g) => g.image_url) };
 }
 
+export async function getUserProfileById(userId: number) {
+  const { rows } = await pool.query(
+    `select u.*, gen.label as generation, prov.label as province, ct.label as career_type
+     from users u
+     left join lookup_options gen on gen.id = u.generation_option_id
+     left join lookup_options prov on prov.id = u.province_option_id
+     left join lookup_options ct on ct.id = u.career_option_id
+     where u.id = $1`,
+    [userId]
+  );
+  if (rows.length === 0) return null;
+  const user = rows[0];
+
+  const { rows: gallery } = await pool.query(
+    `select image_url from media_assets where owner_type = 'user_gallery' and owner_id = $1 order by sort_order limit 3`,
+    [user.id]
+  );
+
+  return { ...user, galleryImages: gallery.map((g) => g.image_url) };
+}
+
 // อัลบั้ม "รูปที่มีคุณ" — รูปที่ถูกคนอื่นแท็ก
 export async function getTaggedPhotos(userId: number) {
   const { rows } = await pool.query(`
-    select ma.*
+    select ma.*, u.name as tagged_by_name
     from media_assets ma
     join photo_tags pt on pt.asset_id = ma.id
+    left join users u on u.id = pt.tagged_by
     where pt.tagged_user_id = $1
     order by ma.created_at desc
   `, [userId]);
   return rows;
+}
+
+// ลบแท็กผู้ใช้ออกจากรูปภาพ (ผู้ใช้สามารถเอาแท็กของตนเองออกได้)
+export async function removeUserPhotoTag(assetId: number, userId: number) {
+  const { rows } = await pool.query(
+    `delete from photo_tags where asset_id = $1 and tagged_user_id = $2 returning *`,
+    [assetId, userId]
+  );
+  return rows.length > 0;
 }
 
 // อัลบั้ม "รูปที่คุณตอบคำถาม" — รูปที่เจ้าตัวปลดล็อกเอง
@@ -971,21 +1126,6 @@ export async function createPost(
   return rows[0];
 }
 
-/** ลบโพสต์ (admin only) */
-export async function deletePost(postId: number, adminId: number) {
-  const { rows } = await pool.query(
-    `DELETE FROM posts WHERE id = $1 RETURNING id, title`,
-    [postId]
-  );
-  if (rows.length > 0) {
-    await pool.query(
-      `INSERT INTO audit_logs (actor_id, action, target_type, target_id)
-       VALUES ($1, 'delete_post', 'post', $2)`,
-      [adminId, postId]
-    );
-  }
-  return rows[0] ?? null;
-}
 
 /** Toggle pin post */
 export async function togglePostPin(postId: number) {

@@ -1,4 +1,4 @@
-import { hasUnlockedPhoto, tagUserInPhoto } from '@/lib/db';
+import { hasUnlockedPhoto, tagUserInPhoto, removeUserPhotoTag } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
@@ -26,6 +26,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, result });
   } catch (err: any) {
     console.error('Gallery tag error:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const { mediaAssetId, taggedUserId } = await req.json();
+
+    if (!mediaAssetId || !taggedUserId) {
+      return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
+    }
+
+    const result = await removeUserPhotoTag(Number(mediaAssetId), Number(taggedUserId));
+    return NextResponse.json({ success: true, result });
+  } catch (err: any) {
+    console.error('Gallery untag error:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

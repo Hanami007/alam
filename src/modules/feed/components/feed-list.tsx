@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Heart,
@@ -16,7 +16,7 @@ import {
   Tag,
   Megaphone,
   HelpCircle,
-  Newspaper,
+  FileText,
   Smile,
   Zap,
   Trophy,
@@ -28,7 +28,14 @@ import {
   Dices,
   Sparkle,
   Flame,
-  Volume2
+  Volume2,
+  Trash2,
+  AlertTriangle,
+  Shield,
+  ShieldAlert,
+  Check,
+  X,
+  UserCheck
 } from 'lucide-react';
 
 interface Comment {
@@ -38,6 +45,21 @@ interface Comment {
   author: string;
   avatar_url?: string;
   parentCommentId?: number | null;
+}
+
+interface PollOption {
+  id: number;
+  text: string;
+  votes: number;
+}
+
+interface PollData {
+  id: number;
+  question: string;
+  pointsPerVote?: number;
+  options: PollOption[];
+  votedUserIds?: number[];
+  userVotes?: { user_id: number; option_id: number }[];
 }
 
 interface Post {
@@ -53,12 +75,9 @@ interface Post {
   commentsList?: Comment[];
   likedUserIds?: number[];
   selectedEmoji?: string;
-  poll?: {
-    question: string;
-    pointsPerVote?: number;
-    options: { id: number; text: string; votes: number }[];
-  };
+  poll?: PollData;
 }
+
 
 interface FeedListProps {
   posts: Post[];
@@ -66,7 +85,10 @@ interface FeedListProps {
   latestPhotos?: any[];
   featuredAlumni?: any[];
   currentUserId: number;
+  currentUserRole?: string;
+  currentUserName?: string;
 }
+
 
 // Sample Birthday Data for this month
 const BIRTHDAY_ALUMNI = [
@@ -124,8 +146,13 @@ export function FeedList({
   stats,
   latestPhotos = [],
   featuredAlumni = [],
-  currentUserId
+  currentUserId,
+  currentUserRole = 'alumni',
+  currentUserName = 'สมชาย ใจดี',
 }: FeedListProps) {
+  // Current Role (from authenticated session)
+  const activeRole: 'admin' | 'alumni' = (currentUserRole as 'admin' | 'alumni') || 'alumni';
+
   // Feed State
   const [feedPosts, setFeedPosts] = useState<Post[]>(posts);
   const [openComments, setOpenComments] = useState<Record<number, boolean>>({});
@@ -152,14 +179,186 @@ export function FeedList({
   const [activeCommentReactionPicker, setActiveCommentReactionPicker] = useState<number | null>(null);
   const [replyTargets, setReplyTargets] = useState<Record<number, { commentId: number; authorName: string } | null>>({});
 
-  // ─── Post Request Form State ──────────────────────────────────────
+  // ─── Post Request Form State (Supports Normal & Poll) ─────────────
   const [showRequestForm, setShowRequestForm] = useState<boolean>(false);
-  const [requestForm, setRequestForm] = useState({ title: '', content: '', category: '' });
+  const [requestForm, setRequestForm] = useState<{
+    postType: 'normal' | 'poll';
+    title: string;
+    content: string;
+    category: string;
+    pollQuestion: string;
+    pollOptions: string[];
+    pointsPerVote: number;
+  }>({
+    postType: 'normal',
+    title: '',
+    content: '',
+    category: 'ทั่วไป',
+    pollQuestion: '',
+    pollOptions: ['', ''],
+    pointsPerVote: 5,
+  });
   const [requestStatus, setRequestStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+
+  // Dynamic Poll Options helpers
+  function handleAddPollOption() {
+    if (requestForm.pollOptions.length < 6) {
+      setRequestForm((prev) => ({
+        ...prev,
+        pollOptions: [...prev.pollOptions, ''],
+      }));
+    }
+  }
+
+  function handleRemovePollOption(index: number) {
+    if (requestForm.pollOptions.length > 2) {
+      setRequestForm((prev) => ({
+        ...prev,
+        pollOptions: prev.pollOptions.filter((_, i) => i !== index),
+      }));
+    }
+  }
+
+  function handlePollOptionChange(index: number, value: string) {
+    setRequestForm((prev) => {
+      const updated = [...prev.pollOptions];
+      updated[index] = value;
+      return { ...prev, pollOptions: updated };
+    });
+  }
+
+
+  // ─── Post Delete & Options Menu State (Admin Only) ────────────────
+  const [activePostMenuId, setActivePostMenuId] = useState<number | null>(null);
+  const [postToDelete, setPostToDelete] = useState<Post | null>(null);
+  const [isDeletingPost, setIsDeletingPost] = useState<boolean>(false);
+  const [deleteToast, setDeleteToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Close menus on click outside
+  useEffect(() => {
+    function handleClickOutside() {
+      setActivePostMenuId(null);
+    }
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  // Handle Post Deletion (Admin Only)
+  async function confirmDeletePost() {
+    if (!postToDelete) return;
+    setIsDeletingPost(true);
+    try {
+      // In demo test mode: if activeRole is admin, use admin user ID 1, otherwise use currentUserId
+      const adminIdToSend = activeRole === 'admin' ? 1 : currentUserId;
+      const res = await fetch('/api/feed/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postId: postToDelete.id,
+          adminId: adminIdToSend,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFeedPosts((prev) => prev.filter((p) => p.id !== postToDelete.id));
+        setPostToDelete(null);
+        setDeleteToast({ message: 'ลบโพสต์ข่าวเรียบร้อยแล้ว ✨', type: 'success' });
+        setTimeout(() => setDeleteToast(null), 3500);
+      } else {
+        setDeleteToast({ message: data.error || 'เกิดข้อผิดพลาดในการลบโพสต์', type: 'error' });
+        setTimeout(() => setDeleteToast(null), 4000);
+      }
+    } catch (err: any) {
+      setDeleteToast({ message: err.message || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', type: 'error' });
+      setTimeout(() => setDeleteToast(null), 4000);
+    } finally {
+      setIsDeletingPost(false);
+    }
+  }
+
+  // Handle Voting in Poll
+  async function handleVotePoll(postId: number, pollId: number, optionId: number, e?: React.MouseEvent) {
+    if (e) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      triggerFloatingHeart(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    } else {
+      triggerFloatingHeart();
+    }
+
+    const targetPost = feedPosts.find((p) => p.id === postId);
+    if (!targetPost || !targetPost.poll) return;
+
+    const currentPoll = targetPost.poll;
+    const isAlreadyVoted =
+      currentPoll.votedUserIds?.includes(currentUserId) ||
+      currentPoll.userVotes?.some((v) => v.user_id === currentUserId);
+
+    if (isAlreadyVoted) {
+      setDeleteToast({ message: '💡 คุณได้ร่วมลงคะแนนโหวตในโพลนี้เรียบร้อยแล้ว', type: 'error' });
+      setTimeout(() => setDeleteToast(null), 3000);
+      return;
+    }
+
+    // Optimistic UI update
+    setFeedPosts((prev) =>
+      prev.map((post) => {
+        if (post.id !== postId || !post.poll) return post;
+        const updatedOptions = post.poll.options.map((opt) =>
+          opt.id === optionId ? { ...opt, votes: opt.votes + 1 } : opt
+        );
+        return {
+          ...post,
+          poll: {
+            ...post.poll,
+            options: updatedOptions,
+            votedUserIds: [...(post.poll.votedUserIds || []), currentUserId],
+            userVotes: [...(post.poll.userVotes || []), { user_id: currentUserId, option_id: optionId }],
+          },
+        };
+      })
+    );
+
+    try {
+      const res = await fetch('/api/feed/poll/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pollId, optionId, userId: currentUserId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDeleteToast({
+          message: `🎉 โหวตสำเร็จ! ได้รับ +${data.pointsAwarded || currentPoll.pointsPerVote || 5} คะแนนสะสม ✨`,
+          type: 'success',
+        });
+        setTimeout(() => setDeleteToast(null), 3500);
+      } else {
+        setDeleteToast({ message: data.error || 'ไม่สามารถบันทึกการโหวตได้', type: 'error' });
+        setTimeout(() => setDeleteToast(null), 3500);
+      }
+    } catch (err: any) {
+      setDeleteToast({ message: err.message || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', type: 'error' });
+      setTimeout(() => setDeleteToast(null), 3500);
+    }
+  }
+
+
 
   async function handleSubmitPostRequest(e: React.FormEvent) {
     e.preventDefault();
-    if (!requestForm.title.trim() || !requestForm.content.trim()) return;
+    if (!requestForm.title.trim()) return;
+
+    const isPoll = requestForm.postType === 'poll';
+    if (!isPoll && !requestForm.content.trim()) return;
+
+    if (isPoll) {
+      const validOptions = requestForm.pollOptions.filter((o) => o.trim().length > 0);
+      if (validOptions.length < 2) {
+        setDeleteToast({ message: '⚠️ โพลต้องมีตัวเลือกคำตอบอย่างน้อย 2 ข้อ', type: 'error' });
+        setTimeout(() => setDeleteToast(null), 3000);
+        return;
+      }
+    }
+
     setRequestStatus('submitting');
     try {
       const res = await fetch('/api/feed/request', {
@@ -168,21 +367,48 @@ export function FeedList({
         body: JSON.stringify({
           requestedBy: currentUserId,
           title: requestForm.title.trim(),
-          content: requestForm.content.trim(),
-          category: requestForm.category.trim() || 'ทั่วไป',
+          content: isPoll
+            ? (requestForm.content.trim() || requestForm.pollQuestion.trim() || requestForm.title.trim())
+            : requestForm.content.trim(),
+          category: requestForm.category.trim() || (isPoll ? 'โพลสำรวจความเห็น' : 'ทั่วไป'),
+          postType: requestForm.postType,
+          poll: isPoll
+            ? {
+                question: (requestForm.pollQuestion.trim() || requestForm.title.trim()),
+                options: requestForm.pollOptions.filter((o) => o.trim().length > 0),
+                pointsPerVote: requestForm.pointsPerVote || 5,
+              }
+            : undefined,
         }),
       });
       const data = await res.json();
       if (data.success) {
         setRequestStatus('success');
-        setRequestForm({ title: '', content: '', category: '' });
+        setRequestForm({
+          postType: 'normal',
+          title: '',
+          content: '',
+          category: 'ทั่วไป',
+          pollQuestion: '',
+          pollOptions: ['', ''],
+          pointsPerVote: 5,
+        });
+        setDeleteToast({
+          message: isPoll ? '✨ ส่งคำขอสร้างโพลแบบสำรวจเรียบร้อยแล้ว!' : '✨ ส่งคำขอสร้างโพสต์เรียบร้อยแล้ว!',
+          type: 'success',
+        });
+        setTimeout(() => setDeleteToast(null), 3500);
         setTimeout(() => {
           setRequestStatus('idle');
           setShowRequestForm(false);
-        }, 2500);
+        }, 2000);
       } else {
         setRequestStatus('error');
-        setTimeout(() => setRequestStatus('idle'), 3000);
+        setDeleteToast({ message: data.error || 'เกิดข้อผิดพลาดในการส่งคำขอ', type: 'error' });
+        setTimeout(() => {
+          setRequestStatus('idle');
+          setDeleteToast(null);
+        }, 3500);
       }
     } catch {
       setRequestStatus('error');
@@ -442,82 +668,245 @@ export function FeedList({
               onSubmit={handleSubmitPostRequest}
               className="border-t border-indigo-100/60 px-6 py-5 space-y-4 bg-indigo-50/20"
             >
+              {/* Type Switcher: Normal Post vs Poll Survey */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">รูปแบบโพสต์</label>
+                <div className="grid grid-cols-2 gap-2 p-1 bg-white rounded-2xl border border-slate-200 shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => setRequestForm((f) => ({ ...f, postType: 'normal', category: 'ทั่วไป' }))}
+                    className={`flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold transition-all ${
+                      requestForm.postType === 'normal'
+                        ? 'bg-indigo-500 text-white shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <FileText className="h-4 w-4" />
+                    <span>📝 โพสต์ข่าวทั่วไป</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRequestForm((f) => ({ ...f, postType: 'poll', category: 'โพลสำรวจความเห็น' }))}
+                    className={`flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold transition-all ${
+                      requestForm.postType === 'poll'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <Zap className="h-4 w-4" />
+                    <span>โพลแบบสำรวจ</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Category */}
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1.5">หมวดหมู่</label>
                 <div className="flex flex-wrap gap-2">
-                  {['ทั่วไป', 'กิจกรรม', 'ประชาสัมพันธ์', 'ประกาศ', 'ถาม-ตอบ'].map((cat) => (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setRequestForm((f) => ({ ...f, category: cat }))}
-                      className={`rounded-full px-3 py-1 text-xs font-semibold border transition-all ${
-                        requestForm.category === cat
-                          ? 'bg-indigo-500 text-white border-indigo-500 shadow-sm'
-                          : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'
-                      }`}
-                    >
-                      {cat}
-                    </button>
-                  ))}
+                  {requestForm.postType === 'poll'
+                    ? ['โพลสำรวจความเห็น', 'กิจกรรม', 'ถาม-ตอบ', 'ทั่วไป'].map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setRequestForm((f) => ({ ...f, category: cat }))}
+                          className={`rounded-full px-3 py-1 text-xs font-semibold border transition-all ${
+                            requestForm.category === cat
+                              ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                              : 'bg-white text-slate-500 border-slate-200 hover:border-purple-300'
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ))
+                    : ['ทั่วไป', 'กิจกรรม', 'ประชาสัมพันธ์', 'ประกาศ', 'ถาม-ตอบ'].map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setRequestForm((f) => ({ ...f, category: cat }))}
+                          className={`rounded-full px-3 py-1 text-xs font-semibold border transition-all ${
+                            requestForm.category === cat
+                              ? 'bg-indigo-500 text-white border-indigo-500 shadow-sm'
+                              : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
                 </div>
               </div>
 
-              {/* Title */}
+              {/* Title / Question */}
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">หัวข้อโพสต์ <span className="text-rose-400">*</span></label>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                  {requestForm.postType === 'poll' ? 'คำถามโพลแบบสำรวจ' : 'หัวข้อโพสต์'} <span className="text-rose-400">*</span>
+                </label>
                 <input
                   type="text"
                   required
                   maxLength={100}
                   value={requestForm.title}
-                  onChange={(e) => setRequestForm((f) => ({ ...f, title: e.target.value }))}
-                  placeholder="ใส่หัวข้อโพสต์..."
+                  onChange={(e) =>
+                    setRequestForm((f) => ({
+                      ...f,
+                      title: e.target.value,
+                      pollQuestion: f.postType === 'poll' ? e.target.value : f.pollQuestion,
+                    }))
+                  }
+                  placeholder={
+                    requestForm.postType === 'poll'
+                      ? 'เช่น อยากให้จัดกิจกรรมคืนสู่เหย้าในธีมแบบไหน?'
+                      : 'ใส่หัวข้อโพสต์...'
+                  }
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                 />
               </div>
 
-              {/* Content */}
+              {/* Poll Specific: Dynamic Options List */}
+              {requestForm.postType === 'poll' && (
+                <div className="space-y-3 rounded-2xl border border-purple-100 bg-purple-50/40 p-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+                      <span>ตัวเลือกคำตอบ (อย่างน้อย 2 ตัวเลือก)</span>
+                      <span className="text-rose-400">*</span>
+                    </label>
+                    <span className="text-[11px] font-semibold text-purple-600">
+                      {requestForm.pollOptions.length}/6 ตัวเลือก
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {requestForm.pollOptions.map((opt, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-purple-100 font-bold text-xs text-purple-700">
+                          {idx + 1}
+                        </span>
+                        <input
+                          type="text"
+                          required
+                          maxLength={60}
+                          value={opt}
+                          onChange={(e) => handlePollOptionChange(idx, e.target.value)}
+                          placeholder={`ตัวเลือกที่ ${idx + 1}...`}
+                          className="flex-1 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-100"
+                        />
+                        {requestForm.pollOptions.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePollOption(idx)}
+                            className="rounded-full p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-colors"
+                            title="ลบตัวเลือกนี้"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {requestForm.pollOptions.length < 6 && (
+                    <button
+                      type="button"
+                      onClick={handleAddPollOption}
+                      className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-purple-300 bg-white/80 py-2 text-xs font-bold text-purple-600 hover:bg-purple-50 transition-colors"
+                    >
+                      <span>+ เพิ่มตัวเลือก</span>
+                    </button>
+                  )}
+
+                  {/* Points per vote reward */}
+                  <div className="pt-2 border-t border-purple-100 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-purple-800">แต้มสะสมเมื่อร่วมโหวต:</span>
+                    <div className="flex gap-1.5">
+                      {[3, 5, 10].map((pts) => (
+                        <button
+                          key={pts}
+                          type="button"
+                          onClick={() => setRequestForm((f) => ({ ...f, pointsPerVote: pts }))}
+                          className={`rounded-full px-3 py-0.5 text-xs font-bold border transition-all ${
+                            requestForm.pointsPerVote === pts
+                              ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                              : 'bg-white text-purple-600 border-purple-200 hover:bg-purple-50'
+                          }`}
+                        >
+                          +{pts} แต้ม
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Content / Additional Details */}
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">เนื้อหา <span className="text-rose-400">*</span></label>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                  {requestForm.postType === 'poll' ? 'รายละเอียดเพิ่มเติม (ไม่บังคับ)' : 'เนื้อหาโพสต์'}{' '}
+                  {requestForm.postType === 'normal' && <span className="text-rose-400">*</span>}
+                </label>
                 <textarea
-                  required
-                  rows={4}
+                  required={requestForm.postType === 'normal'}
+                  rows={requestForm.postType === 'poll' ? 2 : 4}
                   maxLength={1000}
                   value={requestForm.content}
                   onChange={(e) => setRequestForm((f) => ({ ...f, content: e.target.value }))}
-                  placeholder="อธิบายเนื้อหาโพสต์ที่ต้องการให้แอดมินช่วยสร้าง..."
+                  placeholder={
+                    requestForm.postType === 'poll'
+                      ? 'อธิบายรายละเอียดของโพลแบบสำรวจนี้เพิ่มเติม...'
+                      : 'อธิบายเนื้อหาโพสต์ที่ต้องการให้แอดมินช่วยสร้าง...'
+                  }
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100 resize-none"
                 />
                 <p className="text-right text-xs text-slate-400 mt-1">{requestForm.content.length}/1000</p>
               </div>
 
-              {/* Submit */}
-              <div className="flex items-center justify-between gap-3">
+              {/* Submit Button */}
+              <div className="flex items-center justify-between gap-3 pt-1">
                 <button
                   type="button"
-                  onClick={() => { setShowRequestForm(false); setRequestForm({ title: '', content: '', category: '' }); setRequestStatus('idle'); }}
+                  onClick={() => {
+                    setShowRequestForm(false);
+                    setRequestForm({
+                      postType: 'normal',
+                      title: '',
+                      content: '',
+                      category: 'ทั่วไป',
+                      pollQuestion: '',
+                      pollOptions: ['', ''],
+                      pointsPerVote: 5,
+                    });
+                    setRequestStatus('idle');
+                  }}
                   className="rounded-full border border-slate-200 px-5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors"
                 >
                   ยกเลิก
                 </button>
+
                 <button
                   type="submit"
-                  disabled={requestStatus === 'submitting' || !requestForm.title.trim() || !requestForm.content.trim()}
-                  className={`flex-1 flex items-center justify-center gap-2 rounded-full py-2 text-sm font-bold transition-all shadow-sm ${
+                  disabled={
+                    requestStatus === 'submitting' ||
+                    !requestForm.title.trim() ||
+                    (requestForm.postType === 'normal' && !requestForm.content.trim()) ||
+                    (requestForm.postType === 'poll' &&
+                      requestForm.pollOptions.filter((o) => o.trim().length > 0).length < 2)
+                  }
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-full py-2.5 text-sm font-bold transition-all shadow-sm ${
                     requestStatus === 'success'
                       ? 'bg-emerald-500 text-white'
                       : requestStatus === 'error'
                       ? 'bg-rose-500 text-white'
+                      : requestForm.postType === 'poll'
+                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:opacity-90 disabled:opacity-40'
                       : 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white hover:opacity-90 disabled:opacity-40'
                   }`}
                 >
                   {requestStatus === 'submitting' ? (
                     <><span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" /> กำลังส่ง...</>
                   ) : requestStatus === 'success' ? (
-                    <><CheckCircle2 className="h-4 w-4" /> ส่งคำขอแล้ว ✨</>
+                    <><CheckCircle2 className="h-4 w-4" /> ส่งคำขอสำเร็จแล้ว ✨</>
                   ) : requestStatus === 'error' ? (
                     '⚠️ เกิดข้อผิดพลาด ลองใหม่'
+                  ) : requestForm.postType === 'poll' ? (
+                    <><Zap className="h-4 w-4" /> ส่งคำขอสร้างโพลแบบสำรวจ</>
                   ) : (
                     <><Send className="h-4 w-4" /> ส่งคำขอโพสต์</>
                   )}
@@ -537,6 +926,7 @@ export function FeedList({
           feedPosts.map((post) => {
             const isLiked = post.likedUserIds?.includes(currentUserId);
             const currentEmoji = post.selectedEmoji || (isLiked ? '💖' : '💖');
+            const isMenuOpen = activePostMenuId === post.id;
 
             return (
               <div
@@ -546,13 +936,13 @@ export function FeedList({
               >
                 {/* Post Header */}
                 <div className="p-7 sm:p-8">
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-4">
                       <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-purple-100 via-pink-100 to-rose-100 border border-purple-200/50 text-purple-700 font-extrabold text-base shadow-2xs">
                         {post.author ? post.author.substring(0, 2) : 'CS'}
                       </div>
                       <div>
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-2.5 flex-wrap">
                           <h4 className="font-bold text-slate-900 text-base sm:text-lg">{post.author || 'แอดมินระบบ'}</h4>
                           {post.pinned && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-pink-50 px-3 py-0.5 text-xs font-semibold text-pink-600 border border-pink-100">
@@ -572,10 +962,75 @@ export function FeedList({
                       </div>
                     </div>
 
-                    <button className="rounded-full p-2 text-slate-300 hover:bg-slate-50 hover:text-slate-500 transition-colors">
-                      <MoreHorizontal className="h-6 w-6" />
-                    </button>
+                    {/* Post Header Right: Admin Quick Action & Dropdown Menu */}
+                    <div className="flex items-center gap-2 relative">
+                      {/* Admin Quick Delete Button */}
+                      {activeRole === 'admin' && (
+                        <button
+                          onClick={() => setPostToDelete(post)}
+                          className="flex items-center gap-1.5 rounded-full bg-rose-50 hover:bg-rose-100/90 text-rose-600 border border-rose-200/90 px-3.5 py-1.5 text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-2xs"
+                          title="ลบโพสต์ข่าวนี้ (เฉพาะแอดมิน)"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+                          <span>ลบโพสต์</span>
+                        </button>
+                      )}
+
+                      {/* 3-Dots Options Menu Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActivePostMenuId(isMenuOpen ? null : post.id);
+                        }}
+                        className={`rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors ${
+                          isMenuOpen ? 'bg-slate-100 text-slate-700' : ''
+                        }`}
+                        title="ตัวเลือกเพิ่มเติม"
+                      >
+                        <MoreHorizontal className="h-6 w-6" />
+                      </button>
+
+                      {/* Options Dropdown Popover */}
+                      {isMenuOpen && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 top-12 z-30 w-52 overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-1.5 shadow-hero animate-fade-in text-xs font-medium"
+                        >
+                          <button
+                            onClick={() => {
+                              handleShare(post.id);
+                              setActivePostMenuId(null);
+                            }}
+                            className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                          >
+                            <Share2 className="h-4 w-4 text-slate-400" />
+                            <span>คัดลอกลิงก์โพสต์</span>
+                          </button>
+
+                          {activeRole === 'admin' ? (
+                            <>
+                              <div className="my-1 border-t border-slate-100" />
+                              <button
+                                onClick={() => {
+                                  setActivePostMenuId(null);
+                                  setPostToDelete(post);
+                                }}
+                                className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-rose-600 hover:bg-rose-50 font-bold transition-colors text-left"
+                              >
+                                <Trash2 className="h-4 w-4 text-rose-500" />
+                                <span>ลบโพสต์นี้ (Admin)</span>
+                              </button>
+                            </>
+                          ) : (
+                            <div className="px-3 py-2 text-[11px] text-slate-400 border-t border-slate-100 mt-1">
+                              เฉพาะแอดมินสามารถลบโพสต์ได้
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
+
 
                   {/* Post Content Box */}
                   <div className="mt-6 space-y-3 bg-slate-50/70 rounded-2xl p-6 sm:p-7 border border-slate-200/70 shadow-xs/30">
@@ -585,28 +1040,114 @@ export function FeedList({
                     <p className="text-base sm:text-lg leading-relaxed text-slate-700 whitespace-pre-line">{post.body}</p>
                   </div>
 
-                  {/* Poll Box (if applicable) */}
-                  {post.poll && (
-                    <div className="mt-5 rounded-2xl border border-purple-100 bg-purple-50/40 p-5 sm:p-6">
-                      <p className="text-xs font-bold text-purple-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                        <Zap className="h-4 w-4" /> โพลแบบสำรวจ
-                      </p>
-                      <p className="text-base font-bold text-slate-800 mb-3.5">{post.poll.question}</p>
-                      <div className="space-y-3">
-                        {post.poll.options.map((opt) => (
-                          <div
-                            key={opt.id}
-                            className="flex items-center justify-between rounded-xl border border-purple-100 bg-white px-5 py-3 text-sm sm:text-base transition-all hover:border-purple-300 shadow-2xs cursor-pointer active:scale-98"
-                          >
-                            <span className="text-slate-700 font-semibold">{opt.text}</span>
-                            <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-bold text-purple-700">
-                              {opt.votes} โหวต
-                            </span>
-                          </div>
-                        ))}
+                  {/* Poll Box (Interactive Real Voting) */}
+                  {post.poll && (() => {
+                    const poll = post.poll;
+                    const totalVotes = poll.options.reduce((sum, o) => sum + (o.votes || 0), 0);
+                    const userVote = poll.userVotes?.find((v) => v.user_id === currentUserId);
+                    const hasVoted = Boolean(
+                      poll.votedUserIds?.includes(currentUserId) || userVote
+                    );
+
+                    return (
+                      <div className="mt-5 rounded-2xl border border-purple-200/80 bg-gradient-to-br from-purple-50/60 via-white to-pink-50/40 p-5 sm:p-6 shadow-xs">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <p className="text-xs font-bold text-purple-600 uppercase tracking-wider flex items-center gap-1.5">
+                            <Zap className="h-4 w-4" /> โพลแบบสำรวจ
+                          </p>
+                          <span className="rounded-full bg-purple-100/90 text-purple-700 px-2.5 py-0.5 text-xs font-bold border border-purple-200/60">
+                            +{poll.pointsPerVote ?? 5} แต้ม
+                          </span>
+                        </div>
+
+                        <p className="text-base sm:text-lg font-bold text-slate-800 mb-4">{poll.question}</p>
+
+                        <div className="space-y-3">
+                          {poll.options.map((opt) => {
+                            const percent = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0;
+                            const isMyChoice = userVote?.option_id === opt.id;
+
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                disabled={hasVoted}
+                                onClick={(e) => handleVotePoll(post.id, poll.id, opt.id, e)}
+                                className={`w-full relative overflow-hidden rounded-xl border text-left transition-all duration-300 p-4 shadow-2xs group ${
+                                  hasVoted
+                                    ? isMyChoice
+                                      ? 'border-purple-300 bg-purple-50/30'
+                                      : 'border-slate-200/70 bg-white/80 opacity-90'
+                                    : 'border-purple-100/80 bg-white hover:border-purple-300 hover:bg-purple-50/30 hover:shadow-xs active:scale-[0.99] cursor-pointer'
+                                }`}
+                              >
+                                {/* Animated Progress Fill Bar */}
+                                {hasVoted && (
+                                  <div
+                                    className={`absolute inset-y-0 left-0 transition-all duration-700 ease-out rounded-r-lg ${
+                                      isMyChoice
+                                        ? 'bg-gradient-to-r from-purple-200/70 to-pink-200/60'
+                                        : 'bg-slate-100/80'
+                                    }`}
+                                    style={{ width: `${percent}%` }}
+                                  />
+                                )}
+
+                                <div className="relative z-10 flex items-center justify-between gap-3">
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold transition-colors ${
+                                      isMyChoice
+                                        ? 'border-purple-500 bg-purple-500 text-white shadow-2xs'
+                                        : hasVoted
+                                        ? 'border-slate-300 bg-white text-slate-400'
+                                        : 'border-slate-300 bg-white text-slate-500 group-hover:border-purple-400 group-hover:text-purple-600'
+                                    }`}>
+                                      {isMyChoice ? <Check className="h-3.5 w-3.5" /> : null}
+                                    </div>
+                                    <span className={`font-semibold text-sm sm:text-base truncate ${
+                                      isMyChoice ? 'text-purple-900 font-bold' : 'text-slate-700'
+                                    }`}>
+                                      {opt.text}
+                                    </span>
+                                  </div>
+
+                                  <div className="shrink-0 flex items-center gap-2">
+                                    {hasVoted && (
+                                      <span className={`text-xs font-extrabold ${isMyChoice ? 'text-purple-700' : 'text-slate-500'}`}>
+                                        {percent}%
+                                      </span>
+                                    )}
+                                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                                      isMyChoice
+                                        ? 'bg-purple-200/80 text-purple-800'
+                                        : 'bg-slate-100 text-slate-600'
+                                    }`}>
+                                      {opt.votes} โหวต
+                                    </span>
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Poll Footer Summary */}
+                        <div className="mt-3.5 flex items-center justify-between text-xs text-slate-400 px-1">
+                          <span>
+                            {hasVoted ? (
+                              <span className="text-emerald-600 font-semibold flex items-center gap-1">
+                                <CheckCircle2 className="h-3.5 w-3.5" /> คุณได้ร่วมโหวตแล้ว
+                              </span>
+                            ) : (
+                              'แตะที่ตัวเลือกเพื่อลงคะแนน'
+                            )}
+                          </span>
+                          <span className="font-medium text-slate-500">รวม {totalVotes} คะแนนโหวต</span>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
+
 
                   {/* Cute Reaction Stats Bar */}
                   <div className="mt-5 flex items-center justify-between text-xs sm:text-sm text-slate-400 px-1">
@@ -1073,6 +1614,130 @@ export function FeedList({
           </div>
         </div>
       </aside>
+
+      {/* ===== CUTE FLOATING TOAST NOTIFICATION ===== */}
+      {deleteToast && (
+        <div className="fixed bottom-6 right-6 z-50 animate-pop-in">
+          <div className={`flex items-center gap-3 rounded-2xl px-5 py-3.5 shadow-hero border backdrop-blur-md text-sm font-semibold ${
+            deleteToast.type === 'success'
+              ? 'bg-emerald-50/95 text-emerald-800 border-emerald-200 shadow-emerald-500/10'
+              : 'bg-rose-50/95 text-rose-800 border-rose-200 shadow-rose-500/10'
+          }`}>
+            {deleteToast.type === 'success' ? (
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0" />
+            )}
+            <span>{deleteToast.message}</span>
+            <button
+              onClick={() => setDeleteToast(null)}
+              className="ml-2 rounded-full p-1 text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== CUTE GLASSMORPHISM DELETE CONFIRMATION MODAL ===== */}
+      {postToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
+          <div
+            className="w-full max-w-lg rounded-[32px] border border-rose-100 bg-white p-7 sm:p-8 shadow-hero animate-scale-up space-y-6 relative overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top decorative gradient bar */}
+            <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-rose-500 via-pink-500 to-amber-500" />
+
+            {/* Modal Header */}
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-100/80 text-rose-600 shadow-2xs">
+                <ShieldAlert className="h-6 w-6" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-slate-900">ยืนยันการลบโพสต์ข่าว</h3>
+                  <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-[11px] font-bold text-rose-600 border border-rose-200">
+                    Admin Only
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  คุณกำลังจะลบโพสต์นี้ออกจากวอลล์/ฟีดของระบบ
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  if (!isDeletingPost) setPostToDelete(null);
+                }}
+                disabled={isDeletingPost}
+                className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Post Preview Box */}
+            <div className="rounded-2xl border border-rose-100 bg-rose-50/40 p-4.5 space-y-2 text-xs">
+              <div className="flex items-center justify-between text-slate-500">
+                <span className="font-semibold text-rose-700">ผู้โพสต์: {postToDelete.author || 'แอดมิน'}</span>
+                {postToDelete.category && (
+                  <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600 border border-rose-100">
+                    {postToDelete.category}
+                  </span>
+                )}
+              </div>
+              {postToDelete.title && (
+                <p className="font-bold text-slate-900 text-sm">{postToDelete.title}</p>
+              )}
+              <p className="text-slate-600 line-clamp-3 leading-relaxed">
+                {postToDelete.body}
+              </p>
+            </div>
+
+            {/* Warning Details */}
+            <div className="rounded-2xl bg-amber-50/80 border border-amber-200/80 p-3.5 flex items-start gap-2.5 text-xs text-amber-900">
+              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">คำเตือนการลบข้อมูลถาวร</p>
+                <p className="mt-0.5 text-amber-800 leading-relaxed">
+                  การลบโพสต์นี้จะลบคอมเมนต์, การส่งความรัก (Likes) และผลโหวตที่เกี่ยวข้องทั้งหมด และไม่สามารถกู้คืนได้
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setPostToDelete(null)}
+                disabled={isDeletingPost}
+                className="rounded-full border border-slate-200 px-6 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                ยกเลิก
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmDeletePost}
+                disabled={isDeletingPost}
+                className="flex items-center gap-2 rounded-full bg-gradient-to-r from-rose-600 to-pink-600 px-6 py-2.5 text-xs font-bold text-white shadow-md hover:from-rose-700 hover:to-pink-700 active:scale-95 transition-all disabled:opacity-50"
+              >
+                {isDeletingPost ? (
+                  <>
+                    <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                    <span>กำลังลบโพสต์...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" />
+                    <span>ยืนยันลบโพสต์</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+}

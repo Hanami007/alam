@@ -11,9 +11,11 @@ import {
 import { getAdminOverviewStats, getPendingUsers, getPostRequests } from '@/lib/db';
 import { PostRequestQueue } from './post-request-queue';
 
-const CURRENT_ADMIN_ID = 1; // TODO: ดึงจาก session จริง (Admin มีคนเดียว)
+interface AdminDashboardProps {
+  adminId?: number;
+}
 
-export async function AdminDashboard() {
+export async function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
   const [pendingUsers, stats, postRequests] = await Promise.all([
     getPendingUsers(),
     getAdminOverviewStats(),
@@ -23,7 +25,7 @@ export async function AdminDashboard() {
   return (
     <div className="animate-slide-up space-y-6">
       {/* คำขอสร้างโพสต์ */}
-      <PostRequestQueue requests={postRequests} adminId={CURRENT_ADMIN_ID} />
+      <PostRequestQueue requests={postRequests} adminId={adminId} />
 
       {/* คิวอนุมัติศิษย์เก่า */}
       <section className="card-elevated p-6">
