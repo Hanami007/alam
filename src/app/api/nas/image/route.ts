@@ -77,7 +77,7 @@ function generateGraduationPortraitSvg(studentId: string, name: string, code3: s
 
     <rect x="0" y="475" width="400" height="45" fill="rgba(15, 23, 42, 0.75)" />
     <text x="200" y="502" fill="#ffffff" font-size="16" font-weight="bold" font-family="sans-serif" text-anchor="middle">
-      ${studentId} (${code3})
+      ${genLabel}
     </text>
   </svg>
   `;

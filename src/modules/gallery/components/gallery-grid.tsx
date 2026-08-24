@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, Fragment } from 'react';
 import {
   Lock,
   Unlock,
@@ -97,6 +97,10 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
     tags?: string[];
   } | null>(null);
 
+  // Pagination state (20 photos per page)
+  const PAGE_SIZE = 20;
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
   // Load catalog and unlocked generations whenever selectedGen or selectedSubfolder changes
   useEffect(() => {
     let isMounted = true;
@@ -113,6 +117,7 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
 
         if (catalogRes.status === 'fulfilled' && catalogRes.value.success) {
           setCatalogPhotos(catalogRes.value.photos || []);
+          setCurrentPage(1);
           if (catalogRes.value.generations) {
             setGenerationsSummary(catalogRes.value.generations);
           }
@@ -163,7 +168,6 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
       const q = searchQuery.toLowerCase().trim();
       list = list.filter(
         (p) =>
-          p.studentName.toLowerCase().includes(q) ||
           p.studentId.includes(q) ||
           p.personCode.includes(q) ||
           p.filename.toLowerCase().includes(q)
@@ -172,6 +176,15 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
 
     return list;
   }, [catalogPhotos, filterMode, selectedGen, selectedYear, codeFilter, searchQuery]);
+
+  // Paginated 20 photos
+  const totalPhotosCount = filteredPhotos.length;
+  const totalPages = Math.max(1, Math.ceil(totalPhotosCount / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedPhotos = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE;
+    return filteredPhotos.slice(start, start + PAGE_SIZE);
+  }, [filteredPhotos, safePage]);
 
   const activeGenObj = generationsSummary.find((g) => g.generationLabel === selectedGen);
   const activeQuiz = activeGenObj?.quiz || 'อาจารย์ประจำสาขาหรือที่ปรึกษาของรุ่นนี้คือใคร?';
@@ -241,18 +254,8 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
               </div>
               <div className="flex items-center gap-2">
                 {lightbox.year && (
-                  <span className="rounded-xl bg-indigo-500/30 px-3 py-1 text-xs font-bold text-indigo-300 border border-indigo-500/40">
+                  <span className="rounded-xl bg-indigo-500/30 px-3.5 py-1.5 text-xs font-bold text-indigo-300 border border-indigo-500/40">
                     📅 ปีการศึกษา 25{lightbox.year}
-                  </span>
-                )}
-                {lightbox.code3 && (
-                  <span className="rounded-xl bg-purple-500/30 px-3 py-1 text-xs font-bold text-purple-300 border border-purple-500/40">
-                    👤 ลำดับ {lightbox.code3}
-                  </span>
-                )}
-                {lightbox.filename && (
-                  <span className="rounded-xl bg-white/10 px-3 py-1 text-xs font-mono text-slate-300 border border-white/10">
-                    📁 {lightbox.filename}
                   </span>
                 )}
               </div>
@@ -459,7 +462,7 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="ค้นหาชื่อ-นามสกุล หรือรหัสเต็ม (5704101301)..."
+                    placeholder="ค้นหาชื่อไฟล์ หรือรหัสนักศึกษา (5704101301)..."
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-xs text-slate-800 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
                   />
                 </div>
@@ -575,16 +578,16 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
               </div>
             )}
 
-            {/* ─── PHOTOS GRID (คมชัดเมื่อปลดล็อก / เบลอเมื่อยังไม่ปลดล็อก) ── */}
+            {/* ─── PHOTOS GRID (ครั้งละ 20 รูป) ── */}
             <div className="grid gap-5 grid-cols-2 sm:grid-cols-3 xl:grid-cols-4">
-              {filteredPhotos.length === 0 ? (
+              {paginatedPhotos.length === 0 ? (
                 <div className="col-span-full rounded-[28px] border border-slate-100 bg-white p-12 text-center">
                   <ImageIcon className="mx-auto h-10 w-10 text-slate-300" />
                   <p className="mt-3 text-sm font-medium text-slate-500">ไม่พบรูปภาพตามเงื่อนไขที่ค้นหา</p>
                   <p className="text-xs text-slate-400 mt-1">ลองล้างคำค้นหาหรือเลือกรุ่น/ปีอื่น</p>
                 </div>
               ) : (
-                filteredPhotos.map((photo) => {
+                paginatedPhotos.map((photo) => {
                   return (
                     <div
                       key={photo.id}
@@ -596,10 +599,8 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
                           onClick={() => {
                             if (isCurrentGenUnlocked) {
                               setLightbox({
-                                title: photo.studentName,
-                                subtitle: `${photo.generationLabel} (${photo.yearLabel}) · รหัส ${photo.studentId}`,
-                                filename: photo.filename,
-                                code3: photo.personCode,
+                                title: `${photo.generationLabel} (${photo.yearLabel})`,
+                                subtitle: `ทำเนียบรุ่นภาควิชาวิทยาการคอมพิวเตอร์ แม่โจ้`,
                                 year: photo.year,
                                 image: photo.photoUrl,
                               });
@@ -611,13 +612,13 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
                         >
                           <img
                             src={photo.photoUrl}
-                            alt={photo.studentName}
+                            alt={`${photo.generationLabel} ${photo.yearLabel}`}
                             className={`h-full w-full object-cover transition-all duration-300 ${
                               !isCurrentGenUnlocked ? 'blur-md brightness-90 scale-105' : 'hover:scale-105'
                             }`}
                             onError={(e) => {
                               (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                photo.studentName
+                                photo.generationLabel
                               )}&background=6366f1&color=fff`;
                             }}
                           />
@@ -642,22 +643,11 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
                           )}
                         </div>
 
-                        {/* File name badge (e.g. 5704101301.jpg) */}
-                        <div className="mt-2 flex items-center justify-between gap-1">
-                          <span className="font-mono text-[11px] font-bold text-slate-700 truncate bg-slate-50 rounded-lg px-2 py-0.5 border border-slate-100">
-                            {photo.filename}
-                          </span>
-                          <span className="rounded-md bg-purple-50 px-1.5 py-0.5 text-[10px] font-extrabold text-purple-700 border border-purple-100 shrink-0">
-                            #{photo.personCode}
-                          </span>
-                        </div>
-
-                        {/* Student info */}
-                        <div className="mt-2 text-center">
-                          <h4 className="font-bold text-slate-900 text-xs sm:text-sm truncate">{photo.studentName}</h4>
-                          <p className="text-[11px] text-slate-400 truncate">
+                        {/* Generation and Year info ONLY */}
+                        <div className="mt-2.5 text-center">
+                          <h4 className="font-bold text-slate-900 text-xs sm:text-sm">
                             {photo.generationLabel} · {photo.yearLabel}
-                          </p>
+                          </h4>
                         </div>
                       </div>
                     </div>
@@ -665,6 +655,75 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
                 })
               )}
             </div>
+
+            {/* ─── PAGINATION CONTROLS (ครั้งละ 20 รูป) ──────────────────── */}
+            {totalPhotosCount > PAGE_SIZE && (
+              <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl bg-white border border-slate-200/90 p-4 shadow-2xs">
+                <p className="text-xs sm:text-sm font-medium text-slate-500">
+                  แสดงรูปที่{' '}
+                  <span className="font-bold text-indigo-600">
+                    {(currentPage - 1) * PAGE_SIZE + 1} -{' '}
+                    {Math.min(currentPage * PAGE_SIZE, totalPhotosCount)}
+                  </span>{' '}
+                  จากทั้งหมด <span className="font-bold text-slate-800">{totalPhotosCount}</span> รูป (ครั้งละ 20 รูป)
+                </p>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={currentPage <= 1}
+                    onClick={() => {
+                      setCurrentPage((p) => Math.max(1, p - 1));
+                      window.scrollTo({ top: 380, behavior: 'smooth' });
+                    }}
+                    className="rounded-xl border border-slate-200 px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                  >
+                    ← ก่อนหน้า
+                  </button>
+
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
+                      .map((pageNum, idx, arr) => {
+                        const prev = arr[idx - 1];
+                        return (
+                          <Fragment key={pageNum}>
+                            {prev && pageNum - prev > 1 && (
+                              <span className="px-1 text-slate-400 text-xs">...</span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCurrentPage(pageNum);
+                                window.scrollTo({ top: 380, behavior: 'smooth' });
+                              }}
+                              className={`h-8 w-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                currentPage === pageNum
+                                  ? 'bg-indigo-600 text-white shadow-xs'
+                                  : 'text-slate-700 hover:bg-slate-100'
+                              }`}
+                            >
+                              {pageNum}
+                            </button>
+                          </Fragment>
+                        );
+                      })}
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => {
+                      setCurrentPage((p) => Math.min(totalPages, p + 1));
+                      window.scrollTo({ top: 380, behavior: 'smooth' });
+                    }}
+                    className="rounded-xl border border-slate-200 px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                  >
+                    ถัดไป →
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
