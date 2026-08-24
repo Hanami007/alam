@@ -20,6 +20,7 @@ exports.up = (pgm) => {
     id:                        { type: 'serial', primaryKey: true },
     student_id:                { type: 'text',    unique: true },
     citizen_id_hash:           { type: 'text' },
+    password_hash:             { type: 'text' },
     email:                     { type: 'text',    unique: true },
     name:                      { type: 'text',    notNull: true },
     generation_option_id:      { type: 'integer', references: 'lookup_options(id)' },
@@ -180,9 +181,18 @@ exports.up = (pgm) => {
     points_earned: { type: 'integer',     default: 0 },
     verified_at:   { type: 'timestamptz', default: pgm.func('now()') },
   });
+
+  // ─── 15. sessions ────────────────────────────────────────────────────────────
+  pgm.createTable('sessions', {
+    id:         { type: 'text',        primaryKey: true },
+    user_id:    { type: 'integer',     notNull: true, references: 'users(id)', onDelete: 'CASCADE' },
+    expires_at: { type: 'timestamptz', notNull: true },
+    created_at: { type: 'timestamptz', notNull: true, default: pgm.func('now()') },
+  });
 };
 
 exports.down = (pgm) => {
+  pgm.dropTable('sessions',                 { cascade: true });
   pgm.dropTable('photo_view_verifications', { cascade: true });
   pgm.dropTable('photo_tags',               { cascade: true });
   pgm.dropTable('hof_votes',                { cascade: true });
