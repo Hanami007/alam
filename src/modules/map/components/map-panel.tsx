@@ -18,7 +18,6 @@ import {
   Info,
   X,
   Compass,
-  CheckCircle2,
 } from 'lucide-react';
 
 type MapMode = 'hometown' | 'workplace';
@@ -105,18 +104,23 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
     let list = activeData;
     const regionConf = REGION_CONFIG[selectedRegion];
     if (regionConf.provinces && regionConf.provinces.length > 0) {
-      list = list.filter((p) => regionConf.provinces!.includes(p.province_name));
+      list = list.filter((p) => {
+        const provName = p.province_name || (p as any).provinceName;
+        return regionConf.provinces!.includes(provName);
+      });
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
-      list = list.filter(
-        (p) =>
-          p.province_name.toLowerCase().includes(q) ||
-          p.name.toLowerCase().includes(q) ||
-          p.company?.toLowerCase().includes(q) ||
-          p.position?.toLowerCase().includes(q) ||
-          p.generation?.toLowerCase().includes(q)
-      );
+      list = list.filter((p) => {
+        const provName = p.province_name || (p as any).provinceName || '';
+        return (
+          provName.toLowerCase().includes(q) ||
+          (p.name && p.name.toLowerCase().includes(q)) ||
+          (p.company && p.company.toLowerCase().includes(q)) ||
+          (p.position && p.position.toLowerCase().includes(q)) ||
+          (p.generation && p.generation.toLowerCase().includes(q))
+        );
+      });
     }
     return list;
   }, [activeData, selectedRegion, searchQuery]);
@@ -125,9 +129,11 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
   const peopleByProvince = useMemo(() => {
     const map = new Map<string, MapPoint[]>();
     for (const p of activeData) {
-      const list = map.get(p.province_name) ?? [];
+      const pName = p.province_name || (p as any).provinceName;
+      if (!pName) continue;
+      const list = map.get(pName) ?? [];
       list.push(p);
-      map.set(p.province_name, list);
+      map.set(pName, list);
     }
     return map;
   }, [activeData]);
@@ -210,7 +216,7 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                 setMode('hometown');
                 setSelectedProvince(null);
               }}
-              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all ${
+              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                 mode === 'hometown'
                   ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/30'
                   : 'text-slate-300 hover:text-white hover:bg-white/5'
@@ -224,7 +230,7 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                 setMode('workplace');
                 setSelectedProvince(null);
               }}
-              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all ${
+              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                 mode === 'workplace'
                   ? 'bg-gradient-to-r from-teal-500 to-emerald-600 text-white shadow-md shadow-teal-500/30'
                   : 'text-slate-300 hover:text-white hover:bg-white/5'
@@ -281,17 +287,17 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
 
       {/* ─── Region Filter Chips & Quick Navigation ─────────────────────── */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {(Object.keys(REGION_CONFIG) as RegionKey[]).map((rKey) => {
+        {(Object.keys(REGION_CONFIG) as RegionKey[]).map((rKey, idx) => {
           const conf = REGION_CONFIG[rKey];
           const isActive = selectedRegion === rKey;
           return (
             <button
-              key={rKey}
+              key={`region-btn-${rKey}-${idx}`}
               onClick={() => {
                 setSelectedRegion(rKey);
                 setZoomScale(1);
               }}
-              className={`flex items-center gap-1.5 shrink-0 rounded-2xl px-4 py-2 text-xs sm:text-sm font-bold transition-all ${
+              className={`flex items-center gap-1.5 shrink-0 rounded-2xl px-4 py-2 text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                 isActive
                   ? mode === 'hometown'
                     ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
@@ -324,21 +330,21 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
             <div className="flex items-center gap-1 bg-slate-100/90 rounded-2xl p-1 border border-slate-200/80">
               <button
                 onClick={() => setZoomScale((z) => Math.min(z + 0.3, 2.5))}
-                className="rounded-xl p-1.5 text-slate-600 hover:bg-white hover:text-slate-900 transition-colors shadow-2xs"
+                className="rounded-xl p-1.5 text-slate-600 hover:bg-white hover:text-slate-900 transition-colors shadow-2xs cursor-pointer"
                 title="ขยายแผนที่"
               >
                 <ZoomIn className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setZoomScale((z) => Math.max(z - 0.3, 0.8))}
-                className="rounded-xl p-1.5 text-slate-600 hover:bg-white hover:text-slate-900 transition-colors shadow-2xs"
+                className="rounded-xl p-1.5 text-slate-600 hover:bg-white hover:text-slate-900 transition-colors shadow-2xs cursor-pointer"
                 title="ย่อแผนที่"
               >
                 <ZoomOut className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setZoomScale(1)}
-                className="rounded-xl p-1.5 text-slate-600 hover:bg-white hover:text-slate-900 transition-colors shadow-2xs"
+                className="rounded-xl p-1.5 text-slate-600 hover:bg-white hover:text-slate-900 transition-colors shadow-2xs cursor-pointer"
                 title="รีเซ็ตมุมมอง"
               >
                 <RotateCcw className="h-4 w-4" />
@@ -361,7 +367,7 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                 </filter>
               </defs>
 
-              {provinceNames.map((name) => {
+              {provinceNames.map((name, idx) => {
                 const count = peopleByProvince.get(name)?.length ?? 0;
                 const isMetro = METRO_PROVINCES.includes(name);
                 const isSelected = selectedProvince === name;
@@ -370,7 +376,7 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
 
                 return (
                   <path
-                    key={name}
+                    key={`prov-path-${name}-${idx}`}
                     d={THAILAND_PROVINCE_PATHS[name]}
                     fill={fill}
                     stroke={
@@ -395,10 +401,9 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                 );
               })}
 
-              {/* ─── CONNECTING DASHED LINE & METRO INSET (ไม่มีวงกลม เลื่อนลงมาด้านล่างไม่ทับแผนที่) ─── */}
+              {/* ─── CONNECTING DASHED LINE & METRO INSET ─── */}
               {selectedRegion === 'all' && (
                 <g className="animate-fade-in transition-opacity duration-300">
-                  {/* Yellow dashed connecting line */}
                   <line
                     x1="188"
                     y1="405"
@@ -411,7 +416,6 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                     className="animate-pulse"
                   />
 
-                  {/* Label Header */}
                   <text
                     x="350"
                     y="608"
@@ -433,9 +437,8 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                     และปริมณฑล
                   </text>
 
-                  {/* Nested Zoomed SVG Map of Metro Area without circle frame */}
                   <svg x="260" y="630" width="180" height="145" viewBox="140.2 364.5 84.4 66.4">
-                    {METRO_PROVINCES.map((name) => {
+                    {METRO_PROVINCES.map((name, idx) => {
                       const count = peopleByProvince.get(name)?.length ?? 0;
                       const isSelected = selectedProvince === name;
                       const isHovered = hoveredProvince === name;
@@ -443,7 +446,7 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
 
                       return (
                         <path
-                          key={`metro-bubble-${name}`}
+                          key={`metro-bubble-${name}-${idx}`}
                           d={THAILAND_PROVINCE_PATHS[name]}
                           fill={fill}
                           stroke={isSelected ? '#FFFFFF' : '#D97706'}
@@ -517,7 +520,7 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -544,7 +547,7 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
 
                   <button
                     onClick={() => setSelectedProvince(null)}
-                    className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                    className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
                     title="ปิดรายละเอียด"
                   >
                     <X className="h-5 w-5" />
@@ -559,9 +562,9 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                     </div>
                   )}
 
-                  {selectedProvinceAlumni.map((alumnus) => (
+                  {selectedProvinceAlumni.map((alumnus, idx) => (
                     <div
-                      key={alumnus.id}
+                      key={`alumnus-card-${alumnus.id || idx}-${alumnus.name}-${idx}`}
                       className="rounded-2xl border border-slate-100 bg-slate-50/60 hover:bg-white hover:border-indigo-100 hover:shadow-xs p-3.5 transition-all space-y-2"
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -574,7 +577,7 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                             />
                           ) : (
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-100 to-purple-100 text-indigo-700 font-extrabold text-xs border border-indigo-200/60">
-                              {alumnus.name.substring(0, 2)}
+                              {alumnus.name ? alumnus.name.substring(0, 2) : 'ศก'}
                             </div>
                           )}
                           <div>
@@ -639,7 +642,7 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
 
                     return (
                       <div
-                        key={provName}
+                        key={`sorted-prov-${provName}-${idx}`}
                         onClick={() => setSelectedProvince(provName)}
                         className={`group relative overflow-hidden rounded-2xl border p-3.5 cursor-pointer transition-all hover:border-indigo-300 hover:shadow-xs active:scale-[0.99] ${
                           selectedProvince === provName

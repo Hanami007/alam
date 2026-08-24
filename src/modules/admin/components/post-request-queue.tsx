@@ -1,6 +1,3 @@
-// เพิ่ม component นี้เข้าไปใน admin-dashboard.tsx เดิม (import แล้ววางในหน้า)
-// ต้องดึง postRequests มาจาก getPostRequests() ใน page.tsx แล้วส่งเป็น prop เข้ามา
-
 'use client';
 import { useState } from 'react';
 
@@ -25,21 +22,33 @@ interface PostRequest {
 interface PostRequestQueueProps {
   requests: PostRequest[];
   adminId: number;
+  onRefresh?: () => void;
 }
 
-export function PostRequestQueue({ requests: initialRequests, adminId }: PostRequestQueueProps) {
-  const [requests, setRequests] = useState(initialRequests);
+export function PostRequestQueue({ requests = [], adminId = 1, onRefresh }: PostRequestQueueProps) {
+  const [dismissedIds, setDismissedIds] = useState<number[]>([]);
   const [processingId, setProcessingId] = useState<number | null>(null);
+
+  const visibleRequests = requests.filter((r) => !dismissedIds.includes(r.id));
 
   async function handleDecision(postId: number, action: 'approve' | 'reject') {
     setProcessingId(postId);
     try {
-      await fetch(`/api/admin/post-requests/${postId}`, {
+      const res = await fetch(`/api/admin/post-requests/${postId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, adminId }),
       });
-      setRequests((prev) => prev.filter((r) => r.id !== postId));
+      const data = await res.json();
+      if (data.success) {
+        setDismissedIds((prev) => [...prev, postId]);
+        if (onRefresh) onRefresh();
+      } else {
+        alert(data.error || 'เกิดข้อผิดพลาดในการดำเนินการ');
+      }
+    } catch (err: any) {
+      console.error('Error handling decision:', err);
+      alert('เกิดข้อผิดพลาดในการส่งข้อมูล');
     } finally {
       setProcessingId(null);
     }
@@ -53,12 +62,12 @@ export function PostRequestQueue({ requests: initialRequests, adminId }: PostReq
           <h3 className="text-lg font-bold text-slate-900">คำขอสร้างโพสต์จากศิษย์เก่า</h3>
         </div>
         <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-600 border border-indigo-100">
-          {requests.length} รายการ
+          {visibleRequests.length} รายการ
         </span>
       </div>
 
       <div className="mt-5 space-y-4">
-        {requests.map((r) => (
+        {visibleRequests.map((r) => (
           <div key={r.id} className="rounded-2xl border border-slate-100 bg-slate-50/50 p-5 space-y-3 transition-all hover:border-indigo-100 hover:bg-white">
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-1">
@@ -114,7 +123,7 @@ export function PostRequestQueue({ requests: initialRequests, adminId }: PostReq
                 type="button"
                 disabled={processingId === r.id}
                 onClick={() => handleDecision(r.id, 'reject')}
-                className="rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50"
+                className="rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50 cursor-pointer"
               >
                 ปฏิเสธ
               </button>
@@ -122,14 +131,14 @@ export function PostRequestQueue({ requests: initialRequests, adminId }: PostReq
                 type="button"
                 disabled={processingId === r.id}
                 onClick={() => handleDecision(r.id, 'approve')}
-                className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-1.5 text-xs font-bold text-white shadow-xs hover:opacity-90 active:scale-95 transition-all disabled:opacity-50"
+                className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-1.5 text-xs font-bold text-white shadow-xs hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
               >
                 {processingId === r.id ? 'กำลังอนุมัติ...' : 'อนุมัติเผยแพร่ ✨'}
               </button>
             </div>
           </div>
         ))}
-        {requests.length === 0 && (
+        {visibleRequests.length === 0 && (
           <p className="text-center text-xs text-slate-400 py-6">ไม่มีคำขอค้างอยู่</p>
         )}
       </div>

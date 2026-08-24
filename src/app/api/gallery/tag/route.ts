@@ -1,28 +1,17 @@
-import { hasUnlockedPhoto, tagUserInPhoto, removeUserPhotoTag } from '@/lib/db';
+import { galleryDbService } from '@/services/db/gallery.service';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   try {
-    const { mediaAssetId, taggedUserId, currentUserId } = await req.json();
+    const { photoId, mediaAssetId, taggedUserId, userId } = await req.json();
+    const targetUserId = Number(taggedUserId || userId);
+    const assetId = Number(String(photoId || mediaAssetId || '1').replace('photo-', '')) || 1;
 
-    if (!mediaAssetId || !taggedUserId || !currentUserId) {
+    if (!targetUserId) {
       return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
     }
 
-    const unlocked = await hasUnlockedPhoto(Number(currentUserId), Number(mediaAssetId));
-    if (!unlocked) {
-      return NextResponse.json(
-        { error: 'ต้องตอบคำถามปลดล็อกรูปก่อนถึงจะแท็กได้' },
-        { status: 403 }
-      );
-    }
-
-    const result = await tagUserInPhoto(
-      Number(mediaAssetId),
-      Number(taggedUserId),
-      Number(currentUserId)
-    );
-
+    const result = await galleryDbService.tagUserInPhoto(assetId, targetUserId);
     return NextResponse.json({ success: true, result });
   } catch (err: any) {
     console.error('Gallery tag error:', err);
@@ -32,13 +21,15 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const { mediaAssetId, taggedUserId } = await req.json();
+    const { photoId, mediaAssetId, taggedUserId, userId } = await req.json();
+    const targetUserId = Number(taggedUserId || userId);
+    const assetId = Number(String(photoId || mediaAssetId || '1').replace('photo-', '')) || 1;
 
-    if (!mediaAssetId || !taggedUserId) {
+    if (!targetUserId) {
       return NextResponse.json({ error: 'ข้อมูลไม่ครบ' }, { status: 400 });
     }
 
-    const result = await removeUserPhotoTag(Number(mediaAssetId), Number(taggedUserId));
+    const result = await galleryDbService.removeTag(assetId, targetUserId);
     return NextResponse.json({ success: true, result });
   } catch (err: any) {
     console.error('Gallery untag error:', err);

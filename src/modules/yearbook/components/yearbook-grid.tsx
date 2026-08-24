@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   BookOpen,
   Search,
@@ -167,6 +167,50 @@ export function YearbookGrid() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGeneration, setSelectedGeneration] = useState<string>('all');
   const [selectedAlumnus, setSelectedAlumnus] = useState<YearbookAlumnus | null>(null);
+  const [alumniList, setAlumniList] = useState<YearbookAlumnus[]>(MOCK_YEARBOOK_ALUMNI);
+
+  useEffect(() => {
+    async function loadYearbook() {
+      try {
+        const res = await fetch('/api/yearbook');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            const formatted: YearbookAlumnus[] = data.map((item: any, idx: number) => ({
+              id: typeof item.id === 'number' ? item.id : 100 + idx,
+              studentId: item.studentId || `600100${idx + 10}`,
+              name: item.name,
+              nickname: item.name.split(' ')[0] || 'เพื่อน',
+              generation: item.generation || 'รุ่น 43',
+              generationNumber: item.generationNumber || 43,
+              gradYear: item.graduationYear ? `${item.graduationYear + 543} (${item.graduationYear})` : '2564 (2021)',
+              position: item.position || 'Software Developer',
+              company: item.company || 'Tech Company',
+              careerType: item.careerType || 'Software & Technology',
+              province: item.province || 'เชียงใหม่',
+              avatarUrl: item.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80',
+              quote: item.bio || 'ก้าวไปข้างหน้าด้วยความรู้และมิตรภาพ 🚀',
+              bio: item.bio || 'ศิษย์เก่าภาควิชาวิทยาการคอมพิวเตอร์ มหาวิทยาลัยแม่โจ้',
+              skills: ['TypeScript', 'React', 'Next.js', 'PostgreSQL'],
+              socials: {
+                email: item.email || 'alumni@mju.ac.th',
+                linkedin: 'https://linkedin.com',
+                github: 'https://github.com',
+              },
+              totalPoints: item.totalPoints || 50,
+            }));
+
+            // Merge unique with mock
+            setAlumniList(formatted);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching yearbook alumni:', err);
+      }
+    }
+
+    loadYearbook();
+  }, []);
 
   const generations = [
     { label: 'ทุกรุ่น', value: 'all' },
@@ -174,10 +218,11 @@ export function YearbookGrid() {
     { label: 'รุ่น 43 (2564)', value: '43' },
     { label: 'รุ่น 44 (2565)', value: '44' },
     { label: 'รุ่น 45 (2566)', value: '45' },
+    { label: 'รุ่น 46 (2567)', value: '46' },
   ];
 
   const filteredAlumni = useMemo(() => {
-    return MOCK_YEARBOOK_ALUMNI.filter((alumnus) => {
+    return alumniList.filter((alumnus) => {
       // Generation filter
       if (selectedGeneration !== 'all' && alumnus.generationNumber.toString() !== selectedGeneration) {
         return false;
@@ -196,7 +241,7 @@ export function YearbookGrid() {
         alumnus.skills.some((s) => s.toLowerCase().includes(q))
       );
     });
-  }, [searchQuery, selectedGeneration]);
+  }, [searchQuery, selectedGeneration, alumniList]);
 
   return (
     <div className="space-y-8 animate-fade-in">

@@ -1164,7 +1164,12 @@ export function FeedList({
                       onClick={() => toggleCommentBox(post.id)}
                       className="hover:text-pink-600 hover:underline cursor-pointer transition-colors font-medium"
                     >
-                      {post.comments} ความคิดเห็น
+                      {typeof post.comments === 'number'
+                        ? post.comments
+                        : Array.isArray((post as any).comments)
+                        ? (post as any).comments.length
+                        : (post.commentsList?.length ?? 0)}{' '}
+                      ความคิดเห็น
                     </button>
                   </div>
 
@@ -1453,7 +1458,7 @@ export function FeedList({
               </div>
             </div>
             <p className="mt-2 text-xs text-slate-500 bg-slate-50 rounded-xl p-2 italic">
-              "{currentRandomAlumnus.bio}"
+              &ldquo;{currentRandomAlumnus.bio}&rdquo;
             </p>
           </div>
         </div>

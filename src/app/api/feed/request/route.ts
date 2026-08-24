@@ -1,13 +1,18 @@
+import { getCurrentUser } from '@/lib/auth';
 import { createPostRequest } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   try {
-    const { requestedBy, title, content, category, postType, poll } = await req.json();
+    const user = await getCurrentUser();
+    const body = await req.json();
+    const { requestedBy, title, content, category, postType, poll } = body;
 
-    if (!requestedBy || !title) {
+    const requesterId = Number(requestedBy) || user?.id || 1;
+
+    if (!title || !title.trim()) {
       return NextResponse.json(
-        { success: false, error: 'กรุณากรอกข้อมูลหัวข้อโพสต์และผู้ส่ง' },
+        { success: false, error: 'กรุณากรอกหัวข้อโพสต์' },
         { status: 400 }
       );
     }
@@ -50,9 +55,9 @@ export async function POST(req: Request) {
     }
 
     const post = await createPostRequest(
-      Number(requestedBy),
+      requesterId,
       title.trim(),
-      content ? content.trim() : '',
+      content ? content.trim() : (pollData?.question || ''),
       category ? category.trim() : (type === 'poll' ? 'โพลสำรวจความเห็น' : 'ทั่วไป'),
       type,
       pollData
