@@ -16,6 +16,12 @@ export type Generation = {
 };
 
 export const generations: Generation[] = [
+  ...Array.from({ length: 32 }, (_, i) => ({
+    id: `gen-${i + 1}`,
+    name: `รุ่น ${i + 1}`,
+    yearStart: 1975 + i,
+    yearEnd: 1979 + i,
+  })),
   { id: 'gen-43', name: 'รุ่น 43', yearStart: 2011, yearEnd: 2015 },
   { id: 'gen-46', name: 'รุ่น 46', yearStart: 2014, yearEnd: 2018 },
   { id: 'gen-48', name: 'รุ่น 48', yearStart: 2016, yearEnd: 2020 },

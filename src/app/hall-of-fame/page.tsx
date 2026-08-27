@@ -15,16 +15,25 @@ export default function HallOfFamePage() {
         setLoading(true);
         const data = await api.hof.getCandidates();
         if (Array.isArray(data)) {
-          const formatted = data.map((p: any, idx: number) => ({
-            id: p.id || idx + 1,
-            name: p.name,
-            company: p.company || 'บริษัทเอกชน',
-            position: p.position || p.occupation || 'ศิษย์เก่าดีเด่น',
-            avatar_url: p.avatarUrl || p.avatar_url || p.image || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=500&auto=format&fit=crop&q=80',
-            description: p.achievement || p.description || 'ศิษย์เก่าผู้สร้างชื่อเสียงและประโยชน์ให้แก่องค์กรและสังคม',
-            generation_label: p.generation || p.generation_label || 'รุ่น 43',
-            votes: p.hofPoints || p.hof_points || (184 - idx * 28),
-          }));
+          const formatted = data.map((p: any, idx: number) => {
+            // Parse generation number from label like "รุ่น 43" → 43
+            const genLabel: string = p.generation || p.generation_label || 'รุ่น 43';
+            const genMatch = genLabel.match(/(\d+)/);
+            const generationNumber = genMatch ? parseInt(genMatch[1], 10) : 43;
+
+            return {
+              id: p.id || idx + 1,
+              name: p.name,
+              studentId: p.studentId || p.student_id || undefined,
+              company: p.company || 'บริษัทเอกชน',
+              position: p.position || p.occupation || 'ศิษย์เก่าดีเด่น',
+              avatar_url: p.avatarUrl || p.avatar_url || p.image || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=500&auto=format&fit=crop&q=80',
+              description: p.achievement || p.description || 'ศิษย์เก่าผู้สร้างชื่อเสียงและประโยชน์ให้แก่องค์กรและสังคม',
+              generation_label: genLabel,
+              generationNumber,
+              votes: p.hofPoints || p.hof_points || (184 - idx * 28),
+            };
+          });
           setCandidates(formatted);
         }
       } catch (err) {

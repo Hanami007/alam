@@ -129,6 +129,11 @@ export const api = {
   // User Profile & Settings API
   user: {
     getProfile: () => fetchJson<any>('/api/user/profile'),
+    updateProfile: (data: { name?: string; position?: string; company?: string; bio?: string; avatarUrl?: string }) =>
+      fetchJson<any>('/api/user/profile', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
     updatePrivacy: (settings: { showHometownOnMap: boolean; showWorkplaceOnMap: boolean }) =>
       fetchJson<any>('/api/user/privacy', {
         method: 'PUT',
