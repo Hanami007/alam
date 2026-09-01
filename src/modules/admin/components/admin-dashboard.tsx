@@ -12,8 +12,12 @@ import {
   XCircle,
   RefreshCw,
   Sparkles,
+  Megaphone,
+  Layers,
+  UserCheck,
 } from 'lucide-react';
 import { PostRequestQueue } from './post-request-queue';
+import { AdminAnnouncementForm } from './admin-announcement-form';
 import { api } from '@/lib/api-client';
 
 interface AdminDashboardProps {
@@ -21,6 +25,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
+  const [activeTab, setActiveTab] = useState<'posts' | 'announcement' | 'users'>('posts');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>({
     totalAlumni: 0,
@@ -123,11 +128,11 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-indigo-600">Admin Control Center</p>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">แดชบอร์ดจัดการระบบ</h1>
+          <p className="text-xs font-bold uppercase tracking-wider text-indigo-600">Admin System Control Center</p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">ระบบจัดการสำหรับผู้ดูแลระบบ</h1>
         </div>
         <button
-          onClick={() => loadAdminData()}
+          onClick={() => loadAdminData(true)}
           disabled={loading}
           className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-xs font-bold text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 transition-all cursor-pointer disabled:opacity-50"
         >
@@ -154,57 +159,103 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
         ))}
       </section>
 
-      {/* คำขอสร้างโพสต์ */}
-      <PostRequestQueue requests={postRequests} adminId={adminId} onRefresh={() => loadAdminData()} />
+      {/* Admin Function Tabs */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
+        <button
+          onClick={() => setActiveTab('posts')}
+          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
+            activeTab === 'posts'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <Layers className="h-4 w-4" />
+          <span>จัดการคำขอโพสต์วอลล์ ({postRequests.length})</span>
+        </button>
 
-      {/* คิวอนุมัติศิษย์เก่า */}
-      <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-xs space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">รออนุมัติ</p>
-            <h2 className="text-lg font-bold text-slate-900">คิวอนุมัติศิษย์เก่าใหม่ (Student Verification)</h2>
+        <button
+          onClick={() => setActiveTab('announcement')}
+          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
+            activeTab === 'announcement'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <Megaphone className="h-4 w-4" />
+          <span>สร้างประกาศทางการลงวอลล์</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('users')}
+          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
+            activeTab === 'users'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <UserCheck className="h-4 w-4" />
+          <span>อนุมัติสมาชิกศิษย์เก่า ({pendingUsers.length})</span>
+        </button>
+      </div>
+
+      {/* TAB CONTENT */}
+      {activeTab === 'posts' && (
+        <PostRequestQueue requests={postRequests} adminId={adminId} onRefresh={() => loadAdminData()} />
+      )}
+
+      {activeTab === 'announcement' && (
+        <AdminAnnouncementForm onSuccess={() => loadAdminData()} />
+      )}
+
+      {activeTab === 'users' && (
+        <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">รออนุมัติ</p>
+              <h2 className="text-lg font-bold text-slate-900">คิวอนุมัติศิษย์เก่าใหม่ (Student Verification)</h2>
+            </div>
+            <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-600 border border-indigo-100">
+              {pendingUsers.length} รายการ
+            </span>
           </div>
-          <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-600 border border-indigo-100">
-            {pendingUsers.length} รายการ
-          </span>
-        </div>
 
-        <div className="mt-4 space-y-3">
-          {pendingUsers.length === 0 ? (
-            <p className="rounded-2xl bg-slate-50 p-6 text-center text-xs text-slate-400">ไม่มีรายการรออนุมัติตอนนี้</p>
-          ) : (
-            pendingUsers.map((u) => (
-              <div key={u.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50/80 border border-slate-100 p-4 hover:bg-white transition-all">
-                <div>
-                  <p className="text-sm font-bold text-slate-900">{u.name}</p>
-                  <p className="text-xs text-slate-500">
-                    รหัสนักศึกษา: <span className="font-semibold text-slate-700">{u.studentId || 'ไม่ระบุ'}</span> · {u.generation ?? 'ยังไม่ระบุรุ่น'} · {u.email}
-                  </p>
-                  <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-indigo-600">
-                    <ShieldCheck className="h-3.5 w-3.5" /> ตรวจสอบเทียบกับฐานข้อมูล apimju เรียบร้อย
-                  </p>
+          <div className="mt-4 space-y-3">
+            {pendingUsers.length === 0 ? (
+              <p className="rounded-2xl bg-slate-50 p-6 text-center text-xs text-slate-400">ไม่มีรายการรออนุมัติตอนนี้</p>
+            ) : (
+              pendingUsers.map((u) => (
+                <div key={u.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50/80 border border-slate-100 p-4 hover:bg-white transition-all">
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">{u.name}</p>
+                    <p className="text-xs text-slate-500">
+                      รหัสนักศึกษา: <span className="font-semibold text-slate-700">{u.studentId || 'ไม่ระบุ'}</span> · {u.generation ?? 'ยังไม่ระบุรุ่น'} · {u.email}
+                    </p>
+                    <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-indigo-600">
+                      <ShieldCheck className="h-3.5 w-3.5" /> ตรวจสอบเทียบกับฐานข้อมูล apimju เรียบร้อย
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      disabled={actionLoadingId === u.id}
+                      onClick={() => handleUserVerification(u.id, 'approved')}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" /> อนุมัติ
+                    </button>
+                    <button
+                      disabled={actionLoadingId === u.id}
+                      onClick={() => handleUserVerification(u.id, 'rejected')}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      <XCircle className="h-3.5 w-3.5" /> ปฏิเสธ
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    disabled={actionLoadingId === u.id}
-                    onClick={() => handleUserVerification(u.id, 'approved')}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
-                  >
-                    <CheckCircle2 className="h-3.5 w-3.5" /> อนุมัติ
-                  </button>
-                  <button
-                    disabled={actionLoadingId === u.id}
-                    onClick={() => handleUserVerification(u.id, 'rejected')}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    <XCircle className="h-3.5 w-3.5" /> ปฏิเสธ
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </section>
+              ))
+            )}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

@@ -1,0 +1,34 @@
+import { NextResponse } from 'next/server';
+import { getCurrentUser } from '@/lib/auth';
+import { pool } from '@/lib/db';
+
+export async function POST(req: Request) {
+  try {
+    const user = await getCurrentUser();
+    // Allow admin announcement
+    const body = await req.json();
+    const { title, body: contentText, category, imageUrl, pinned } = body;
+
+    if (!title || !title.trim()) {
+      return NextResponse.json({ error: 'กรุณาระบุหัวข้อประกาศ' }, { status: 400 });
+    }
+
+    const adminUserId = user?.id || 1;
+
+    const { rows: insertedPost } = await pool.query(
+      `INSERT INTO posts (user_id, title, content, category, status, pinned, created_at)
+       VALUES ($1, $2, $3, $4, 'approved', $5, NOW())
+       RETURNING id, title, content, category, pinned, created_at`,
+      [adminUserId, title.trim(), contentText?.trim() || '', category || 'ประกาศทางการ', pinned ? true : false]
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: 'สร้างประกาศทางการและแสดงผลบนวอลล์เรียบร้อยแล้ว',
+      post: insertedPost[0],
+    });
+  } catch (err: any) {
+    console.error('[API /api/admin/announcement] Error:', err);
+    return NextResponse.json({ error: err.message || 'Error publishing admin announcement' }, { status: 500 });
+  }
+}

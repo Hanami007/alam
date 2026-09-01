@@ -131,6 +131,7 @@ export class UserDbService {
       company?: string;
       bio?: string;
       avatarUrl?: string;
+      generation?: string;
     }
   ) {
     const updates: string[] = [];
@@ -156,6 +157,16 @@ export class UserDbService {
     if (data.avatarUrl !== undefined) {
       updates.push(`avatar_url = $${idx++}`);
       values.push(data.avatarUrl);
+    }
+    if (data.generation !== undefined) {
+      const genRes = await pool.query(
+        `SELECT id FROM lookup_options WHERE category = 'generation' AND label = $1 LIMIT 1`,
+        [data.generation]
+      );
+      if (genRes.rows.length > 0) {
+        updates.push(`generation_option_id = $${idx++}`);
+        values.push(genRes.rows[0].id);
+      }
     }
 
     if (updates.length === 0) return { success: true };

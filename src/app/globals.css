@@ -24,11 +24,18 @@
   --shadow-blue-glow: 0 6px 20px rgba(99, 102, 241, 0.22);
   --shadow-hero: 0 16px 40px -8px rgba(99, 102, 241, 0.15), 0 4px 12px -2px rgba(0, 0, 0, 0.05);
 
-  --font-sans: var(--font-prompt), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: var(--font-prompt), var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans Thai", "Sukhumvit Set", "Thonburi", Arial, sans-serif;
 
   --animate-fade-in: fade-in 0.3s ease both;
   --animate-slide-up: slide-up 0.3s ease both;
   --animate-pulse-soft: pulse-soft 2s ease-in-out infinite;
+}
+
+body {
+  font-family: var(--font-prompt), var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans Thai", "Sukhumvit Set", "Thonburi", Arial, sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @keyframes fade-in {

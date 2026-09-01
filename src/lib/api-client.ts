@@ -129,7 +129,7 @@ export const api = {
   // User Profile & Settings API
   user: {
     getProfile: () => fetchJson<any>('/api/user/profile'),
-    updateProfile: (data: { name?: string; position?: string; company?: string; bio?: string; avatarUrl?: string }) =>
+    updateProfile: (data: { name?: string; position?: string; company?: string; bio?: string; avatarUrl?: string; generation?: string }) =>
       fetchJson<any>('/api/user/profile', {
         method: 'PUT',
         body: JSON.stringify(data),
@@ -156,6 +156,27 @@ export const api = {
       fetchJson<any>('/api/admin/post-requests/decide', {
         method: 'POST',
         body: JSON.stringify({ postId, decision }),
+      }),
+    createAnnouncement: (data: { title: string; body: string; category?: string; pinned?: boolean }) =>
+      fetchJson<any>('/api/admin/announcement', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    // Yearbook Data Management
+    getYearbookList: () => fetchJson<any[]>('/api/admin/yearbook'),
+    addYearbookEntry: (data: { name: string; nickname?: string; avatarUrl?: string; quote?: string; generation?: string }) =>
+      fetchJson<any>('/api/admin/yearbook', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    updateYearbookEntry: (data: { id: number | string; name?: string; nickname?: string; avatarUrl?: string; quote?: string; generation?: string }) =>
+      fetchJson<any>('/api/admin/yearbook', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    deleteYearbookEntry: (id: number | string) =>
+      fetchJson<any>(`/api/admin/yearbook?id=${encodeURIComponent(String(id))}`, {
+        method: 'DELETE',
       }),
   },
 };
