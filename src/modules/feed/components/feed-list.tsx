@@ -1505,36 +1505,6 @@ export function FeedList({
           </div>
         </div>
 
-        {/* 3. Featured Alumni Widget */}
-        <div className="rounded-[26px] border border-slate-100 bg-white p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <Sparkles className="h-4 w-4 text-amber-400" />
-              <span>ศิษย์เก่าแนะนำ</span>
-            </h3>
-            <Link href="/hall-of-fame" className="text-xs font-medium text-pink-500 hover:underline">
-              ดูทั้งหมด
-            </Link>
-          </div>
-          <div className="mt-2.5 space-y-2">
-            {featuredAlumni.length === 0 ? (
-              <p className="text-xs text-slate-400 py-2 text-center">ไม่มีข้อมูลศิษย์เก่าแนะนำ</p>
-            ) : (
-              featuredAlumni.slice(0, 3).map((a) => (
-                <div key={a.id} className="flex items-center gap-2.5 rounded-2xl p-1.5 bg-slate-50/50 hover:bg-pink-50/30 border border-slate-100/60 transition-colors">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-amber-300 to-pink-400 font-bold text-white text-xs shadow-2xs">
-                    {a.name ? a.name.substring(0, 2) : 'AL'}
-                  </div>
-                  <div className="overflow-hidden">
-                    <p className="text-xs font-bold text-slate-800 truncate">{a.name}</p>
-                    <p className="text-xs text-slate-400 truncate">{a.position || 'ศิษย์เก่า CS'}</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
         {/* 4. 🎂 CUTE BIRTHDAY WALL WIDGET */}
         <div className="rounded-[26px] border border-pink-200/70 bg-gradient-to-b from-pink-50/60 via-white to-white p-4.5 shadow-card transition-all duration-200">
           <div className="flex items-center justify-between">

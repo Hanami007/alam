@@ -16,8 +16,8 @@ export async function POST(req: Request) {
     const adminUserId = user?.id || 1;
 
     const { rows: insertedPost } = await pool.query(
-      `INSERT INTO posts (user_id, title, content, category, status, pinned, created_at)
-       VALUES ($1, $2, $3, $4, 'approved', $5, NOW())
+      `INSERT INTO posts (admin_id, title, content, category, status, pinned, published_at, created_at)
+       VALUES ($1, $2, $3, $4, 'published', $5, NOW(), NOW())
        RETURNING id, title, content, category, pinned, created_at`,
       [adminUserId, title.trim(), contentText?.trim() || '', category || 'ประกาศทางการ', pinned ? true : false]
     );

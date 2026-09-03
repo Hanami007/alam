@@ -82,7 +82,7 @@ function NavSection({
                 isActive
                   ? 'text-white'
                   : 'text-muted-foreground hover:bg-primary-light/60 hover:text-primary'
-              } ${collapsed ? 'justify-center' : ''}`}
+              } ${collapsed ? 'justify-center px-0' : ''}`}
             >
               <Icon className={`h-[18px] w-[18px] shrink-0 transition-transform ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
               {!collapsed && <span>{item.label}</span>}
@@ -258,14 +258,16 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Floating Glassmorphism Sidebar */}
       <aside
-        className={`fixed top-3 bottom-3 left-3 z-40 flex flex-col rounded-3xl border border-border/80 bg-card/85 p-4 backdrop-blur-xl shadow-hero transition-all duration-300 ${sidebarWidth} ${
+        className={`fixed top-3 bottom-3 left-3 z-40 flex flex-col rounded-3xl border border-border/80 bg-card/85 backdrop-blur-xl shadow-hero transition-all duration-300 ${sidebarWidth} ${
+          collapsed ? 'px-2 py-4' : 'p-4'
+        } ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
         {/* Brand Header */}
-        <div className="mb-6 flex items-center justify-between px-1">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl gradient-primary text-white shadow-blue-glow">
+        <div className={`mb-6 flex items-center justify-between ${collapsed ? 'px-0 justify-center' : 'px-1'}`}>
+          <div className={`flex items-center gap-2.5 ${collapsed ? 'justify-center' : ''}`}>
+            <div className="flex h-10 w-10 shrink-0 aspect-square items-center justify-center rounded-2xl gradient-primary text-white shadow-blue-glow">
               <GraduationCap className="h-5 w-5" />
             </div>
             {!collapsed && <span className="text-base font-bold text-gradient-primary">AlumniConnect</span>}
@@ -292,10 +294,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                     <img
                       src={currentUser.avatar_url}
                       alt={currentUser.name}
-                      className="h-10 w-10 rounded-full object-cover ring-2 ring-white/40"
+                      className="h-10 w-10 shrink-0 aspect-square rounded-full object-cover ring-2 ring-white/40"
                     />
                   ) : (
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 font-bold text-white text-xs backdrop-blur-xs">
+                    <div className="flex h-10 w-10 shrink-0 aspect-square items-center justify-center rounded-full bg-white/20 font-bold text-white text-xs backdrop-blur-xs">
                       {currentUser.name?.substring(0, 2) || 'CS'}
                     </div>
                   )}
@@ -365,29 +367,29 @@ export function AppShell({ children }: { children: ReactNode }) {
           )}
 
           {/* Integrated User Card with Smooth Slide-Up Inline Expansion */}
-          <div className="gradient-primary overflow-hidden rounded-2xl p-3 text-white shadow-blue-glow transition-all duration-300">
+          <div className={`gradient-primary overflow-hidden rounded-2xl text-white shadow-blue-glow transition-all duration-300 ${collapsed ? 'p-2' : 'p-3'}`}>
             <button
               onClick={() => {
                 setAvatarOpen((v) => !v);
                 setNotifOpen(false);
               }}
-              className="w-full text-left flex items-center gap-2.5 cursor-pointer"
+              className="w-full text-left flex items-center gap-2.5 cursor-pointer justify-center"
               title={collapsed ? `${currentUser.name} (${currentUser.points} แต้ม)` : undefined}
             >
               {collapsed ? (
-                <div className="flex flex-col items-center gap-1 mx-auto">
+                <div className="flex flex-col items-center gap-1 mx-auto shrink-0">
                   {currentUser.avatar_url ? (
                     <img
                       src={currentUser.avatar_url}
                       alt={currentUser.name}
-                      className="h-8 w-8 rounded-full object-cover ring-1 ring-white/40"
+                      className="h-9 w-9 shrink-0 aspect-square rounded-full object-cover ring-1 ring-white/40"
                     />
                   ) : (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/25 text-xs font-bold shadow-xs">
+                    <div className="flex h-9 w-9 shrink-0 aspect-square items-center justify-center rounded-full bg-white/25 text-xs font-bold shadow-xs">
                       {currentUser.name?.substring(0, 2) || 'CS'}
                     </div>
                   )}
-                  <p className="text-[10px] font-extrabold">{currentUser.points}p</p>
+                  <p className="text-[10px] font-extrabold shrink-0 text-center leading-none mt-0.5">{currentUser.points}p</p>
                 </div>
               ) : (
                 <>
@@ -396,10 +398,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                       <img
                         src={currentUser.avatar_url}
                         alt={currentUser.name}
-                        className="h-9 w-9 rounded-full object-cover ring-2 ring-white/40"
+                        className="h-9 w-9 shrink-0 aspect-square rounded-full object-cover ring-2 ring-white/40"
                       />
                     ) : (
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-xs font-bold shadow-xs ring-2 ring-white/40 backdrop-blur-xs">
+                      <div className="flex h-9 w-9 shrink-0 aspect-square items-center justify-center rounded-full bg-white/20 text-xs font-bold shadow-xs ring-2 ring-white/40 backdrop-blur-xs">
                         {currentUser.name?.substring(0, 2) || 'CS'}
                       </div>
                     )}
