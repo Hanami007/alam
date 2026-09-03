@@ -226,12 +226,21 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
               pendingUsers.map((u) => (
                 <div key={u.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50/80 border border-slate-100 p-4 hover:bg-white transition-all">
                   <div>
-                    <p className="text-sm font-bold text-slate-900">{u.name}</p>
-                    <p className="text-xs text-slate-500">
-                      รหัสนักศึกษา: <span className="font-semibold text-slate-700">{u.studentId || 'ไม่ระบุ'}</span> · {u.generation ?? 'ยังไม่ระบุรุ่น'} · {u.email}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-bold text-slate-900">{u.name}</p>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        (u.studentStatus || u.student_status) === 'alumni'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-teal-100 text-teal-800'
+                      }`}>
+                        {(u.studentStatus || u.student_status) === 'alumni' ? 'ศิษย์เก่า' : 'นักศึกษาปัจจุบัน'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      รหัสนักศึกษา: <span className="font-semibold text-slate-700">{u.studentId || u.student_id || 'ไม่ระบุ'}</span> · {u.generation ?? 'ยังไม่ระบุรุ่น'} {u.province ? `· ${u.province}` : ''} · {u.email}
                     </p>
                     <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-indigo-600">
-                      <ShieldCheck className="h-3.5 w-3.5" /> ตรวจสอบเทียบกับฐานข้อมูล apimju เรียบร้อย
+                      <ShieldCheck className="h-3.5 w-3.5" /> พร้อมสำหรับการอนุมัติเข้าใช้งานระบบ
                     </p>
                   </div>
                   <div className="flex gap-2">

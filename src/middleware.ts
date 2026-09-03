@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // เส้นทางที่ไม่ต้องล็อกอิน
-const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/auth/logout'];
+const PUBLIC_PATHS = ['/login', '/register', '/api/auth/login', '/api/auth/logout', '/api/auth/register', '/api/lookup/register-data'];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -11,6 +11,7 @@ export function middleware(req: NextRequest) {
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/api/lookup') ||
     pathname.startsWith('/api/nas') ||
     pathname === '/favicon.ico' ||
     pathname.includes('.')
@@ -20,8 +21,8 @@ export function middleware(req: NextRequest) {
 
   const sessionId = req.cookies.get('session_id')?.value;
 
-  // ถ้าอยู่ที่หน้า /login และมี session อยู่แล้ว ให้ redirect ไปที่ /feed
-  if (pathname === '/login') {
+  // ถ้าอยู่ที่หน้า /login หรือ /register และมี session อยู่แล้ว ให้ redirect ไปที่ /feed
+  if (pathname === '/login' || pathname === '/register') {
     if (sessionId) {
       return NextResponse.redirect(new URL('/feed', req.url));
     }

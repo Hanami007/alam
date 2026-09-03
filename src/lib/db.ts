@@ -12,7 +12,9 @@ declare global {
 export const pool =
   global._alumniPool ??
   new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString:
+      process.env.DATABASE_URL ||
+      'postgresql://alumni:alumni_dev_password@localhost:5435/alumni_db',
   });
 
 if (process.env.NODE_ENV !== 'production') {
@@ -578,12 +580,15 @@ export async function checkAndPromoteToAlumni(userId: number) {
 // ---------------------------------------------------------------
 export async function getPendingUsers() {
   const { rows } = await pool.query(`
-    select u.id, u.student_id, u.name, gen.label as generation, u.created_at,
+    select u.id, u.student_id, u.name, u.email, u.student_status, u.created_at,
+      gen.label as generation,
+      prov.label as province,
       (select v.status from user_verifications v
        where v.user_id = u.id and v.source = 'registrar_api'
        order by v.decided_at desc limit 1) as registrar_status
     from users u
     left join lookup_options gen on gen.id = u.generation_option_id
+    left join lookup_options prov on prov.id = u.province_option_id
     where u.status = 'pending'
     order by u.created_at desc
   `);
@@ -741,7 +746,9 @@ export async function togglePostLike(postId: number, userId: number) {
 /** ดึง generations ทั้งหมดสำหรับ dropdown filter */
 export async function getGenerations() {
   const { rows } = await pool.query(
-    `SELECT id, code, label, extra FROM lookup_options WHERE category = 'generation' ORDER BY code`
+    `SELECT id, code, label, extra FROM lookup_options
+     WHERE category = 'generation'
+     ORDER BY COALESCE((extra->>'gen_number')::int, id) DESC`
   );
   return rows;
 }
@@ -875,6 +882,22 @@ export async function approveUser(userId: number, adminId: number) {
        VALUES ($1, 'approve_user', 'user', $2)`,
       [adminId, userId]
     );
+
+    // แจ้งเตือนผู้สมัครว่าได้รับการอนุมัติแล้ว
+    try {
+      await createNotification(
+        userId,
+        'user_approved',
+        'บัญชีของคุณได้รับการอนุมัติแล้ว!',
+        'ยินดีต้อนรับสู่ CS MJU CONNECT แอดมินได้อนุมัติบัญชีของคุณเรียบร้อยแล้ว',
+        '/feed'
+      );
+    } catch {}
+
+    // ตรวจสอบสถานะ 4 ปีอัตโนมัติ
+    try {
+      await promoteEligibleStudentsToAlumni();
+    } catch {}
   }
   return rows[0] ?? null;
 }
@@ -1189,6 +1212,229 @@ export async function getProvinceAlumniCount(type: 'hometown' | 'workplace') {
 // ---------------------------------------------------------------
 // Audit log
 // ---------------------------------------------------------------
+// Notifications System
+// ---------------------------------------------------------------
+
+export async function createNotification(
+  userId: number,
+  type: string,
+  title: string,
+  message: string,
+  link?: string,
+  referenceId?: string
+) {
+  const { rows } = await pool.query(
+    `INSERT INTO notifications (user_id, type, title, message, link, reference_id)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING *`,
+    [userId, type, title, message, link ?? null, referenceId ? String(referenceId) : null]
+  );
+  return rows[0];
+}
+
+/** แจ้งเตือนแอดมินทุกคนเมื่อมีคนสมัครใหม่ */
+export async function notifyAdminNewRegistration(newUserId: number, applicantName: string, generationLabel?: string) {
+  const { rows: admins } = await pool.query(`SELECT id FROM users WHERE role = 'admin'`);
+  const genText = generationLabel ? ` (${generationLabel})` : '';
+  for (const admin of admins) {
+    await createNotification(
+      admin.id,
+      'admin_pending',
+      'มีผู้สมัครสมาชิกใหม่รอการอนุมัติ',
+      `${applicantName}${genText} ได้ลงทะเบียนเข้าสู่ระบบ โปรดตรวจสอบและอนุมัติในแดชบอร์ด`,
+      '/admin',
+      String(newUserId)
+    );
+  }
+}
+
+/** แจ้งเตือนเพื่อนร่วมรุ่นทุกคนที่ได้รับการอนุมัติแล้ว */
+export async function notifyBatchmatesNewRegistration(
+  generationOptionId: number,
+  newUserId: number,
+  applicantName: string,
+  studentId?: string
+) {
+  if (!generationOptionId) return;
+
+  const { rows: batchmates } = await pool.query(
+    `SELECT id FROM users
+     WHERE generation_option_id = $1
+       AND status = 'approved'
+       AND id != $2`,
+    [generationOptionId, newUserId]
+  );
+
+  const studentIdText = studentId ? ` (รหัส ${studentId})` : '';
+  for (const mate of batchmates) {
+    await createNotification(
+      mate.id,
+      'batchmate_pending',
+      'เพื่อนร่วมรุ่นคนใหม่รอการยืนยัน',
+      `${applicantName}${studentIdText} ได้สมัครเข้าสู่ระบบในรุ่นของคุณ ช่วยยืนยันตัวตนเพื่อนร่วมรุ่น`,
+      '/member/approvals',
+      String(newUserId)
+    );
+  }
+}
+
+/** ดึงการแจ้งเตือนของผู้ใช้ */
+export async function getUserNotifications(userId: number, limit = 20) {
+  const { rows } = await pool.query(
+    `SELECT id, user_id, type, title, message, link, reference_id, is_read, created_at
+     FROM notifications
+     WHERE user_id = $1
+     ORDER BY created_at DESC
+     LIMIT $2`,
+    [userId, limit]
+  );
+  return rows;
+}
+
+/** นับจำนวนการแจ้งเตือนที่ยังไม่ได้อ่าน */
+export async function getUnreadNotificationCount(userId: number): Promise<number> {
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int as count FROM notifications WHERE user_id = $1 AND is_read = false`,
+    [userId]
+  );
+  return rows[0]?.count ?? 0;
+}
+
+/** ทำเครื่องหมายว่าอ่านแล้ว */
+export async function markNotificationAsRead(notifId: number, userId: number) {
+  const { rows } = await pool.query(
+    `UPDATE notifications SET is_read = true WHERE id = $1 AND user_id = $2 RETURNING id, is_read`,
+    [notifId, userId]
+  );
+  return rows[0] ?? null;
+}
+
+/** ทำเครื่องหมายว่าอ่านทั้งหมดแล้ว */
+export async function markAllNotificationsAsRead(userId: number) {
+  await pool.query(
+    `UPDATE notifications SET is_read = true WHERE user_id = $1 AND is_read = false`,
+    [userId]
+  );
+  return { success: true };
+}
+
+// ---------------------------------------------------------------
+// Batchmate Approvals
+// ---------------------------------------------------------------
+
+/** ดึงรายการเพื่อนร่วมรุ่นที่รออนุมัติ */
+export async function getPendingBatchmates(generationOptionId: number) {
+  if (!generationOptionId) return [];
+
+  const { rows } = await pool.query(
+    `SELECT u.id, u.student_id, u.name, u.email, u.student_status, u.admission_year,
+            u.created_at, gen.label as generation, prov.label as province
+     FROM users u
+     LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
+     LEFT JOIN lookup_options prov ON prov.id = u.province_option_id
+     WHERE u.generation_option_id = $1 AND u.status = 'pending'
+     ORDER BY u.created_at DESC`,
+    [generationOptionId]
+  );
+  return rows;
+}
+
+/** เพื่อนร่วมรุ่นกดยืนยัน/อนุมัติเพื่อนร่วมรุ่น */
+export async function approveBatchmate(applicantId: number, approverUserId: number) {
+  const { rows: approver } = await pool.query(
+    `SELECT id, name, generation_option_id FROM users WHERE id = $1`,
+    [approverUserId]
+  );
+  if (!approver.length) throw new Error('ไม่พบข้อมูลผู้กดยืนยัน');
+
+  const { rows: applicant } = await pool.query(
+    `SELECT id, name, generation_option_id, status FROM users WHERE id = $1`,
+    [applicantId]
+  );
+  if (!applicant.length) throw new Error('ไม่พบข้อมูลผู้สมัคร');
+  if (applicant[0].status === 'approved') return applicant[0];
+
+  // ตรวจสอบว่าเป็นรุ่นเดียวกันหรือไม่
+  if (approver[0].generation_option_id !== applicant[0].generation_option_id) {
+    throw new Error('เฉพาะเพื่อนร่วมรุ่นเดียวกันเท่านั้นที่สามารถยืนยันตัวตนได้');
+  }
+
+  // อัปเดตสถานะเป็น approved
+  const { rows: updated } = await pool.query(
+    `UPDATE users SET status = 'approved' WHERE id = $1 RETURNING id, name, status, email`,
+    [applicantId]
+  );
+
+  // บันทึกลง user_verifications
+  await pool.query(
+    `INSERT INTO user_verifications (user_id, admin_id, source, status, remark)
+     VALUES ($1, $2, 'batchmate_endorsement', 'approved', $3)`,
+    [applicantId, approverUserId, `ยืนยันตัวตนโดยเพื่อนร่วมรุ่น: ${approver[0].name}`]
+  );
+
+  // ส่งแจ้งเตือนให้ผู้สมัครทราบว่าได้รับการอนุมัติแล้ว
+  await createNotification(
+    applicantId,
+    'user_approved',
+    'ยินดีต้อนรับสู่ CS MJU CONNECT!',
+    `บัญชีของคุณได้รับการยืนยันตัวตนโดยเพื่อนร่วมรุ่น (${approver[0].name}) เรียบร้อยแล้ว สามารถเข้าใช้งานระบบได้ทันที`,
+    '/feed'
+  );
+
+  // แจ้งเตือนแอดมินทราบ
+  const { rows: admins } = await pool.query(`SELECT id FROM users WHERE role = 'admin'`);
+  for (const admin of admins) {
+    await createNotification(
+      admin.id,
+      'system',
+      'เพื่อนร่วมรุ่นยืนยันสมาชิกแล้ว',
+      `${approver[0].name} ได้ยืนยันตัวตนเพื่อนร่วมรุ่น ${applicant[0].name} เรียบร้อยแล้ว`,
+      '/admin'
+    );
+  }
+
+  return updated[0];
+}
+
+// ---------------------------------------------------------------
+// Auto-promote 4 Years: Current Student -> Alumni
+// ---------------------------------------------------------------
+
+/**
+ * เลื่อนสถานะนักศึกษาปัจจุบัน (studying) เป็นศิษย์เก่า (alumni) อัตโนมัติ
+ * ถ้าครบ 4 ปีตามปีปัจจุบัน (พิจารณาจาก admission_year, expected_graduation_year, หรือรหัสนักศึกษา)
+ */
+export async function promoteEligibleStudentsToAlumni(): Promise<number> {
+  const currentYearCE = new Date().getFullYear(); // e.g. 2026
+  const currentYearBE = currentYearCE + 543;       // e.g. 2569
+
+  // ตรวจสอบเงื่อนไข:
+  // 1) expected_graduation_year <= currentYearCE หรือ expected_graduation_year <= currentYearBE
+  // 2) admission_year <= (currentYearCE - 4) หรือ admission_year <= (currentYearBE - 4)
+  // 3) student_id มีเลข 2 หลักแรกเป็นปี พ.ศ. เช่น '65' -> 2565 + 4 = 2569 <= currentYearBE
+  const { rowCount } = await pool.query(
+    `UPDATE users
+     SET student_status = 'alumni'
+     WHERE student_status = 'studying'
+       AND (
+         (expected_graduation_year IS NOT NULL AND (expected_graduation_year <= $1 OR expected_graduation_year <= $2))
+         OR
+         (admission_year IS NOT NULL AND (admission_year <= ($1 - 4) OR admission_year <= ($2 - 4)))
+         OR
+         (
+           student_id ~ '^[0-9]{2}' AND
+           (2500 + substring(student_id from 1 for 2)::int + 4) <= $2
+         )
+       )`,
+    [currentYearCE, currentYearBE]
+  );
+
+  return rowCount ?? 0;
+}
+
+// ---------------------------------------------------------------
+// Audit log
+// ---------------------------------------------------------------
 
 /** ดึง audit logs สำหรับ admin */
 export async function getAuditLogs(limit = 50) {
@@ -1203,4 +1449,68 @@ export async function getAuditLogs(limit = 50) {
     [limit]
   );
   return rows;
-}
+}
+
+// ---------------------------------------------------------------
+// User Profile Photos (Tagged & Unlocked from DB)
+// ---------------------------------------------------------------
+
+/** ดึงรูปภาพที่ผู้ใช้ถูกแท็กจริงจากตาราง photo_tags */
+export async function getUserTaggedPhotos(userId: number) {
+  const { rows } = await pool.query(
+    `SELECT
+       pt.id as tag_id,
+       pt.tag_source,
+       ma.id,
+       ma.image_url,
+       ma.watermark_url,
+       ma.caption,
+       gen.label as generation,
+       u_by.name as tagged_by_name
+     FROM photo_tags pt
+     JOIN media_assets ma ON ma.id = pt.asset_id
+     LEFT JOIN lookup_options gen ON gen.id = ma.generation_option_id
+     LEFT JOIN users u_by ON u_by.id = pt.tagged_by
+     WHERE pt.tagged_user_id = $1
+     ORDER BY pt.id DESC`,
+    [userId]
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    tag_id: r.tag_id,
+    image_url: r.image_url,
+    watermark_url: r.watermark_url,
+    caption: r.caption || 'รูปภาพกิจกรรม',
+    generation: r.generation,
+    tagged_by_name: r.tagged_by_name,
+  }));
+}
+
+/** ดึงรูปภาพที่ผู้ใช้ปลดล็อกจากการตอบคำถามจริงจาก photo_view_verifications */
+export async function getUserUnlockedPhotos(userId: number) {
+  const { rows } = await pool.query(
+    `SELECT
+       pv.id as verification_id,
+       pv.verified_at,
+       ma.id,
+       ma.image_url,
+       ma.watermark_url,
+       ma.caption,
+       gen.label as generation
+     FROM photo_view_verifications pv
+     JOIN media_assets ma ON ma.id = pv.asset_id
+     LEFT JOIN lookup_options gen ON gen.id = ma.generation_option_id
+     WHERE pv.user_id = $1 AND pv.is_passed = true
+     ORDER BY pv.verified_at DESC`,
+    [userId]
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    image_url: r.image_url,
+    watermark_url: r.watermark_url,
+    caption: r.caption || 'รูปภาพที่ปลดล็อก',
+    generation: r.generation,
+    verified_at: r.verified_at,
+  }));
+}
+
