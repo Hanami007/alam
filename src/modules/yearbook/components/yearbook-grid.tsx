@@ -44,6 +44,7 @@ export interface YearbookAlumnus {
   skills: string[];
   likesCount?: number;
   laughsCount?: number;
+  isAvailableForMentorship?: boolean;
 }
 
 const FUNNY_SENIOR_QUOTES = [
@@ -344,6 +345,7 @@ export function YearbookGrid() {
 
   // Reaction State
   const [reactions, setReactions] = useState<Record<string, { likes: number; laughs: number }>>({});
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
 
   // Current logged in user state & My Yearbook Entry form state
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -357,6 +359,7 @@ export function YearbookGrid() {
     avatarUrl: '',
     generation: 'รุ่น 43',
     quote: '',
+    isAvailableForMentorship: false,
   });
 
   useEffect(() => {
@@ -367,34 +370,32 @@ export function YearbookGrid() {
           setCurrentUser(meRes.user);
         }
 
-        const res = await fetch('/api/yearbook');
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            const formatted: YearbookAlumnus[] = data.map((item: any, idx: number) => {
-              const fallbackQuote = FUNNY_SENIOR_QUOTES[idx % FUNNY_SENIOR_QUOTES.length];
-              return {
-                id: item.id || `mju-${idx}`,
-                studentId: item.studentId || `600100${idx + 10}`,
-                name: item.name,
-                nickname: item.nickname || item.name.split(' ')[0] || 'เพื่อน',
-                generation: item.generation || 'รุ่น 43',
-                generationNumber: item.generationNumber || 43,
-                gradYear: item.graduationYear ? `${item.graduationYear + 543} (${item.graduationYear})` : '2564 (2021)',
-                position: item.position || 'Software Developer',
-                company: item.company || 'Tech Company',
-                careerType: item.careerType || 'Software & Technology',
-                province: item.province || 'เชียงใหม่',
-                avatarUrl: item.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80',
-                quote: item.bio && item.bio.length > 3 ? item.bio : fallbackQuote,
-                bio: item.bio || 'ศิษย์เก่าภาควิชาวิทยาการคอมพิวเตอร์ มหาวิทยาลัยแม่โจ้',
-                skills: ['TypeScript', 'React', 'Next.js'],
-                likesCount: 15 + idx * 3,
-                laughsCount: 20 + idx * 5,
-              };
-            });
-            setAlumniList(formatted);
-          }
+        const data = await api.admin.getYearbookList().catch(() => null);
+        if (Array.isArray(data) && data.length > 0) {
+          const formatted: YearbookAlumnus[] = data.map((item: any, idx: number) => {
+            const fallbackQuote = FUNNY_SENIOR_QUOTES[idx % FUNNY_SENIOR_QUOTES.length];
+            return {
+              id: item.id || `mju-${idx}`,
+              studentId: item.studentId || `600100${idx + 10}`,
+              name: item.name,
+              nickname: item.nickname || item.name.split(' ')[0] || 'เพื่อน',
+              generation: item.generation || 'รุ่น 43',
+              generationNumber: item.generationNumber || 43,
+              gradYear: item.graduationYear ? `${item.graduationYear + 543} (${item.graduationYear})` : '2564 (2021)',
+              position: item.position || 'Software Developer',
+              company: item.company || 'Tech Company',
+              careerType: item.careerType || 'Software & Technology',
+              province: item.province || 'เชียงใหม่',
+              avatarUrl: item.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80',
+              quote: item.bio && item.bio.length > 3 ? item.bio : fallbackQuote,
+              bio: item.bio || 'ศิษย์เก่าภาควิชาวิทยาการคอมพิวเตอร์ มหาวิทยาลัยแม่โจ้',
+              skills: ['CS MJU'],
+              likesCount: 15 + idx * 3,
+              laughsCount: 20 + idx * 5,
+              isAvailableForMentorship: Boolean(item.isAvailableForMentorship),
+            };
+          });
+          setAlumniList(formatted);
         }
       } catch (err) {
         console.error('Error fetching yearbook data:', err);
@@ -404,20 +405,31 @@ export function YearbookGrid() {
     loadData();
   }, []);
 
-  // Reaction Handler
+  // Reaction Handler (toggle like)
   const handleReact = (e: React.MouseEvent, id: number | string, type: 'likes' | 'laughs') => {
     e.stopPropagation();
     const key = String(id);
-    setReactions((prev) => {
-      const current = prev[key] || { likes: 0, laughs: 0 };
-      return {
-        ...prev,
-        [key]: {
-          ...current,
-          [type]: current[type] + 1,
-        },
-      };
-    });
+    if (type === 'likes') {
+      const alreadyLiked = likedIds.has(key);
+      setLikedIds((prev) => {
+        const next = new Set(prev);
+        if (alreadyLiked) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+      setReactions((prev) => {
+        const current = prev[key] || { likes: 0, laughs: 0 };
+        return {
+          ...prev,
+          [key]: { ...current, likes: alreadyLiked ? current.likes - 1 : current.likes + 1 },
+        };
+      });
+    } else {
+      setReactions((prev) => {
+        const current = prev[key] || { likes: 0, laughs: 0 };
+        return { ...prev, [key]: { ...current, [type]: current[type] + 1 } };
+      });
+    }
   };
 
   const getReactionCount = (alumnus: YearbookAlumnus, type: 'likes' | 'laughs') => {
@@ -435,6 +447,11 @@ export function YearbookGrid() {
   }, [alumniList, currentUser]);
 
   const handleOpenMyModal = () => {
+    const isMentor = Boolean(
+      myExistingEntry?.isAvailableForMentorship ??
+        currentUser?.is_available_for_mentorship ??
+        currentUser?.isAvailableForMentorship
+    );
     if (myExistingEntry) {
       setMyEntryForm({
         name: myExistingEntry.name || currentUser?.name || '',
@@ -442,6 +459,7 @@ export function YearbookGrid() {
         avatarUrl: myExistingEntry.avatarUrl || currentUser?.avatar_url || '',
         generation: myExistingEntry.generation || 'รุ่น 43',
         quote: myExistingEntry.quote || '',
+        isAvailableForMentorship: isMentor,
       });
     } else {
       setMyEntryForm({
@@ -450,6 +468,7 @@ export function YearbookGrid() {
         avatarUrl: currentUser?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80',
         generation: currentUser?.generation || 'รุ่น 43',
         quote: currentUser?.bio || '',
+        isAvailableForMentorship: isMentor,
       });
     }
     setStatusAlert(null);
@@ -478,6 +497,7 @@ export function YearbookGrid() {
         bio: myEntryForm.quote.trim(),
         avatarUrl: myEntryForm.avatarUrl.trim(),
         generation: myEntryForm.generation,
+        isAvailableForMentorship: myEntryForm.isAvailableForMentorship,
       }).catch((err) => {
         console.error('Error updating profile to Database:', err);
       });
@@ -488,6 +508,7 @@ export function YearbookGrid() {
         bio: myEntryForm.quote.trim(),
         avatar_url: myEntryForm.avatarUrl.trim(),
         generation: myEntryForm.generation,
+        is_available_for_mentorship: myEntryForm.isAvailableForMentorship,
       }));
 
       const genNum = parseInt(myEntryForm.generation.replace(/\D/g, '')) || 43;
@@ -508,6 +529,7 @@ export function YearbookGrid() {
             generationNumber: genNum,
             quote: myEntryForm.quote.trim(),
             bio: myEntryForm.quote.trim(),
+            isAvailableForMentorship: myEntryForm.isAvailableForMentorship,
           };
           return updated;
         } else {
@@ -527,6 +549,7 @@ export function YearbookGrid() {
             quote: myEntryForm.quote.trim(),
             bio: myEntryForm.quote.trim(),
             skills: ['CS MJU'],
+            isAvailableForMentorship: myEntryForm.isAvailableForMentorship,
           };
           return [newEntry, ...prevList];
         }
@@ -705,10 +728,15 @@ export function YearbookGrid() {
                 {/* RIGHT CONTENT: รุ่น + ชื่อ + คำคม */}
                 <div className="flex flex-col justify-center px-3.5 py-3 flex-1 min-w-0 space-y-1.5">
                   {/* 2. รุ่น (Generation Badge) */}
-                  <div>
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <span className="inline-block text-[10px] font-extrabold tracking-wider uppercase text-indigo-600 bg-indigo-50/80 px-2 py-0.5 rounded-md border border-indigo-100/80">
                       {alumnus.generation}
                     </span>
+                    {alumnus.isAvailableForMentorship && (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200 shadow-2xs">
+                        💬 ยินดีให้คำแนะนำ
+                      </span>
+                    )}
                   </div>
 
                   {/* 3. ชื่อ (Name & Nickname) */}
@@ -726,6 +754,27 @@ export function YearbookGrid() {
                   >
                     &ldquo;{alumnus.quote}&rdquo;
                   </p>
+
+                  {/* 5. ปุ่มกดใจ */}
+                  <div className="flex items-center pt-1">
+                    <button
+                      onClick={(e) => handleReact(e, alumnus.id, 'likes')}
+                      className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-xl transition-all duration-200 active:scale-90 ${
+                        likedIds.has(String(alumnus.id))
+                          ? 'bg-rose-100 text-rose-600 border border-rose-200'
+                          : 'bg-slate-100 text-slate-500 hover:bg-rose-50 hover:text-rose-500 border border-transparent'
+                      }`}
+                    >
+                      <Heart
+                        className={`h-3.5 w-3.5 transition-all duration-200 ${
+                          likedIds.has(String(alumnus.id))
+                            ? 'fill-rose-500 text-rose-500 scale-110'
+                            : 'fill-transparent text-rose-400'
+                        }`}
+                      />
+                      <span>{getReactionCount(alumnus, 'likes')}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -764,6 +813,11 @@ export function YearbookGrid() {
                       <span className="text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 shrink-0">
                         {alumnus.generation}
                       </span>
+                      {alumnus.isAvailableForMentorship && (
+                        <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200 shrink-0">
+                          💬 ยินดีให้คำแนะนำ
+                        </span>
+                      )}
                       {isMe && (
                         <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-md shrink-0">
                           ฉัน
@@ -952,7 +1006,6 @@ export function YearbookGrid() {
                   <span className="font-mono">{myEntryForm.quote.length} / 180</span>
                 </div>
               </div>
-
 
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">

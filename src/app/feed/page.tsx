@@ -87,6 +87,7 @@ export default function FeedPage() {
           currentUserId={currentUser?.id || 2}
           currentUserRole={currentUser?.role || 'alumni'}
           currentUserName={currentUser?.name || 'สมชาย ใจดี'}
+          currentUserMentorship={Boolean(currentUser?.is_available_for_mentorship ?? currentUser?.isAvailableForMentorship)}
         />
       )}
     </AppShell>

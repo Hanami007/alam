@@ -32,11 +32,12 @@ export default function ProfilePage() {
             generation: u.generation || 'รุ่น 43',
             province: u.province || 'กรุงเทพมหานคร',
             career_type: u.careerType || u.career_type || 'เอกชน',
-            company: u.company || 'บริษัท เอบีซี จำกัด',
-            position: u.position || 'Senior Developer',
-            bio: u.bio || 'ดูแลระบบและพัฒนาโปรดักต์ให้ทีมงานภายใน',
-            total_points: u.totalPoints || u.total_points || 16,
+            company: u.company ?? 'บริษัท เอบีซี จำกัด',
+            position: u.position ?? 'Senior Developer',
+            bio: u.bio ?? 'ดูแลระบบและพัฒนาโปรดักต์ให้ทีมงานภายใน',
+            total_points: u.totalPoints ?? u.total_points ?? 16,
             avatar_url: u.avatarUrl || u.avatar_url || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=600&q=80',
+            is_available_for_mentorship: Boolean(u.isAvailableForMentorship ?? u.is_available_for_mentorship),
           });
         } else {
           // Fallback mock profile for preview
@@ -53,6 +54,7 @@ export default function ProfilePage() {
             bio: 'ดูแลระบบและพัฒนาโปรดักต์ให้ทีมงานภายใน',
             total_points: 16,
             avatar_url: 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=600&q=80',
+            is_available_for_mentorship: false,
           });
         }
 

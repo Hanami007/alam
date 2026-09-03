@@ -15,11 +15,13 @@ export interface UserSession {
   avatar_url?: string | null;
   company?: string | null;
   position?: string | null;
+  bio?: string | null;
   generation?: string | null;
   province?: string | null;
   career_type?: string | null;
   show_hometown_on_map: boolean;
   show_workplace_on_map: boolean;
+  is_available_for_mentorship?: boolean;
 }
 
 /** เข้ารหัสรหัสผ่าน */
@@ -86,7 +88,7 @@ export async function getSessionUser(sessionId: string): Promise<UserSession | n
 
   const { rows } = await pool.query(
     `SELECT u.id, u.student_id, u.email, u.name, u.role, u.status, u.student_status,
-            u.total_points, u.avatar_url, u.company, u.position,
+            u.total_points, u.avatar_url, u.company, u.position, u.bio, u.is_available_for_mentorship,
             u.show_hometown_on_map, u.show_workplace_on_map,
             gen.label as generation, prov.label as province, ct.label as career_type
      FROM sessions s

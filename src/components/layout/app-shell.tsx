@@ -20,6 +20,7 @@ import {
   Award,
   CheckCheck,
   MessageSquare,
+  MessageCircle,
   Sparkles,
   BookOpen,
 } from 'lucide-react';
@@ -39,7 +40,7 @@ const ACCOUNT_NAV = [
   { href: '/admin', label: 'จัดการระบบ', icon: Settings },
 ];
 
-const CURRENT_USER = { name: 'สมชาย ใจดี', generation: 'รุ่น 43', points: 16, level: 2 };
+const CURRENT_USER = { name: 'สมชาย ใจดี', generation: 'รุ่น 43', points: 16, level: 2, is_available_for_mentorship: true };
 
 function NavSection({
   title,
@@ -107,21 +108,22 @@ export function AppShell({ children }: { children: ReactNode }) {
   const avatarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Fetch logged in user data
-    fetch('/api/auth/me')
+    // Fetch logged in user profile data from DB
+    fetch('/api/user/profile')
       .then((res) => res.json())
-      .then((data) => {
-        if (data?.user) {
-          const u = data.user;
-          const points = u.total_points ?? 0;
+      .then((u) => {
+        if (u && !u.error) {
+          const points = u.totalPoints ?? u.total_points ?? 16;
           const level = Math.floor(points / 20) + 1;
           setCurrentUser({
-            name: u.name || 'ศิษย์เก่า',
-            generation: u.generation || 'CS MJU',
+            id: u.id,
+            name: u.name || 'สมชาย ใจดี',
+            generation: u.generation || 'รุ่น 43',
             points: points,
             level: level,
-            avatar_url: u.avatar_url,
-            role: u.role,
+            avatar_url: u.avatarUrl || u.avatar_url,
+            role: u.role || 'alumni',
+            is_available_for_mentorship: Boolean(u.isAvailableForMentorship ?? u.is_available_for_mentorship),
           });
         }
       })
@@ -304,6 +306,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <div className="min-w-0">
                     <p className="text-sm font-bold truncate">{currentUser.name}</p>
                     <p className="text-xs text-white/80">{currentUser.generation}</p>
+                    {currentUser.is_available_for_mentorship && (
+                      <span className="inline-block mt-1 rounded-md bg-emerald-400/30 px-2 py-0.5 text-[9px] font-extrabold text-emerald-100 border border-emerald-300/40">
+                        💬 ยินดีให้คำแนะนำ
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between rounded-xl bg-white/15 px-3 py-1.5 text-xs backdrop-blur-xs">
@@ -313,7 +320,36 @@ export function AppShell({ children }: { children: ReactNode }) {
               </div>
 
               <div className="p-1.5 divide-y divide-border/50 text-xs">
-                <div className="py-1">
+                <div className="py-1 space-y-1">
+                  <div className="flex items-center justify-between rounded-xl px-3 py-2 bg-emerald-50 border border-emerald-200/80 text-emerald-950">
+                    <span className="flex items-center gap-2 text-xs font-bold">
+                      <MessageCircle className="h-4 w-4 text-emerald-600" />
+                      ยินดีให้คำแนะนำ
+                    </span>
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const next = !currentUser.is_available_for_mentorship;
+                        setCurrentUser((prev: any) => ({ ...prev, is_available_for_mentorship: next }));
+                        await fetch('/api/user/profile', {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ isAvailableForMentorship: next, userId: currentUser.id }),
+                        }).catch(() => {});
+                      }}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        currentUser.is_available_for_mentorship ? 'bg-emerald-500' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                          currentUser.is_available_for_mentorship ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
                   <Link
                     href="/profile"
                     onClick={() => setAvatarOpen(false)}
@@ -414,7 +450,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                         Lv.{currentUser.level}
                       </span>
                     </div>
-                    <p className="text-[11px] text-white/80">{currentUser.generation} • {currentUser.points} แต้ม</p>
+                    <p className="text-[11px] text-white/80 truncate">{currentUser.generation} • {currentUser.points} แต้ม</p>
+                    {currentUser.is_available_for_mentorship && (
+                      <span className="inline-block mt-0.5 rounded-md bg-emerald-400/30 px-1.5 py-0.5 text-[9px] font-extrabold text-emerald-100 border border-emerald-300/40">
+                        💬 ยินดีให้คำแนะนำ
+                      </span>
+                    )}
                   </div>
                   <ChevronRight className={`h-4 w-4 text-white/80 shrink-0 transition-transform duration-300 ${avatarOpen ? '-rotate-90' : ''}`} />
                 </>
@@ -423,7 +464,37 @@ export function AppShell({ children }: { children: ReactNode }) {
 
             {/* Inline Slide-Up Options inside the SAME Card */}
             {avatarOpen && !collapsed && (
-              <div className="mt-3 pt-3 border-t border-white/20 text-xs space-y-1 animate-popover-down">
+              <div className="mt-3 pt-3 border-t border-white/20 text-xs space-y-1.5 animate-popover-down">
+                {/* Quick Toggle for Mentorship */}
+                <div className="flex items-center justify-between rounded-xl px-2.5 py-2 bg-white/15 backdrop-blur-xs text-white my-1">
+                  <span className="flex items-center gap-2 text-xs font-bold">
+                    <MessageCircle className="h-4 w-4 text-emerald-300" />
+                    ยินดีให้คำแนะนำรุ่นน้อง
+                  </span>
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const next = !currentUser.is_available_for_mentorship;
+                      setCurrentUser((prev: any) => ({ ...prev, is_available_for_mentorship: next }));
+                      await fetch('/api/user/profile', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ isAvailableForMentorship: next, userId: currentUser.id }),
+                      }).catch(() => {});
+                    }}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      currentUser.is_available_for_mentorship ? 'bg-emerald-400' : 'bg-white/30'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        currentUser.is_available_for_mentorship ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
                 <Link
                   href="/profile"
                   onClick={() => setAvatarOpen(false)}

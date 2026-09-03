@@ -37,6 +37,7 @@ create table users (
   student_status            text not null default 'studying'
     check (student_status in ('studying', 'alumni')),
   expected_graduation_year  integer,
+  is_available_for_mentorship boolean not null default false,
   created_at          timestamptz not null default now()
 );
 

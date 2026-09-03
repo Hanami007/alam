@@ -18,6 +18,7 @@ export interface UserProfileData {
   careerType: string | null;
   showHometownOnMap: boolean;
   showWorkplaceOnMap: boolean;
+  isAvailableForMentorship: boolean;
   createdAt: string;
 }
 
@@ -38,7 +39,7 @@ export class UserDbService {
       SELECT 
         u.id, u.student_id, u.email, u.name, u.role, u.status, u.student_status,
         u.total_points, u.avatar_url, u.company, u.position, u.bio,
-        u.show_hometown_on_map, u.show_workplace_on_map, u.created_at,
+        u.show_hometown_on_map, u.show_workplace_on_map, u.is_available_for_mentorship, u.created_at,
         gen.label as generation, 
         prov.label as province, 
         ct.label as career_type
@@ -70,6 +71,7 @@ export class UserDbService {
       careerType: r.career_type,
       showHometownOnMap: r.show_hometown_on_map,
       showWorkplaceOnMap: r.show_workplace_on_map,
+      isAvailableForMentorship: Boolean(r.is_available_for_mentorship),
       createdAt: r.created_at,
     };
   }
@@ -132,6 +134,7 @@ export class UserDbService {
       bio?: string;
       avatarUrl?: string;
       generation?: string;
+      isAvailableForMentorship?: boolean;
     }
   ) {
     const updates: string[] = [];
@@ -157,6 +160,11 @@ export class UserDbService {
     if (data.avatarUrl !== undefined) {
       updates.push(`avatar_url = $${idx++}`);
       values.push(data.avatarUrl);
+    }
+    const mentorshipVal = data.isAvailableForMentorship !== undefined ? data.isAvailableForMentorship : (data as any).is_available_for_mentorship;
+    if (mentorshipVal !== undefined) {
+      updates.push(`is_available_for_mentorship = $${idx++}`);
+      values.push(Boolean(mentorshipVal));
     }
     if (data.generation !== undefined) {
       const genRes = await pool.query(

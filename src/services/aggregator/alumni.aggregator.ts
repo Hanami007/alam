@@ -23,6 +23,7 @@ export interface UnifiedAlumniProfile {
   avatarUrl: string;
   totalPoints: number;
   isRegisteredUser: boolean;
+  isAvailableForMentorship?: boolean;
 }
 
 export class AlumniAggregatorService {
@@ -45,7 +46,7 @@ export class AlumniAggregatorService {
     const { rows: dbUsers } = await pool.query(`
       SELECT 
         u.id, u.student_id, u.name, u.role, u.status, u.student_status,
-        u.total_points, u.avatar_url, u.company, u.position, u.bio,
+        u.total_points, u.avatar_url, u.company, u.position, u.bio, u.is_available_for_mentorship,
         gen.label as generation,
         prov.label as province,
         ct.label as career_type
@@ -91,6 +92,7 @@ export class AlumniAggregatorService {
         avatarUrl: dbUser?.avatar_url || student.avatarUrl || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=600&q=80',
         totalPoints: dbUser?.total_points || 0,
         isRegisteredUser: !!dbUser,
+        isAvailableForMentorship: Boolean(dbUser?.is_available_for_mentorship),
       };
 
       // ฟิลเตอร์เสริม province / careerType
@@ -114,7 +116,7 @@ export class AlumniAggregatorService {
       const { rows } = await pool.query(`
         SELECT 
           u.id, u.student_id, u.name, u.role, u.status, u.student_status,
-          u.total_points, u.avatar_url, u.company, u.position, u.bio,
+          u.total_points, u.avatar_url, u.company, u.position, u.bio, u.is_available_for_mentorship,
           gen.label as generation,
           prov.label as province,
           ct.label as career_type
@@ -153,6 +155,7 @@ export class AlumniAggregatorService {
       avatarUrl: dbUser?.avatar_url || mjuStudent?.avatarUrl || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=600&q=80',
       totalPoints: dbUser?.total_points || 0,
       isRegisteredUser: !!dbUser,
+      isAvailableForMentorship: Boolean(dbUser?.is_available_for_mentorship),
     };
   }
 }

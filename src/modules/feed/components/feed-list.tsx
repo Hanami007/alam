@@ -35,7 +35,8 @@ import {
   ShieldAlert,
   Check,
   X,
-  UserCheck
+  UserCheck,
+  Edit3
 } from 'lucide-react';
 
 interface Comment {
@@ -44,6 +45,7 @@ interface Comment {
   created_at: string;
   author: string;
   avatar_url?: string;
+  isAvailableForMentorship?: boolean;
   parentCommentId?: number | null;
 }
 
@@ -75,6 +77,7 @@ interface Post {
   commentsList?: Comment[];
   likedUserIds?: number[];
   selectedEmoji?: string;
+  isAvailableForMentorship?: boolean;
   poll?: PollData;
 }
 
@@ -87,6 +90,7 @@ interface FeedListProps {
   currentUserId: number;
   currentUserRole?: string;
   currentUserName?: string;
+  currentUserMentorship?: boolean;
 }
 
 
@@ -113,12 +117,6 @@ const ALUMNI_FORTUNES = [
   "🌸 การได้กลับมาคุยกับเพื่อนเก่า จะนำพาโชคดีและแรงบันดาลใจมาให้",
 ];
 
-// Random Alumni Profiles for Icebreaker
-const RANDOM_ALUMNI_POOL = [
-  { name: 'พี่ธนกร สายลุย', gen: 'รุ่น 39', job: 'Senior Backend Dev @ Agoda', bio: 'ยินดีให้คำปรึกษาเรื่อง Node.js & Go ครับ!' },
-  { name: 'พี่ภัทรวดี อินดี้', gen: 'รุ่น 42', job: 'UX/UI Designer @ Shopee', bio: 'ทักมาคุยเรื่องดีไซน์หรือรีวิว พอร์ตฟอลิโอได้น้า ✨' },
-  { name: 'พี่ชูเกียรติ ก้าวไกล', gen: 'รุ่น 36', job: 'DevOps Engineer @ Line Thailand', bio: 'สาย Cloud / Kubernetes มาคุยแลกเปลี่ยนกันได้เลย' },
-];
 
 const EMOJI_REACTIONS = [
   { emoji: '💖', label: 'ส่งหัวใจ' },
@@ -149,6 +147,7 @@ export function FeedList({
   currentUserId,
   currentUserRole = 'alumni',
   currentUserName = 'สมชาย ใจดี',
+  currentUserMentorship = false,
 }: FeedListProps) {
   // Current Role (from authenticated session)
   const activeRole: 'admin' | 'alumni' = (currentUserRole as 'admin' | 'alumni') || 'alumni';
@@ -169,7 +168,7 @@ export function FeedList({
   // Fun Widgets State
   const [fortuneIndex, setFortuneIndex] = useState<number>(0);
   const [isSpinningFortune, setIsSpinningFortune] = useState<boolean>(false);
-  const [randomAlumnusIdx, setRandomAlumnusIdx] = useState<number>(0);
+
 
   // Radial Burst Particle State
   const [floatingHearts, setFloatingHearts] = useState<BurstParticle[]>([]);
@@ -425,10 +424,7 @@ export function FeedList({
     }, 400);
   }
 
-  // Randomize Alumnus
-  function handleNextRandomAlumnus() {
-    setRandomAlumnusIdx((prev) => (prev + 1) % RANDOM_ALUMNI_POOL.length);
-  }
+
 
   // Handle Birthday Wish Click
   function handleSendWish(id: number, e?: React.MouseEvent) {
@@ -567,7 +563,8 @@ export function FeedList({
       id: Date.now(),
       content: text,
       created_at: new Date().toISOString(),
-      author: 'ศิษย์เก่า',
+      author: currentUserName || 'ศิษย์เก่า',
+      isAvailableForMentorship: currentUserMentorship,
       parentCommentId,
     };
 
@@ -616,8 +613,6 @@ export function FeedList({
       setTimeout(() => setCopiedId(null), 2500);
     }
   }
-
-  const currentRandomAlumnus = RANDOM_ALUMNI_POOL[randomAlumnusIdx];
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_380px] max-w-7xl mx-auto font-sans items-start px-2 sm:px-4 relative">
@@ -944,6 +939,11 @@ export function FeedList({
                       <div>
                         <div className="flex items-center gap-2.5 flex-wrap">
                           <h4 className="font-bold text-slate-900 text-base sm:text-lg">{post.author || 'แอดมินระบบ'}</h4>
+                          {post.isAvailableForMentorship && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 shadow-2xs">
+                              💬 ยินดีให้คำแนะนำ
+                            </span>
+                          )}
                           {post.pinned && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-pink-50 px-3 py-0.5 text-xs font-semibold text-pink-600 border border-pink-100">
                               <Pin className="h-3.5 w-3.5" /> ปักหมุด
@@ -1271,7 +1271,14 @@ export function FeedList({
                                     )}
                                     {/* Comment bubble */}
                                     <div className="rounded-2xl rounded-tl-xs bg-white px-4 py-2.5 shadow-sm border border-slate-100">
-                                      <p className="text-xs font-bold text-indigo-700">{comment.author}</p>
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <p className="text-xs font-bold text-indigo-700">{comment.author}</p>
+                                        {comment.isAvailableForMentorship && (
+                                          <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200 shadow-2xs">
+                                            💬 ยินดีให้คำแนะนำ
+                                          </span>
+                                        )}
+                                      </div>
                                       <p className="text-xs sm:text-sm text-slate-700 mt-0.5 whitespace-pre-line">{comment.content}</p>
                                       {/* Like count badge on bubble */}
                                       {cLike.count > 0 && (
@@ -1431,37 +1438,6 @@ export function FeedList({
           </div>
         </div>
 
-        {/* 🤝 FUN WIDGET: RANDOM ALUMNI ICEBREAKER */}
-        <div className="rounded-[26px] border border-sky-200/70 bg-gradient-to-br from-sky-50/60 via-white to-white p-4.5 shadow-card transition-all duration-200">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <Smile className="h-4 w-4 text-sky-500" />
-              <span>ทำความรู้จักศิษย์เก่า 🤝</span>
-            </h3>
-            <button
-              onClick={handleNextRandomAlumnus}
-              className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-bold text-sky-700 hover:bg-sky-200 transition-colors flex items-center gap-1 active:scale-95"
-            >
-              <Dices className="h-3 w-3" />
-              <span>สุ่มเปลี่ยน</span>
-            </button>
-          </div>
-
-          <div className="mt-3 rounded-2xl border border-sky-100/60 bg-white p-3 shadow-2xs">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-sky-400 to-indigo-400 font-bold text-white text-xs shadow-2xs">
-                {currentRandomAlumnus.name.substring(0, 2)}
-              </div>
-              <div className="overflow-hidden">
-                <p className="text-xs font-bold text-slate-800 truncate">{currentRandomAlumnus.name}</p>
-                <p className="text-xs font-medium text-sky-600 truncate">{currentRandomAlumnus.job}</p>
-              </div>
-            </div>
-            <p className="mt-2 text-xs text-slate-500 bg-slate-50 rounded-xl p-2 italic">
-              &ldquo;{currentRandomAlumnus.bio}&rdquo;
-            </p>
-          </div>
-        </div>
 
         {/* 1. Stats Widget */}
         <div className="grid grid-cols-2 gap-3">

@@ -13,6 +13,9 @@ export async function GET(req: Request) {
         COALESCE(gen.label, 'รุ่น 43') as generation,
         COALESCE(u.avatar_url, 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=600&q=80') as "avatarUrl",
         COALESCE(u.bio, '') as quote,
+        COALESCE(u.company, '') as company,
+        COALESCE(u.position, '') as position,
+        COALESCE(u.is_available_for_mentorship, false) as "isAvailableForMentorship",
         u.created_at
       FROM users u
       LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id

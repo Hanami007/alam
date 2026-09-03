@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Briefcase, GraduationCap, ImageIcon, MessageSquareText, Sparkles,
   Mail, MapPin, BadgeCheck, Vote, MessageCircle, Star, Lock, Clock,
@@ -45,6 +45,16 @@ export function ProfileCard({ user, taggedPhotos = [], unlockedPhotos = [], acti
   const [photoToUntag, setPhotoToUntag] = useState<Photo | null>(null);
   const [isUntagging, setIsUntagging] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const [isMentorship, setIsMentorship] = useState<boolean>(
+    Boolean(user?.is_available_for_mentorship ?? user?.isAvailableForMentorship)
+  );
+
+  useEffect(() => {
+    if (user) {
+      setIsMentorship(Boolean(user?.is_available_for_mentorship ?? user?.isAvailableForMentorship));
+    }
+  }, [user]);
 
   if (!user) {
     return (
@@ -118,22 +128,19 @@ export function ProfileCard({ user, taggedPhotos = [], unlockedPhotos = [], acti
             </span>
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="text-2xl font-extrabold tracking-tight">{user.name}</h2>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="text-2xl font-extrabold tracking-tight">{user.name}</h2>
+              {isMentorship && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/30 px-3.5 py-1 text-xs font-extrabold text-emerald-100 border border-emerald-300/50 backdrop-blur-md shadow-xs animate-pulse">
+                  💬 ยินดีให้คำแนะนำรุ่นน้อง
+                </span>
+              )}
+            </div>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-white/85">
               <span className="flex items-center gap-1"><GraduationCap className="h-3.5 w-3.5" /> {user.generation ?? 'ยังไม่ระบุรุ่น'} · {user.student_status === 'alumni' ? 'ศิษย์เก่า' : 'นักศึกษาปัจจุบัน'}</span>
               {(user.company || user.position) && (
                 <span className="flex items-center gap-1"><Briefcase className="h-3.5 w-3.5" /> {user.company} {user.position ? `· ${user.position}` : ''}</span>
               )}
-            </div>
-
-            <div className="mt-4 max-w-xs">
-              <div className="flex items-center justify-between text-[11px] text-white/80">
-                <span>คะแนนสะสม {user.total_points ?? 0} แต้ม</span>
-                <span>อีก {POINTS_PER_LEVEL - progressInLevel} แต้มขึ้น Lv.{level + 1}</span>
-              </div>
-              <div className="progress-bar-track mt-1">
-                <div className="progress-bar-fill" style={{ width: `${progressPct}%` }} />
-              </div>
             </div>
           </div>
         </div>
@@ -141,9 +148,52 @@ export function ProfileCard({ user, taggedPhotos = [], unlockedPhotos = [], acti
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.3fr]">
         {/* ข้อมูลส่วนตัว */}
-        <section className="card-elevated h-fit p-6">
+        <section className="card-elevated h-fit p-6 space-y-4">
           <h3 className="text-[15px] font-bold text-foreground">ข้อมูลส่วนตัว</h3>
-          <dl className="mt-4 space-y-3 text-sm">
+
+          {/* Toggle เปิด/ปิด สถานะยินดีให้คำแนะนำ */}
+          <div className="flex items-center justify-between rounded-2xl bg-emerald-50/80 p-3.5 border border-emerald-200/80 shadow-2xs">
+            <div className="flex items-center gap-3 min-w-0 flex-1 pr-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                <MessageCircle className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-extrabold text-emerald-950">💬 ยินดีให้คำแนะนำรุ่นน้อง</p>
+                <p className="text-[11px] text-emerald-700 mt-0.5">
+                  {isMentorship ? 'เปิดใช้งาน — ป้ายจะแสดงบนโปรไฟล์และทุกที่' : 'ปิดอยู่ — กดเปิดเพื่อแสดงสถานะ'}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                const next = !isMentorship;
+                setIsMentorship(next);
+                try {
+                  await fetch('/api/user/profile', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ is_available_for_mentorship: next }),
+                  });
+                } catch (err) {
+                  console.error('[ProfileCard] Failed to update mentorship:', err);
+                  setIsMentorship(!next); // revert on error
+                }
+              }}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                isMentorship ? 'bg-emerald-500' : 'bg-slate-300'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                  isMentorship ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+
+          <dl className="space-y-3 text-sm">
             <div className="flex items-start gap-3">
               <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
               <div>

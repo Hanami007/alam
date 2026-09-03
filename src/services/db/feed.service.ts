@@ -9,6 +9,7 @@ export interface FeedComment {
   content: string;
   createdAt: string;
   created_at: string;
+  isAvailableForMentorship?: boolean;
 }
 
 export interface FeedPollOption {
@@ -44,6 +45,7 @@ export interface FeedPostItem {
   comments: number;
   commentCount: number;
   isLiked?: boolean;
+  isAvailableForMentorship?: boolean;
   commentsList: FeedComment[];
   poll?: FeedPoll;
 }
@@ -60,6 +62,7 @@ export class FeedDbService {
           COALESCE(admin.id, req.id, 1) as author_id,
           COALESCE(admin.name, req.name, 'ผู้ดูแลระบบ') as author_name,
           COALESCE(admin.role, req.role, 'admin') as author_role,
+          COALESCE(admin.is_available_for_mentorship, req.is_available_for_mentorship, false) as is_available_for_mentorship,
           COALESCE(like_stat.like_count, 0)::int as like_count,
           COALESCE(comment_stat.comment_count, 0)::int as comment_count,
           ${currentUserId ? `EXISTS(SELECT 1 FROM post_interactions WHERE post_id = p.id AND user_id = ${Number(currentUserId)} AND type IN ('like', 'reaction')) as is_liked` : 'false as is_liked'}
@@ -88,7 +91,7 @@ export class FeedDbService {
 
       const { rows: comments } = await pool.query(
         `SELECT pi.id, pi.post_id, pi.user_id, pi.content, pi.created_at,
-                u.name as user_name, u.avatar_url as user_avatar
+                u.name as user_name, u.avatar_url as user_avatar, u.is_available_for_mentorship
          FROM post_interactions pi
          JOIN users u ON u.id = pi.user_id
          WHERE pi.post_id = ANY($1::int[]) AND pi.type = 'comment'
@@ -143,6 +146,7 @@ export class FeedDbService {
             content: c.content,
             createdAt: c.created_at,
             created_at: c.created_at,
+            isAvailableForMentorship: Boolean(c.is_available_for_mentorship),
           }));
 
         const poll = polls.find((pl) => pl.post_id === p.id);
@@ -187,6 +191,7 @@ export class FeedDbService {
           comments: p.comment_count || postComments.length || 0,
           commentCount: p.comment_count || postComments.length || 0,
           isLiked: p.is_liked,
+          isAvailableForMentorship: Boolean(p.is_available_for_mentorship),
           commentsList: postComments,
           poll: formattedPoll,
         };

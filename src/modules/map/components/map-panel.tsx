@@ -18,6 +18,9 @@ import {
   Info,
   X,
   Compass,
+  Smile,
+  Heart,
+  Award
 } from 'lucide-react';
 
 type MapMode = 'hometown' | 'workplace';
@@ -47,12 +50,12 @@ const METRO_PROVINCES = ['กรุงเทพมหานคร', 'นนท�
 
 const REGION_CONFIG: Record<RegionKey, { label: string; icon: string; provinces?: string[]; viewBox?: { x: number; y: number; width: number; height: number } }> = {
   all: {
-    label: 'ทั้งหมด (ทั่วประเทศ)',
+    label: 'ทั่วประเทศ',
     icon: '🗺️',
     viewBox: { x: 0, y: 0, width: THAILAND_MAP_VIEWBOX.width, height: THAILAND_MAP_VIEWBOX.height },
   },
   metro: {
-    label: 'กรุงเทพฯ-ปริมณฑล',
+    label: 'กทม.-ปริมณฑล',
     icon: '🏙️',
     provinces: METRO_PROVINCES,
     viewBox: { x: 140.2, y: 364.5, width: 84.4, height: 66.4 },
@@ -82,7 +85,7 @@ const REGION_CONFIG: Record<RegionKey, { label: string; icon: string; provinces?
     viewBox: { x: 20, y: 550, width: 260, height: 342.5 },
   },
   east_west: {
-    label: 'ภาคตะวันออก/ตก',
+    label: 'ตะวันออก/ตก',
     icon: '🌄',
     provinces: ['ชลบุรี', 'ระยอง', 'จันทบุรี', 'ตราด', 'ฉะเชิงเทรา', 'ปราจีนบุรี', 'สระแก้ว', 'กาญจนบุรี', 'ราชบุรี', 'เพชรบุรี', 'ประจวบคีรีขันธ์'],
     viewBox: { x: 60, y: 280, width: 300, height: 300 },
@@ -97,9 +100,10 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
   const [selectedProvince, setSelectedProvince] = useState<string | null>(null);
   const [zoomScale, setZoomScale] = useState<number>(1);
 
-  const activeData = mode === 'hometown' ? hometownData : workplaceData;
+  const isHometown = mode === 'hometown';
+  const activeData = isHometown ? hometownData : workplaceData;
 
-  // Filter data by region
+  // Filter data by region & search query
   const filteredData = useMemo(() => {
     let list = activeData;
     const regionConf = REGION_CONFIG[selectedRegion];
@@ -148,29 +152,29 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
   const provincesWithDataCount = sortedProvinces.filter(([_, list]) => list.length > 0).length;
   const topProvince = sortedProvinces[0] || null;
 
-  // Color generator for heatmap
+  // Pastel Color generator for Heatmap
   function getProvinceFillColor(count: number, isSelected: boolean, isHovered: boolean) {
     if (isSelected) {
-      return mode === 'hometown' ? '#4F46E5' : '#0D9488'; // Vibrant Indigo / Teal
+      return isHometown ? '#6366F1' : '#0D9488'; // Vibrant Pastel Focus
     }
     if (isHovered) {
-      return mode === 'hometown' ? '#818CF8' : '#2DD4BF';
+      return isHometown ? '#A5B4FC' : '#5EEAD4'; // Soft Glow on Hover
     }
     if (count === 0) {
-      return '#F8FAFC'; // Clean light slate
+      return '#F8FAFC'; // Clean cloud white
     }
 
     const ratio = count / maxCount;
-    if (mode === 'hometown') {
-      if (ratio > 0.6) return '#4338CA'; // Deep Indigo
-      if (ratio > 0.35) return '#6366F1'; // Medium Indigo
-      if (ratio > 0.15) return '#818CF8'; // Soft Indigo
-      return '#C7D2FE'; // Very light Indigo
+    if (isHometown) {
+      if (ratio > 0.6) return '#6366F1'; // Pastel Indigo Rich
+      if (ratio > 0.35) return '#818CF8'; // Soft Lavender Indigo
+      if (ratio > 0.15) return '#A5B4FC'; // Pastel Periwinkle
+      return '#E0E7FF'; // Very Soft Lavender
     } else {
-      if (ratio > 0.6) return '#0F766E'; // Deep Teal
-      if (ratio > 0.35) return '#0D9488'; // Medium Teal
-      if (ratio > 0.15) return '#14B8A6'; // Soft Teal
-      return '#99F6E4'; // Very light Teal
+      if (ratio > 0.6) return '#0D9488'; // Mint Teal Rich
+      if (ratio > 0.35) return '#14B8A6'; // Soft Mint
+      if (ratio > 0.15) return '#5EEAD4'; // Pastel Aqua
+      return '#CCFBF1'; // Soft Fresh Mint
     }
   }
 
@@ -184,109 +188,134 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
   };
 
   const provinceNames = Object.keys(THAILAND_PROVINCE_PATHS);
-
-  // Selected province alumni list
   const selectedProvinceAlumni = selectedProvince ? peopleByProvince.get(selectedProvince) ?? [] : [];
 
   return (
-    <div className="animate-slide-up space-y-6">
-      {/* ─── Hero Header & Stats Banner ─────────────────────────────────── */}
-      <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-7 sm:p-8 text-white shadow-hero">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-500/20 via-purple-500/10 to-transparent pointer-events-none" />
-        <div className="absolute -bottom-10 -right-10 h-64 w-64 rounded-full bg-purple-500/10 blur-3xl pointer-events-none" />
+    <div className="animate-fade-in space-y-6">
+      {/* ─── 1. HERO HEADER: SOFT PASTEL GLASSMORPHISM ─────────────────── */}
+      <section className={`relative overflow-hidden rounded-[36px] p-7 sm:p-9 text-white shadow-hero transition-all duration-500 ${
+        isHometown
+          ? 'bg-gradient-to-br from-indigo-950 via-purple-900/95 to-slate-900'
+          : 'bg-gradient-to-br from-teal-950 via-emerald-900/95 to-slate-900'
+      }`}>
+        {/* Decorative Floating Glowing Orbs */}
+        <div className={`absolute -top-12 -right-12 h-64 w-64 rounded-full blur-3xl pointer-events-none transition-colors duration-700 ${
+          isHometown ? 'bg-purple-400/25' : 'bg-teal-400/25'
+        }`} />
+        <div className={`absolute -bottom-10 -left-10 h-56 w-56 rounded-full blur-3xl pointer-events-none transition-colors duration-700 ${
+          isHometown ? 'bg-indigo-400/20' : 'bg-emerald-400/20'
+        }`} />
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div className="space-y-2 max-w-xl">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1 text-xs font-semibold backdrop-blur-md border border-white/15 text-indigo-200">
-              <Compass className="h-3.5 w-3.5 text-indigo-300 animate-spin-slow" />
-              <span>Interactive Alumni Network Map</span>
+          <div className="space-y-2.5 max-w-xl">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-xs font-bold backdrop-blur-md border border-white/20 text-white shadow-xs">
+              <Compass className={`h-3.5 w-3.5 animate-spin-slow ${isHometown ? 'text-indigo-300' : 'text-teal-300'}`} />
+              <span>Interactive Alumni Network Map ✨</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
               แผนที่เครือข่ายศิษย์เก่าทั่วประเทศ 🗺️
             </h2>
-            <p className="text-sm text-slate-300 leading-relaxed">
-              สำรวจการกระจายตัวของศิษย์เก่าและนักศึกษา ทั้งถิ่นฐานบ้านเกิดและสถานที่ทำงานจริงทั่วประเทศไทย
+            <p className="text-xs sm:text-sm text-white/85 leading-relaxed font-medium">
+              สำรวจการกระจายตัวของศิษย์เก่าและน้องๆ นักศึกษา ทั้งถิ่นฐานบ้านเกิดและสถานที่ทำงานจริงทั่วไทย
             </p>
           </div>
 
-          {/* Mode Switcher Toggle */}
-          <div className="flex items-center gap-1.5 rounded-2xl bg-white/10 p-1.5 backdrop-blur-md border border-white/15 shrink-0">
+          {/* Pill Switcher สลับโหมดนุ่มนวล */}
+          <div className="flex items-center gap-1.5 rounded-full bg-black/20 p-1.5 backdrop-blur-md border border-white/15 shadow-inner shrink-0 self-start md:self-auto">
             <button
               onClick={() => {
                 setMode('hometown');
                 setSelectedProvince(null);
               }}
-              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                mode === 'hometown'
-                  ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/30'
-                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              className={`group flex items-center gap-2 rounded-full px-5 py-2.5 text-xs sm:text-sm font-extrabold transition-all duration-300 cursor-pointer active:scale-95 ${
+                isHometown
+                  ? 'bg-white text-indigo-900 shadow-md shadow-indigo-950/20 scale-[1.02]'
+                  : 'text-white/80 hover:text-white hover:bg-white/10'
               }`}
             >
-              <Home className="h-4 w-4" />
-              <span>🏡 ภูมิลำเนา</span>
+              <span className="text-base transition-transform duration-200 group-hover:scale-125">🏡</span>
+              <span>ภูมิลำเนา</span>
             </button>
             <button
               onClick={() => {
                 setMode('workplace');
                 setSelectedProvince(null);
               }}
-              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                mode === 'workplace'
-                  ? 'bg-gradient-to-r from-teal-500 to-emerald-600 text-white shadow-md shadow-teal-500/30'
-                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              className={`group flex items-center gap-2 rounded-full px-5 py-2.5 text-xs sm:text-sm font-extrabold transition-all duration-300 cursor-pointer active:scale-95 ${
+                !isHometown
+                  ? 'bg-white text-teal-900 shadow-md shadow-teal-950/20 scale-[1.02]'
+                  : 'text-white/80 hover:text-white hover:bg-white/10'
               }`}
             >
-              <Briefcase className="h-4 w-4" />
-              <span>💼 ที่ทำงานศิษย์เก่า</span>
+              <span className="text-base transition-transform duration-200 group-hover:scale-125">💼</span>
+              <span>ที่ทำงานศิษย์เก่า</span>
             </button>
           </div>
         </div>
 
-        {/* ─── Metric Mini Badges ─────────────────────────────────────────── */}
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 pt-6 border-t border-white/10">
-          <div className="rounded-2xl bg-white/5 p-3.5 backdrop-blur-xs border border-white/5">
-            <p className="text-xs text-slate-400 flex items-center gap-1.5">
-              <Users className="h-3.5 w-3.5 text-indigo-400" /> จำนวนบนแผนที่
-            </p>
-            <p className="text-xl sm:text-2xl font-extrabold text-white mt-1">
-              {totalCount} <span className="text-xs font-normal text-slate-300">คน</span>
-            </p>
-          </div>
-
-          <div className="rounded-2xl bg-white/5 p-3.5 backdrop-blur-xs border border-white/5">
-            <p className="text-xs text-slate-400 flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5 text-teal-400" /> ครอบคลุม
-            </p>
-            <p className="text-xl sm:text-2xl font-extrabold text-white mt-1">
-              {provincesWithDataCount} <span className="text-xs font-normal text-slate-300">/ 77 จังหวัด</span>
+        {/* ─── Metric Mini Bubbles ─────────────────────────────────────────── */}
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 pt-6 border-t border-white/15">
+          {/* Card 1 */}
+          <div className="rounded-[22px] bg-white/10 p-4 backdrop-blur-md border border-white/15 hover:bg-white/15 transition-all duration-200">
+            <div className="flex items-center gap-2 text-xs font-semibold text-white/80">
+              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-400/30 text-indigo-200">
+                <Users className="h-3.5 w-3.5" />
+              </div>
+              <span>จำนวนบนแผนที่</span>
+            </div>
+            <p className="text-xl sm:text-2xl font-black text-white mt-2 tracking-tight">
+              {totalCount} <span className="text-xs font-bold text-white/70">คน</span>
             </p>
           </div>
 
-          <div className="rounded-2xl bg-white/5 p-3.5 backdrop-blur-xs border border-white/5">
-            <p className="text-xs text-slate-400 flex items-center gap-1.5">
-              <TrendingUp className="h-3.5 w-3.5 text-amber-400" /> จังหวัดอันดับ 1
+          {/* Card 2 */}
+          <div className="rounded-[22px] bg-white/10 p-4 backdrop-blur-md border border-white/15 hover:bg-white/15 transition-all duration-200">
+            <div className="flex items-center gap-2 text-xs font-semibold text-white/80">
+              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-teal-400/30 text-teal-200">
+                <MapPin className="h-3.5 w-3.5" />
+              </div>
+              <span>ครอบคลุม</span>
+            </div>
+            <p className="text-xl sm:text-2xl font-black text-white mt-2 tracking-tight">
+              {provincesWithDataCount} <span className="text-xs font-bold text-white/70">/ 77 จังหวัด</span>
             </p>
-            <p className="text-base sm:text-lg font-bold text-white mt-1 truncate">
-              {topProvince ? topProvince[0] : '-'}
+          </div>
+
+          {/* Card 3: Top 1 Province with Radar Ping Badge */}
+          <div className="rounded-[22px] bg-white/10 p-4 backdrop-blur-md border border-white/15 hover:bg-white/15 transition-all duration-200 relative overflow-hidden">
+            <div className="flex items-center gap-2 text-xs font-semibold text-white/80">
+              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-400/30 text-amber-200">
+                <Award className="h-3.5 w-3.5" />
+              </div>
+              <span>จังหวัดอันดับ 1 ✨</span>
+            </div>
+            <p className="text-sm sm:text-base font-extrabold text-white mt-2 truncate flex items-center gap-1.5">
+              <span>{topProvince ? topProvince[0] : '-'}</span>
               {topProvince && (
-                <span className="text-xs font-semibold text-amber-300 ml-1.5">({topProvince[1].length} คน)</span>
+                <span className="rounded-full bg-amber-400/30 text-amber-200 border border-amber-300/40 px-2 py-0.5 text-[11px] font-black">
+                  {topProvince[1].length} คน
+                </span>
               )}
             </p>
           </div>
 
-          <div className="rounded-2xl bg-white/5 p-3.5 backdrop-blur-xs border border-white/5">
-            <p className="text-xs text-slate-400 flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-pink-400" /> โหมดปัจจุบัน
-            </p>
-            <p className="text-base sm:text-lg font-bold text-white mt-1 truncate">
-              {mode === 'hometown' ? 'บ้านเกิด (ศิษย์เก่า+นักศึกษา)' : 'ที่ทำงาน (เฉพาะศิษย์เก่า)'}
+          {/* Card 4 */}
+          <div className="rounded-[22px] bg-white/10 p-4 backdrop-blur-md border border-white/15 hover:bg-white/15 transition-all duration-200">
+            <div className="flex items-center gap-2 text-xs font-semibold text-white/80">
+              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-pink-400/30 text-pink-200">
+                <Sparkles className="h-3.5 w-3.5" />
+              </div>
+              <span>โหมดแสดงผล</span>
+            </div>
+            <p className="text-xs sm:text-sm font-extrabold text-white mt-2 truncate">
+              {isHometown ? '🏡 ภูมิลำเนา (ศิษย์เก่า+นศ.)' : '💼 ที่ทำงาน (ศิษย์เก่า)'}
             </p>
           </div>
         </div>
       </section>
 
-      {/* ─── Region Filter Chips & Quick Navigation ─────────────────────── */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+      {/* ─── 2. REGION FILTER CAPSULES (ชิปเลือกภาคน่ารัก) ──────────────── */}
+      <div className="flex items-center gap-2.5 overflow-x-auto pb-1 scrollbar-none">
         {(Object.keys(REGION_CONFIG) as RegionKey[]).map((rKey, idx) => {
           const conf = REGION_CONFIG[rKey];
           const isActive = selectedRegion === rKey;
@@ -297,54 +326,55 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                 setSelectedRegion(rKey);
                 setZoomScale(1);
               }}
-              className={`flex items-center gap-1.5 shrink-0 rounded-2xl px-4 py-2 text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 shrink-0 rounded-full px-4.5 py-2 text-xs sm:text-sm font-extrabold transition-all duration-200 cursor-pointer active:scale-95 ${
                 isActive
-                  ? mode === 'hometown'
-                    ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
-                    : 'bg-teal-600 text-white shadow-sm shadow-teal-200'
-                  : 'bg-white text-slate-600 border border-slate-200/80 hover:bg-slate-50 hover:border-slate-300'
+                  ? isHometown
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 scale-105'
+                    : 'bg-teal-600 text-white shadow-md shadow-teal-200 scale-105'
+                  : 'bg-white text-slate-600 border border-slate-200/90 hover:bg-slate-50 hover:border-slate-300'
               }`}
             >
-              <span>{conf.icon}</span>
+              <span className="text-sm">{conf.icon}</span>
               <span>{conf.label}</span>
             </button>
           );
         })}
       </div>
 
-      {/* ─── Main Map & Directory Grid ─────────────────────────────────── */}
-      <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
-        {/* Left Column: Interactive Map Canvas */}
-        <div className="relative rounded-[32px] border border-slate-200/90 bg-white p-5 sm:p-6 shadow-card overflow-hidden flex flex-col justify-between min-h-[580px]">
-          {/* Map Controls Header */}
-          <div className="flex items-center justify-between gap-3 mb-3 z-10">
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <span className="font-semibold text-slate-700">
-                {REGION_CONFIG[selectedRegion].label}
+      {/* ─── 3. MAIN MAP & DIRECTORY GRID ──────────────────────────────── */}
+      <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr] items-start">
+        {/* Left Column: Interactive Pastel Map Canvas */}
+        <div className="relative rounded-[36px] border border-slate-200/80 bg-white p-5 sm:p-7 shadow-card overflow-hidden flex flex-col justify-between min-h-[600px]">
+          
+          {/* Map Header Info & Zoom Controls */}
+          <div className="flex items-center justify-between gap-3 mb-2 z-10">
+            <div className="flex items-center gap-2 text-xs text-slate-500 font-semibold">
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700 font-bold border border-slate-200/70">
+                {REGION_CONFIG[selectedRegion].icon} {REGION_CONFIG[selectedRegion].label}
               </span>
               <span>•</span>
-              <span>แตะที่จังหวัดเพื่อดูรายชื่อ</span>
+              <span className="text-slate-400">แตะที่จังหวัดเพื่อดูรายชื่อ 👆</span>
             </div>
 
-            {/* Zoom Controls */}
-            <div className="flex items-center gap-1 bg-slate-100/90 rounded-2xl p-1 border border-slate-200/80">
+            {/* Cute Zoom Controls */}
+            <div className="flex items-center gap-1 bg-slate-100/90 rounded-full p-1 border border-slate-200/80 shadow-2xs">
               <button
                 onClick={() => setZoomScale((z) => Math.min(z + 0.3, 2.5))}
-                className="rounded-xl p-1.5 text-slate-600 hover:bg-white hover:text-slate-900 transition-colors shadow-2xs cursor-pointer"
+                className="rounded-full p-1.5 text-slate-600 hover:bg-white hover:text-indigo-600 transition-all cursor-pointer shadow-2xs active:scale-90"
                 title="ขยายแผนที่"
               >
                 <ZoomIn className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setZoomScale((z) => Math.max(z - 0.3, 0.8))}
-                className="rounded-xl p-1.5 text-slate-600 hover:bg-white hover:text-slate-900 transition-colors shadow-2xs cursor-pointer"
+                className="rounded-full p-1.5 text-slate-600 hover:bg-white hover:text-indigo-600 transition-all cursor-pointer shadow-2xs active:scale-90"
                 title="ย่อแผนที่"
               >
                 <ZoomOut className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setZoomScale(1)}
-                className="rounded-xl p-1.5 text-slate-600 hover:bg-white hover:text-slate-900 transition-colors shadow-2xs cursor-pointer"
+                className="rounded-full p-1.5 text-slate-600 hover:bg-white hover:text-indigo-600 transition-all cursor-pointer shadow-2xs active:scale-90"
                 title="รีเซ็ตมุมมอง"
               >
                 <RotateCcw className="h-4 w-4" />
@@ -353,17 +383,17 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
           </div>
 
           {/* SVG Map Container */}
-          <div className="relative flex-1 flex items-center justify-center my-2">
+          <div className="relative flex-1 flex items-center justify-center my-3">
             <svg
               viewBox={`${currentViewBox.x} ${currentViewBox.y} ${currentViewBox.width} ${currentViewBox.height}`}
-              className="w-full h-auto max-h-[500px] transition-all duration-500 ease-out filter drop-shadow-xs"
+              className="w-full h-auto max-h-[510px] transition-all duration-500 ease-out filter drop-shadow-xs"
             >
               <defs>
-                <filter id="glow-selected" x="-20%" y="-20%" width="140%" height="140%">
-                  <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor={mode === 'hometown' ? '#4F46E5' : '#0D9488'} floodOpacity="0.5" />
+                <filter id="glow-selected" x="-30%" y="-30%" width="160%" height="160%">
+                  <feDropShadow dx="0" dy="3" stdDeviation="5" floodColor={isHometown ? '#6366F1' : '#0D9488'} floodOpacity="0.5" />
                 </filter>
-                <filter id="circle-shadow" x="-30%" y="-30%" width="160%" height="160%">
-                  <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#0F172A" floodOpacity="0.15" />
+                <filter id="glass-lens-shadow" x="-30%" y="-30%" width="160%" height="160%">
+                  <feDropShadow dx="0" dy="4" stdDeviation="8" floodColor="#0F172A" floodOpacity="0.12" />
                 </filter>
               </defs>
 
@@ -385,10 +415,10 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                         : isMetro
                         ? '#F59E0B'
                         : isHovered
-                        ? '#334155'
+                        ? '#475569'
                         : '#CBD5E1'
                     }
-                    strokeWidth={isSelected ? 2 : isMetro ? 1.2 : 0.4}
+                    strokeWidth={isSelected ? 2.2 : isMetro ? 1.4 : 0.45}
                     strokeLinejoin="round"
                     filter={isSelected ? 'url(#glow-selected)' : undefined}
                     onMouseEnter={() => setHoveredProvince(name)}
@@ -401,43 +431,46 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                 );
               })}
 
-              {/* ─── CONNECTING DASHED LINE & METRO INSET ─── */}
+              {/* ─── GLASS LENS: BANGKOK & METRO MAGNIFIER INSET ─── */}
               {selectedRegion === 'all' && (
                 <g className="animate-fade-in transition-opacity duration-300">
-                  <line
-                    x1="188"
-                    y1="405"
-                    x2="275"
-                    y2="605"
-                    stroke="#FACC15"
-                    strokeWidth="2.5"
-                    strokeDasharray="5 5"
+                  {/* Smooth curved connecting line */}
+                  <path
+                    d="M 188 405 Q 220 520 275 605"
+                    fill="none"
+                    stroke="#F59E0B"
+                    strokeWidth="2.2"
+                    strokeDasharray="4 4"
                     strokeLinecap="round"
                     className="animate-pulse"
                   />
 
+                  {/* Magnifier Glass Lens Circular Backdrop */}
+                  <circle
+                    cx="350"
+                    cy="700"
+                    r="85"
+                    fill="#FFFFFF"
+                    fillOpacity="0.95"
+                    stroke="#F59E0B"
+                    strokeWidth="2.5"
+                    filter="url(#glass-lens-shadow)"
+                  />
+
+                  {/* Lens Header Label */}
                   <text
                     x="350"
-                    y="608"
+                    y="635"
                     textAnchor="middle"
-                    fontSize="12"
-                    fontWeight="800"
-                    fill="#0F172A"
+                    fontSize="11"
+                    fontWeight="900"
+                    fill="#1E293B"
                   >
-                    กรุงเทพมหานคร
-                  </text>
-                  <text
-                    x="350"
-                    y="623"
-                    textAnchor="middle"
-                    fontSize="10"
-                    fontWeight="700"
-                    fill="#64748B"
-                  >
-                    และปริมณฑล
+                    🔍 กทม. และปริมณฑล
                   </text>
 
-                  <svg x="260" y="630" width="180" height="145" viewBox="140.2 364.5 84.4 66.4">
+                  {/* Metro SVG Inset Paths */}
+                  <svg x="265" y="642" width="170" height="135" viewBox="140.2 364.5 84.4 66.4">
                     {METRO_PROVINCES.map((name, idx) => {
                       const count = peopleByProvince.get(name)?.length ?? 0;
                       const isSelected = selectedProvince === name;
@@ -450,7 +483,7 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                           d={THAILAND_PROVINCE_PATHS[name]}
                           fill={fill}
                           stroke={isSelected ? '#FFFFFF' : '#D97706'}
-                          strokeWidth={isSelected ? 1.8 : 0.9}
+                          strokeWidth={isSelected ? 2 : 0.9}
                           strokeLinejoin="round"
                           filter={isSelected ? 'url(#glow-selected)' : undefined}
                           onMouseEnter={() => setHoveredProvince(name)}
@@ -467,12 +500,14 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
               )}
             </svg>
 
-            {/* Hover Tooltip Overlay */}
+            {/* Hover Balloon Tooltip 🎈 */}
             {hoveredProvince && (
-              <div className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-2xl bg-slate-900/90 text-white px-4 py-2 text-xs font-bold shadow-xl backdrop-blur-md border border-white/10 animate-fade-in">
-                <MapPin className="h-3.5 w-3.5 text-indigo-400" />
+              <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-full bg-slate-900/90 text-white px-4 py-2 text-xs font-bold shadow-xl backdrop-blur-md border border-white/15 animate-pop-in">
+                <span className="text-sm">🎈</span>
                 <span>{hoveredProvince}</span>
-                <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-extrabold text-white">
+                <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-black ${
+                  isHometown ? 'bg-indigo-500 text-white' : 'bg-teal-500 text-white'
+                }`}>
                   {peopleByProvince.get(hoveredProvince)?.length ?? 0} คน
                 </span>
               </div>
@@ -480,32 +515,32 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
           </div>
 
           {/* Map Legend Bar */}
-          <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+          <div className="mt-3 pt-3.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 font-medium">
             <div className="flex items-center gap-3 flex-wrap">
-              <span className="font-semibold text-slate-700">ระดับความหนาแน่น:</span>
+              <span className="font-bold text-slate-700">ระดับความหนาแน่น:</span>
               <span className="flex items-center gap-1.5">
-                <span className="h-3 w-3 rounded-md bg-[#F8FAFC] border border-slate-200" /> 0 คน
+                <span className="h-3.5 w-3.5 rounded-full bg-[#F8FAFC] border border-slate-200" /> 0 คน
               </span>
               <span className="flex items-center gap-1.5">
-                <span className={`h-3 w-3 rounded-md ${mode === 'hometown' ? 'bg-[#C7D2FE]' : 'bg-[#99F6E4]'}`} /> น้อย
+                <span className={`h-3.5 w-3.5 rounded-full ${isHometown ? 'bg-[#E0E7FF]' : 'bg-[#CCFBF1]'}`} /> น้อย
               </span>
               <span className="flex items-center gap-1.5">
-                <span className={`h-3 w-3 rounded-md ${mode === 'hometown' ? 'bg-[#6366F1]' : 'bg-[#0D9488]'}`} /> ปานกลาง
+                <span className={`h-3.5 w-3.5 rounded-full ${isHometown ? 'bg-[#818CF8]' : 'bg-[#14B8A6]'}`} /> ปานกลาง
               </span>
               <span className="flex items-center gap-1.5">
-                <span className={`h-3 w-3 rounded-md ${mode === 'hometown' ? 'bg-[#4338CA]' : 'bg-[#0F766E]'}`} /> มาก
+                <span className={`h-3.5 w-3.5 rounded-full ${isHometown ? 'bg-[#6366F1]' : 'bg-[#0D9488]'}`} /> หนาแน่น
               </span>
             </div>
 
-            <span className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-sm border-2 border-[#D97706] bg-white" />
+            <span className="flex items-center gap-1.5 text-[11px] text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-ping" />
               <span>กทม.-ปริมณฑล (ขยายล่างขวา)</span>
             </span>
           </div>
         </div>
 
         {/* Right Column: Alumni Directory / Province Details */}
-        <div className="rounded-[32px] border border-slate-200/90 bg-white p-6 shadow-card flex flex-col justify-between min-h-[580px]">
+        <div className="rounded-[36px] border border-slate-200/80 bg-white p-6 sm:p-7 shadow-card flex flex-col justify-between min-h-[600px]">
           <div>
             {/* Search Box */}
             <div className="relative mb-4">
@@ -515,7 +550,7 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="ค้นหาชื่อศิษย์เก่า, จังหวัด, บริษัท หรือรุ่น..."
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-9 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-9 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all font-medium"
               />
               {searchQuery && (
                 <button
@@ -527,45 +562,47 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
               )}
             </div>
 
-            {/* ─── STATE A: Province Selected Detail View ────────────────────── */}
+            {/* ─── STATE A: Selected Province Details ───────────────────────── */}
             {selectedProvince ? (
               <div className="space-y-4 animate-fade-in">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <div className="flex items-center gap-2.5">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-2xl text-white shadow-sm font-bold text-sm ${
-                      mode === 'hometown' ? 'bg-indigo-600' : 'bg-teal-600'
+                {/* Header with dismiss button */}
+                <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className={`flex h-11 w-11 items-center justify-center rounded-2xl text-white shadow-xs font-bold text-base ${
+                      isHometown ? 'bg-indigo-600' : 'bg-teal-600'
                     }`}>
                       <MapPin className="h-5 w-5" />
                     </div>
                     <div>
                       <h3 className="font-extrabold text-slate-900 text-lg leading-snug">{selectedProvince}</h3>
-                      <p className="text-xs text-slate-500">
-                        {mode === 'hometown' ? 'ภูมิลำเนา' : 'ที่ทำงาน'} • {selectedProvinceAlumni.length} คน
+                      <p className="text-xs text-slate-500 font-medium">
+                        {isHometown ? '🏡 ภูมิลำเนา' : '💼 ที่ทำงาน'} • <span className="font-bold text-slate-700">{selectedProvinceAlumni.length} คน</span>
                       </p>
                     </div>
                   </div>
 
                   <button
                     onClick={() => setSelectedProvince(null)}
-                    className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
+                    className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
                     title="ปิดรายละเอียด"
                   >
                     <X className="h-5 w-5" />
                   </button>
                 </div>
 
-                {/* Alumni Cards in Selected Province */}
+                {/* Alumni Cards with Cute Sticker Tags */}
                 <div className="max-h-[420px] overflow-y-auto space-y-2.5 pr-1 scrollbar-thin">
                   {selectedProvinceAlumni.length === 0 && (
-                    <div className="rounded-2xl bg-slate-50 p-8 text-center border border-dashed border-slate-200">
-                      <p className="text-xs text-slate-400">ยังไม่มีข้อมูลในจังหวัดนี้</p>
+                    <div className="rounded-3xl bg-slate-50 p-8 text-center border border-dashed border-slate-200">
+                      <span className="text-3xl">🧭</span>
+                      <p className="text-xs text-slate-400 mt-2 font-medium">ยังไม่มีสมาชิกปักหมุดในจังหวัดนี้</p>
                     </div>
                   )}
 
                   {selectedProvinceAlumni.map((alumnus, idx) => (
                     <div
                       key={`alumnus-card-${alumnus.id || idx}-${alumnus.name}-${idx}`}
-                      className="rounded-2xl border border-slate-100 bg-slate-50/60 hover:bg-white hover:border-indigo-100 hover:shadow-xs p-3.5 transition-all space-y-2"
+                      className="rounded-2xl border border-slate-100 bg-slate-50/60 hover:bg-white hover:border-indigo-200 hover:shadow-xs p-3.5 transition-all space-y-2"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-3">
@@ -573,10 +610,10 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                             <img
                               src={alumnus.avatar_url}
                               alt={alumnus.name}
-                              className="h-10 w-10 rounded-xl object-cover border border-slate-200 shrink-0"
+                              className="h-10 w-10 rounded-2xl object-cover ring-2 ring-slate-100 shrink-0"
                             />
                           ) : (
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-100 to-purple-100 text-indigo-700 font-extrabold text-xs border border-indigo-200/60">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-100 to-purple-100 text-indigo-700 font-extrabold text-xs border border-indigo-200/60 shadow-2xs">
                               {alumnus.name ? alumnus.name.substring(0, 2) : 'ศก'}
                             </div>
                           )}
@@ -584,12 +621,12 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <h4 className="font-bold text-slate-900 text-sm">{alumnus.name}</h4>
                               {alumnus.generation && (
-                                <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600 border border-indigo-100">
-                                  {alumnus.generation}
+                                <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-extrabold text-indigo-600 border border-indigo-100">
+                                  🏷️ {alumnus.generation}
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-slate-400">
+                            <p className="text-[11px] text-slate-400 font-medium mt-0.5">
                               {alumnus.student_status === 'alumni' ? '🎓 ศิษย์เก่า' : '🎒 นักศึกษาปัจจุบัน'}
                             </p>
                           </div>
@@ -597,9 +634,9 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                       </div>
 
                       {(alumnus.position || alumnus.company || alumnus.career_type) && (
-                        <div className="flex items-center gap-2 text-xs text-slate-600 flex-wrap pt-1 border-t border-slate-200/50">
+                        <div className="flex items-center gap-2 text-xs text-slate-600 flex-wrap pt-1.5 border-t border-slate-200/50">
                           {alumnus.company && (
-                            <span className="flex items-center gap-1 font-medium">
+                            <span className="flex items-center gap-1 font-semibold text-slate-700">
                               <Building2 className="h-3 w-3 text-slate-400" /> {alumnus.company}
                             </span>
                           )}
@@ -607,7 +644,7 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                             <span className="text-slate-400">• {alumnus.position}</span>
                           )}
                           {alumnus.career_type && (
-                            <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                            <span className="ml-auto rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600">
                               {alumnus.career_type}
                             </span>
                           )}
@@ -621,17 +658,18 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
               /* ─── STATE B: Ranked Province Distribution List ─────────────── */
               <div className="space-y-3">
                 <div className="flex items-center justify-between pb-2">
-                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                    <TrendingUp className="h-4 w-4 text-indigo-600" />
-                    <span>ลำดับจังหวัดที่มีข้อมูล ({sortedProvinces.length})</span>
+                  <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+                    <TrendingUp className={`h-4 w-4 ${isHometown ? 'text-indigo-600' : 'text-teal-600'}`} />
+                    <span>อันดับจังหวัดที่มีข้อมูล ({sortedProvinces.length})</span>
                   </h3>
-                  <span className="text-xs text-slate-400">คลิกเพื่อดู</span>
+                  <span className="text-xs text-slate-400 font-medium">แตะเพื่อดูรายชื่อ</span>
                 </div>
 
                 <div className="max-h-[440px] overflow-y-auto space-y-2 pr-1 scrollbar-thin">
                   {sortedProvinces.length === 0 && (
-                    <div className="rounded-2xl bg-slate-50 p-8 text-center border border-dashed border-slate-200">
-                      <p className="text-xs text-slate-400">ไม่พบข้อมูลที่ตรงกับคำค้นหา</p>
+                    <div className="rounded-3xl bg-slate-50 p-8 text-center border border-dashed border-slate-200">
+                      <span className="text-3xl">🔍</span>
+                      <p className="text-xs text-slate-400 mt-2 font-medium">ไม่พบข้อมูลที่ตรงกับคำค้นหา</p>
                     </div>
                   )}
 
@@ -644,43 +682,59 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                       <div
                         key={`sorted-prov-${provName}-${idx}`}
                         onClick={() => setSelectedProvince(provName)}
-                        className={`group relative overflow-hidden rounded-2xl border p-3.5 cursor-pointer transition-all hover:border-indigo-300 hover:shadow-xs active:scale-[0.99] ${
+                        className={`group relative overflow-hidden rounded-2xl border p-3.5 cursor-pointer transition-all duration-200 hover:shadow-xs active:scale-[0.99] ${
                           selectedProvince === provName
-                            ? 'border-indigo-500 bg-indigo-50/40 shadow-xs'
-                            : 'border-slate-100 bg-slate-50/40 hover:bg-white'
+                            ? isHometown
+                              ? 'border-indigo-400 bg-indigo-50/50 shadow-xs'
+                              : 'border-teal-400 bg-teal-50/50 shadow-xs'
+                            : 'border-slate-100 bg-slate-50/40 hover:bg-white hover:border-slate-300'
                         }`}
                       >
-                        {/* Background Distribution Progress Bar */}
+                        {/* Soft Pastel Distribution Progress Bar */}
                         <div
-                          className="absolute inset-y-0 left-0 bg-indigo-100/40 transition-all duration-500 rounded-r-xl"
+                          className={`absolute inset-y-0 left-0 transition-all duration-500 rounded-r-xl ${
+                            isHometown ? 'bg-indigo-100/50' : 'bg-teal-100/50'
+                          }`}
                           style={{ width: `${percent}%` }}
                         />
 
                         <div className="relative z-10 flex items-center justify-between gap-3">
                           <div className="flex items-center gap-3">
-                            <span className="flex h-6 w-6 items-center justify-center rounded-xl bg-white border border-slate-200 text-xs font-extrabold text-slate-500 shadow-2xs">
+                            <span className={`flex h-6 w-6 items-center justify-center rounded-xl text-xs font-black shadow-2xs ${
+                              idx === 0
+                                ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                : idx === 1
+                                ? 'bg-slate-200 text-slate-700'
+                                : idx === 2
+                                ? 'bg-amber-50 text-amber-700'
+                                : 'bg-white text-slate-500 border border-slate-200'
+                            }`}>
                               {idx + 1}
                             </span>
                             <div>
                               <div className="flex items-center gap-1.5">
-                                <span className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                                <span className="font-extrabold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
                                   {provName}
                                 </span>
                                 {isMetro && (
-                                  <span className="rounded-full bg-amber-100 px-1.5 py-0.2 text-[10px] font-extrabold text-amber-700">
+                                  <span className="rounded-md bg-amber-100 px-1.5 py-0.2 text-[9px] font-black text-amber-800">
                                     กทม.
                                   </span>
                                 )}
                               </div>
-                              <span className="text-[11px] text-slate-400">
-                                {percent}% ของทั้งหมด
+                              <span className="text-[11px] text-slate-400 font-medium">
+                                {percent}% ของเครือข่ายทั้งหมด
                               </span>
                             </div>
                           </div>
 
                           <div className="flex items-center gap-2">
-                            <span className={`rounded-full px-2.5 py-0.5 text-xs font-extrabold ${
-                              count > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'
+                            <span className={`rounded-full px-3 py-0.5 text-xs font-black ${
+                              count > 0
+                                ? isHometown
+                                  ? 'bg-indigo-100 text-indigo-700'
+                                  : 'bg-teal-100 text-teal-700'
+                                : 'bg-slate-100 text-slate-500'
                             }`}>
                               {count} คน
                             </span>
@@ -696,7 +750,7 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
           </div>
 
           {/* ─── Privacy Policy Notice ───────────────────────────────────── */}
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-start gap-2 text-[11px] text-slate-400">
+          <div className="mt-4 pt-3.5 border-t border-slate-100 flex items-start gap-2 text-[11px] text-slate-400 font-medium">
             <Info className="h-3.5 w-3.5 shrink-0 text-slate-400 mt-0.5" />
             <span>
               ข้อมูลบนแผนที่แสดงเฉพาะสมาชิกที่เปิดการยินยอมในหน้าการตั้งค่าความเป็นส่วนตัว
@@ -706,4 +760,4 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
       </div>
     </div>
   );
-}
+}
