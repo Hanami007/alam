@@ -159,8 +159,8 @@ function LoginForm() {
               <ShieldCheck className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-bold text-slate-800 truncate">แอดมิน (Admin)</p>
-              <p className="text-[10px] text-slate-400 truncate">admin@uni.ac.th</p>
+              <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">แอดมิน (Admin)</p>
+              <p className="text-xs text-slate-500 truncate">admin@uni.ac.th</p>
             </div>
           </button>
 
@@ -173,8 +173,8 @@ function LoginForm() {
               <Users className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-bold text-slate-800 truncate">สมชาย ใจดี (ศิษย์เก่า)</p>
-              <p className="text-[10px] text-slate-400 truncate">รหัส 60010001</p>
+              <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">สมชาย ใจดี (ศิษย์เก่า)</p>
+              <p className="text-xs text-slate-500 truncate">รหัส 60010001</p>
             </div>
           </button>
         </div>

@@ -23,9 +23,52 @@ import {
   MessageCircle,
   Sparkles,
   BookOpen,
+  PartyPopper,
 } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
+import {
+  USER_POINTS_UPDATED_EVENT,
+  NOTIFICATION_ADDED_EVENT,
+  notifyPointsUpdated,
+  notifyNewNotification,
+  type AppNotification,
+} from '@/lib/events';
+
+const INITIAL_NOTIFICATIONS: AppNotification[] = [
+  {
+    id: 'n_bday_1',
+    type: 'birthday',
+    title: 'สุขสันต์วันเกิด! 🎂',
+    description: 'พี่ณัฐพล ชัยชนะ (รุ่น 38) ส่งคำอวยพรวันเกิดให้คุณ 🎉 (+1 แต้ม)',
+    time: '5 นาทีที่แล้ว',
+    unread: true,
+  },
+  {
+    id: 'n_poll_1',
+    type: 'poll',
+    title: 'มีโพลใหม่ให้โหวต 📊',
+    description: 'ศิษย์เก่าดีเด่นประจำปี 2569 (+5 แต้ม)',
+    time: '15 นาทีที่แล้ว',
+    unread: true,
+  },
+  {
+    id: 'n_verify_1',
+    type: 'verify',
+    title: 'ยืนยันตัวตนสำเร็จ ✨',
+    description: 'Admin อนุมัติบัญชีศิษย์เก่าแล้ว',
+    time: '1 ชั่วโมงที่แล้ว',
+    unread: false,
+  },
+  {
+    id: 'n_comment_1',
+    type: 'comment',
+    title: 'ความคิดเห็นใหม่ 💬',
+    description: 'สมพงษ์ ตอบกลับโพสต์ของคุณ',
+    time: 'เมื่อวานนี้',
+    unread: false,
+  },
+];
 
 const MAIN_NAV = [
   { href: '/feed', label: 'วอลล์/ฟีด', icon: Sparkles },
@@ -103,12 +146,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(CURRENT_USER);
+  const [notifications, setNotifications] = useState<AppNotification[]>(INITIAL_NOTIFICATIONS);
 
-  const notifRef = useRef<HTMLDivElement>(null);
+  const notifPopoverRef = useRef<HTMLDivElement>(null);
+  const notifBtnMobileRef = useRef<HTMLDivElement>(null);
+  const notifBtnDesktopRef = useRef<HTMLDivElement>(null);
   const avatarRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    // Fetch logged in user profile data from DB
+  const unreadNotifCount = notifications.filter((n) => n.unread).length;
+
+  const fetchUserProfile = useCallback(() => {
     fetch('/api/user/profile')
       .then((res) => res.json())
       .then((u) => {
@@ -130,6 +177,77 @@ export function AppShell({ children }: { children: ReactNode }) {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    // Fetch logged in user profile data from DB on mount
+    fetchUserProfile();
+
+    // Listen to global points updated events (optimistic + fresh sync)
+    function handlePointsUpdated(e: Event) {
+      const customEvent = e as CustomEvent<{ pointsAdded?: number; totalPoints?: number }>;
+      const added = customEvent.detail?.pointsAdded ?? 1;
+
+      setCurrentUser((prev: any) => {
+        const newPoints = (prev.points ?? 0) + added;
+        const newLevel = Math.floor(newPoints / 20) + 1;
+        return {
+          ...prev,
+          points: newPoints,
+          level: newLevel,
+        };
+      });
+
+      // Also sync fresh from DB
+      fetchUserProfile();
+    }
+
+    // Listen to new notification events (e.g. Birthday wish)
+    function handleNewNotification(e: Event) {
+      const customEvent = e as CustomEvent<AppNotification>;
+      if (customEvent.detail) {
+        setNotifications((prev) => [customEvent.detail, ...prev.filter((n) => n.id !== customEvent.detail.id)]);
+      }
+    }
+
+    window.addEventListener(USER_POINTS_UPDATED_EVENT, handlePointsUpdated);
+    window.addEventListener(NOTIFICATION_ADDED_EVENT, handleNewNotification);
+    return () => {
+      window.removeEventListener(USER_POINTS_UPDATED_EVENT, handlePointsUpdated);
+      window.removeEventListener(NOTIFICATION_ADDED_EVENT, handleNewNotification);
+    };
+  }, [fetchUserProfile]);
+
+  const [thankedNotifIds, setThankedNotifIds] = useState<Record<string, boolean>>({});
+
+  function handleSendThankYou(notifId: string, _description?: string) {
+    setThankedNotifIds((prev) => ({ ...prev, [notifId]: true }));
+    handleMarkAsRead(notifId);
+
+    // Reward points for gratitude
+    notifyPointsUpdated(1);
+    fetch('/api/user/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pointsAdded: 1, userId: currentUser.id }),
+    }).catch(() => {});
+
+    // Add confirmation notification
+    notifyNewNotification({
+      type: 'general',
+      title: 'ส่งคำขอบคุณสำเร็จ! 💌',
+      description: 'ส่งคำขอบคุณสำหรับคำอวยพรวันเกิดเรียบร้อยแล้ว (+1 แต้ม)',
+    });
+  }
+
+  function handleMarkAllAsRead() {
+    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+  }
+
+  function handleMarkAsRead(id: string) {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, unread: false } : n))
+    );
+  }
+
   async function handleLogout() {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
@@ -143,10 +261,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const isInsideNotif =
+        (notifPopoverRef.current && notifPopoverRef.current.contains(target)) ||
+        (notifBtnMobileRef.current && notifBtnMobileRef.current.contains(target)) ||
+        (notifBtnDesktopRef.current && notifBtnDesktopRef.current.contains(target));
+
+      if (!isInsideNotif) {
         setNotifOpen(false);
       }
-      if (avatarRef.current && !avatarRef.current.contains(event.target as Node)) {
+      if (avatarRef.current && !avatarRef.current.contains(target)) {
         setAvatarOpen(false);
       }
     }
@@ -166,8 +290,46 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="decor-dot-pattern absolute inset-0 opacity-[0.35]" />
       </div>
 
-      {/* Top-Right Floating Glass Notification Button */}
-      <div className="fixed top-4 right-4 sm:right-6 z-40" ref={notifRef}>
+      {/* ─── Mobile Sticky Top Bar (Hidden on desktop) ─── */}
+      <header className="sticky top-0 z-30 flex items-center justify-between px-4 py-2.5 bg-card/90 backdrop-blur-xl border-b border-border/70 lg:hidden shadow-2xs">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl gradient-primary text-white shadow-blue-glow">
+            <GraduationCap className="h-5 w-5" />
+          </div>
+          <div>
+            <span className="text-base font-black text-gradient-primary">AlumniConnect</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2" ref={notifBtnMobileRef}>
+          {/* Notification Button (Mobile embedded) */}
+          <button
+            onClick={() => setNotifOpen((v) => !v)}
+            className={`relative flex h-9 w-9 items-center justify-center rounded-full border border-border/80 bg-card text-muted-foreground transition-all active:scale-95 ${
+              notifOpen ? 'bg-card text-primary ring-2 ring-primary/20' : ''
+            }`}
+            title={`การแจ้งเตือน ${unreadNotifCount > 0 ? `(${unreadNotifCount} ใหม่)` : ''}`}
+          >
+            <Bell className="h-4.5 w-4.5" />
+            {unreadNotifCount > 0 && (
+              <span className="gradient-primary absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white shadow-xs animate-pulse">
+                {unreadNotifCount}
+              </span>
+            )}
+          </button>
+
+          {/* User points badge in mobile header */}
+          <Link
+            href="/profile"
+            className="flex items-center gap-1.5 rounded-full bg-primary-light/80 border border-primary/20 px-2.5 py-1 text-xs font-bold text-primary active:scale-95"
+          >
+            <span>✨ {currentUser.points}p</span>
+          </Link>
+        </div>
+      </header>
+
+      {/* Desktop Top-Right Floating Notification Button (Desktop only) */}
+      <div className="hidden lg:block fixed top-4 right-6 z-40" ref={notifBtnDesktopRef}>
         <button
           onClick={() => {
             setNotifOpen((v) => !v);
@@ -176,82 +338,143 @@ export function AppShell({ children }: { children: ReactNode }) {
           className={`relative flex h-11 w-11 items-center justify-center rounded-full border border-border/80 bg-card/90 backdrop-blur-xl shadow-hero text-muted-foreground transition-all hover:bg-card hover:text-primary hover:scale-105 active:scale-95 ${
             notifOpen ? 'bg-card text-primary ring-2 ring-primary/20' : ''
           }`}
-          title="การแจ้งเตือน (2 ใหม่)"
+          title={`การแจ้งเตือน ${unreadNotifCount > 0 ? `(${unreadNotifCount} ใหม่)` : ''}`}
         >
           <Bell className="h-5 w-5" />
-          <span className="gradient-primary absolute -right-0.5 -top-0.5 flex h-4.5 w-4.5 items-center justify-center rounded-full text-[10px] font-bold text-white shadow-xs">
-            2
-          </span>
+          {unreadNotifCount > 0 && (
+            <span className="gradient-primary absolute -right-0.5 -top-0.5 flex h-4.5 w-4.5 items-center justify-center rounded-full text-[10px] font-bold text-white shadow-xs animate-pulse">
+              {unreadNotifCount}
+            </span>
+          )}
         </button>
+      </div>
 
-        {/* Notification Dropdown Popover */}
-        {notifOpen && (
-          <div className="animate-popover-down fixed sm:absolute right-4 sm:right-0 top-16 sm:top-14 z-50 w-80 overflow-hidden rounded-2xl border border-border bg-card shadow-hero">
-            <div className="flex items-center justify-between border-b border-border px-4 py-3 bg-card">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-sm text-foreground">การแจ้งเตือน</span>
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">2 ใหม่</span>
-              </div>
-              <button className="text-xs font-medium text-primary hover:underline flex items-center gap-1">
+      {/* Notification Dropdown Popover */}
+      {notifOpen && (
+        <div
+          ref={notifPopoverRef}
+          onClick={(e) => e.stopPropagation()}
+          className="animate-popover-down fixed right-4 sm:right-6 top-14 sm:top-16 z-50 w-80 sm:w-96 overflow-hidden rounded-2xl border border-border bg-card shadow-hero"
+        >
+          <div className="flex items-center justify-between border-b border-border px-4 py-3 bg-card">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-sm text-foreground">การแจ้งเตือน</span>
+              {unreadNotifCount > 0 && (
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
+                  {unreadNotifCount} ใหม่
+                </span>
+              )}
+            </div>
+            {unreadNotifCount > 0 && (
+              <button
+                onClick={handleMarkAllAsRead}
+                className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+              >
                 <CheckCheck className="h-3.5 w-3.5" />
                 อ่านทั้งหมด
               </button>
-            </div>
-
-            <div className="max-h-[300px] overflow-y-auto divide-y divide-border/60 text-xs">
-              <div className="flex items-start gap-3 p-3.5 bg-primary-light/40 transition-colors hover:bg-primary-light/70 cursor-pointer">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary mt-0.5">
-                  <Sparkles className="h-4 w-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-foreground">มีโพลใหม่ให้โหวต</p>
-                  <p className="text-xs text-muted-foreground truncate">ศิษย์เก่าดีเด่นประจำปี 2569 (+5 แต้ม)</p>
-                  <span className="text-xs text-primary font-medium mt-1 inline-block">10 นาทีที่แล้ว</span>
-                </div>
-                <span className="h-2 w-2 shrink-0 rounded-full bg-primary mt-1.5" />
-              </div>
-
-              <div className="flex items-start gap-3 p-3.5 bg-primary-light/40 transition-colors hover:bg-primary-light/70 cursor-pointer">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 mt-0.5">
-                  <CheckCheck className="h-4 w-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-foreground">ยืนยันตัวตนสำเร็จ</p>
-                  <p className="text-xs text-muted-foreground truncate">Admin อนุมัติบัญชีศิษย์เก่าแล้ว</p>
-                  <span className="text-xs text-muted-foreground mt-1 inline-block">1 ชั่วโมงที่แล้ว</span>
-                </div>
-                <span className="h-2 w-2 shrink-0 rounded-full bg-primary mt-1.5" />
-              </div>
-
-              <div className="flex items-start gap-3 p-3.5 transition-colors hover:bg-muted/40 cursor-pointer">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 mt-0.5">
-                  <MessageSquare className="h-4 w-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-foreground">ความคิดเห็นใหม่</p>
-                  <p className="text-xs text-muted-foreground truncate">สมพงษ์ ตอบกลับโพสต์ของคุณ</p>
-                  <span className="text-xs text-muted-foreground mt-1 inline-block">เมื่อวานนี้</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-border bg-slate-50/50 p-2.5 text-center">
-              <button className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors">
-                ดูการแจ้งเตือนทั้งหมด
-              </button>
-            </div>
+            )}
           </div>
-        )}
-      </div>
 
-      {/* Floating Mobile Hamburger Menu Toggle Button */}
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="fixed top-4 left-4 z-30 flex h-11 w-11 items-center justify-center rounded-2xl border border-border/80 bg-card/90 backdrop-blur-xl shadow-md text-foreground transition-all hover:bg-card hover:scale-105 active:scale-95 lg:hidden"
-        title="เปิดเมนู"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
+          <div className="max-h-[340px] overflow-y-auto divide-y divide-border/60 text-xs">
+            {notifications.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">
+                <Bell className="mx-auto h-8 w-8 text-slate-300 mb-2" />
+                <p>ยังไม่มีการแจ้งเตือน</p>
+              </div>
+            ) : (
+              notifications.map((item) => {
+                const isBirthday = item.type === 'birthday';
+                const isPoll = item.type === 'poll';
+                const isVerify = item.type === 'verify';
+
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => handleMarkAsRead(item.id)}
+                    className={`flex items-start gap-3 p-3.5 transition-colors cursor-pointer ${
+                      item.unread
+                        ? isBirthday
+                          ? 'bg-pink-50/70 hover:bg-pink-100/60'
+                          : 'bg-primary-light/40 hover:bg-primary-light/70'
+                        : 'hover:bg-muted/40'
+                    }`}
+                  >
+                    <div
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl mt-0.5 shadow-2xs ${
+                        isBirthday
+                          ? 'bg-pink-100 text-pink-600'
+                          : isPoll
+                          ? 'bg-purple-100 text-purple-600'
+                          : isVerify
+                          ? 'bg-emerald-500/10 text-emerald-600'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {isBirthday ? (
+                        <PartyPopper className="h-4 w-4" />
+                      ) : isPoll ? (
+                        <Sparkles className="h-4 w-4" />
+                      ) : isVerify ? (
+                        <CheckCheck className="h-4 w-4" />
+                      ) : (
+                        <MessageSquare className="h-4 w-4" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-xs ${item.unread ? 'font-bold text-foreground' : 'font-medium text-slate-700'}`}>
+                        {item.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{item.description}</p>
+                      
+                      {/* Quick Thank-You Button for Birthday Wishes */}
+                      {isBirthday && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSendThankYou(item.id, item.description);
+                            }}
+                            disabled={Boolean(thankedNotifIds[item.id])}
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition-all ${
+                              thankedNotifIds[item.id]
+                                ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-2xs'
+                                : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-2xs hover:opacity-90 active:scale-95 cursor-pointer'
+                            }`}
+                          >
+                            <span>{thankedNotifIds[item.id] ? '🙏 ส่งคำขอบคุณแล้ว ✨' : '🙏 ส่งคำขอบคุณ (+1 แต้ม)'}</span>
+                          </button>
+                        </div>
+                      )}
+
+                      <span className="text-[11px] text-muted-foreground/80 mt-1 inline-block font-medium">
+                        {item.time}
+                      </span>
+                    </div>
+                    {item.unread && (
+                      <span
+                        className={`h-2 w-2 shrink-0 rounded-full mt-1.5 ${
+                          isBirthday ? 'bg-pink-500' : 'bg-primary'
+                        }`}
+                      />
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="border-t border-border bg-slate-50/50 p-2.5 text-center">
+            <button
+              onClick={() => setNotifOpen(false)}
+              className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+            >
+              ปิดหน้าต่าง
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Mobile drawer backdrop */}
       {mobileOpen && (
@@ -307,7 +530,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     <p className="text-sm font-bold truncate">{currentUser.name}</p>
                     <p className="text-xs text-white/80">{currentUser.generation}</p>
                     {currentUser.is_available_for_mentorship && (
-                      <span className="inline-block mt-1 rounded-md bg-emerald-400/30 px-2 py-0.5 text-[9px] font-extrabold text-emerald-100 border border-emerald-300/40">
+                      <span className="inline-block mt-1 rounded-md bg-emerald-400/30 px-2 py-0.5 text-[10px] sm:text-xs font-extrabold text-emerald-100 border border-emerald-300/40">
                         💬 ยินดีให้คำแนะนำ
                       </span>
                     )}
@@ -445,14 +668,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold truncate">{currentUser.name}</p>
-                      <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] font-bold shrink-0">
+                      <p className="text-xs sm:text-sm font-bold truncate">{currentUser.name}</p>
+                      <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] sm:text-xs font-bold shrink-0">
                         Lv.{currentUser.level}
                       </span>
                     </div>
-                    <p className="text-[11px] text-white/80 truncate">{currentUser.generation} • {currentUser.points} แต้ม</p>
+                    <p className="text-xs text-white/80 truncate">{currentUser.generation} • {currentUser.points} แต้ม</p>
                     {currentUser.is_available_for_mentorship && (
-                      <span className="inline-block mt-0.5 rounded-md bg-emerald-400/30 px-1.5 py-0.5 text-[9px] font-extrabold text-emerald-100 border border-emerald-300/40">
+                      <span className="inline-block mt-0.5 rounded-md bg-emerald-400/30 px-1.5 py-0.5 text-[10px] sm:text-xs font-extrabold text-emerald-100 border border-emerald-300/40">
                         💬 ยินดีให้คำแนะนำ
                       </span>
                     )}
@@ -554,10 +777,39 @@ export function AppShell({ children }: { children: ReactNode }) {
         </button>
       </aside>
 
-      {/* Main Content Area (No Topbar Header) */}
+      {/* Main Content Area */}
       <div className={`flex min-h-screen flex-col transition-[padding] duration-200 ${contentOffset}`}>
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+        <main className="flex-1 px-3.5 py-4 sm:px-6 lg:px-8 pb-24 lg:pb-8">{children}</main>
       </div>
+
+      {/* ─── Modern Glassmorphic Mobile Bottom Navigation Bar (< lg) ─── */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border/70 bg-card/90 backdrop-blur-xl px-1.5 py-1.5 shadow-hero lg:hidden">
+        {[
+          { href: '/feed', label: 'วอลล์', icon: Sparkles },
+          { href: '/search', label: 'หนังสือรุ่น', icon: BookOpen },
+          { href: '/hall-of-fame', label: 'ดีเด่น', icon: Star },
+          { href: '/map', label: 'แผนที่', icon: MapPin },
+          { href: '/gallery', label: 'ภาพเก่า', icon: ImageIcon },
+          { href: '/profile', label: 'โปรไฟล์', icon: User },
+        ].map((item) => {
+          const isActive = pathname === item.href;
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex flex-col items-center justify-center gap-0.5 rounded-xl py-1 px-2 transition-all active:scale-90 ${
+                isActive ? 'text-primary font-bold' : 'text-slate-500 hover:text-slate-800 font-medium'
+              }`}
+            >
+              <div className={`p-1.5 rounded-xl transition-all ${isActive ? 'bg-primary/10 text-primary shadow-2xs' : ''}`}>
+                <Icon className="h-4.5 w-4.5" />
+              </div>
+              <span className="text-[10px] tracking-tight">{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }

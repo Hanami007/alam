@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { notifyPointsUpdated, notifyNewNotification } from '@/lib/events';
 import {
   Heart,
   MessageCircle,
@@ -325,8 +326,10 @@ export function FeedList({
       });
       const data = await res.json();
       if (data.success) {
+        const pts = data.pointsAwarded || currentPoll.pointsPerVote || 5;
+        notifyPointsUpdated(pts);
         setDeleteToast({
-          message: `🎉 โหวตสำเร็จ! ได้รับ +${data.pointsAwarded || currentPoll.pointsPerVote || 5} คะแนนสะสม ✨`,
+          message: `🎉 โหวตสำเร็จ! ได้รับ +${pts} คะแนนสะสม ✨`,
           type: 'success',
         });
         setTimeout(() => setDeleteToast(null), 3500);
@@ -427,7 +430,7 @@ export function FeedList({
 
 
   // Handle Birthday Wish Click
-  function handleSendWish(id: number, e?: React.MouseEvent) {
+  async function handleSendWish(id: number, e?: React.MouseEvent) {
     if (e) {
       const rect = e.currentTarget.getBoundingClientRect();
       triggerFloatingHeart(rect.left + rect.width / 2, rect.top + rect.height / 2);
@@ -435,6 +438,35 @@ export function FeedList({
       triggerFloatingHeart();
     }
     setWishedIds((prev) => ({ ...prev, [id]: true }));
+
+    // Add +1 point & sync DB
+    notifyPointsUpdated(1);
+    fetch('/api/user/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pointsAdded: 1, userId: currentUserId }),
+    }).catch(() => {});
+
+    const target = BIRTHDAY_ALUMNI.find((a) => a.id === id);
+    const targetName = target ? target.name : 'เพื่อนศิษย์เก่า';
+    const targetGen = target ? target.gen : 'CSMJU';
+
+    // Send notification into the top-bar bell notification system
+    notifyNewNotification({
+      type: 'birthday',
+      title: 'ส่งคำอวยพรวันเกิดสำเร็จ! 🎂',
+      description: `คุณได้ส่งคำอวยพรวันเกิดให้ ${targetName} (${targetGen}) แล้ว 🎉 (+1 แต้ม)`,
+    });
+
+    // Simulate real-time incoming birthday wish interaction
+    setTimeout(() => {
+      notifyNewNotification({
+        type: 'birthday',
+        title: 'มีคนส่งคำอวยพรวันเกิดให้คุณ! 🎂',
+        description: `${targetName} (${targetGen}) ได้ส่งความปรารถนาดีและคำอวยพรกลับให้คุณ 🎉 (+1 แต้ม)`,
+      });
+      notifyPointsUpdated(1);
+    }, 2800);
   }
 
   // Handle Emoji Selection for Post
@@ -466,11 +498,17 @@ export function FeedList({
     );
 
     try {
-      await fetch('/api/feed/like', {
+      const res = await fetch('/api/feed/like', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ postId, userId: currentUserId }),
       });
+      const data = await res.json();
+      if (data.success && data.liked) {
+        notifyPointsUpdated(1);
+        setDeleteToast({ message: `🎉 ส่งความรู้สึก ${emojiObj.emoji} สำเร็จ! คุณได้รับ +1 แต้มกิจกรรม ✨`, type: 'success' });
+        setTimeout(() => setDeleteToast(null), 3000);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -504,11 +542,17 @@ export function FeedList({
     );
 
     try {
-      await fetch('/api/feed/like', {
+      const res = await fetch('/api/feed/like', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ postId, userId: currentUserId }),
       });
+      const data = await res.json();
+      if (data.success && data.liked) {
+        notifyPointsUpdated(1);
+        setDeleteToast({ message: '💖 ถูกใจโพสต์สำเร็จ! คุณได้รับ +1 แต้มกิจกรรม ✨', type: 'success' });
+        setTimeout(() => setDeleteToast(null), 3000);
+      }
     } catch (err) {
       console.error('Failed to toggle like:', err);
     }
@@ -588,6 +632,7 @@ export function FeedList({
       });
       const data = await res.json();
       if (data.success && data.comment) {
+        notifyPointsUpdated(1);
         setFeedPosts((prev) =>
           prev.map((post) => {
             if (post.id !== postId) return post;
@@ -597,6 +642,8 @@ export function FeedList({
             return { ...post, commentsList: updatedList };
           })
         );
+        setDeleteToast({ message: '💬 ส่งความคิดเห็นสำเร็จ! คุณได้รับ +1 แต้มกิจกรรม ✨', type: 'success' });
+        setTimeout(() => setDeleteToast(null), 3500);
       }
     } catch (err) {
       console.error('Failed to add comment:', err);
@@ -641,13 +688,13 @@ export function FeedList({
       <div className="space-y-7 min-w-0">
 
         {/* ===== POST REQUEST FORM CARD ===== */}
-        <div className="rounded-[32px] border border-indigo-200/80 bg-white shadow-card overflow-hidden">
+        <div className="rounded-[24px] sm:rounded-[32px] border border-indigo-200/80 bg-white shadow-card overflow-hidden">
           <button
             onClick={() => setShowRequestForm((v) => !v)}
-            className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-indigo-50/40 transition-colors"
+            className="w-full flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 text-left hover:bg-indigo-50/40 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-400 to-purple-500 shadow-sm">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-400 to-purple-500 shadow-sm">
                 <Send className="h-4 w-4 text-white" />
               </div>
               <div>
@@ -661,7 +708,7 @@ export function FeedList({
           {showRequestForm && (
             <form
               onSubmit={handleSubmitPostRequest}
-              className="border-t border-indigo-100/60 px-6 py-5 space-y-4 bg-indigo-50/20"
+              className="border-t border-indigo-100/60 px-4 sm:px-6 py-4 sm:py-5 space-y-4 bg-indigo-50/20"
             >
               {/* Type Switcher: Normal Post vs Poll Survey */}
               <div>
@@ -927,34 +974,39 @@ export function FeedList({
               <div
                 id={`post-${post.id}`}
                 key={post.id}
-                className="rounded-[32px] border border-slate-200/90 bg-white shadow-card transition-all duration-200 overflow-hidden relative"
+                className="rounded-[28px] sm:rounded-[32px] border border-slate-200/90 bg-white shadow-card transition-all duration-200 overflow-hidden relative"
               >
                 {/* Post Header */}
-                <div className="p-7 sm:p-8">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-purple-100 via-pink-100 to-rose-100 border border-purple-200/50 text-purple-700 font-extrabold text-base shadow-2xs">
+                <div className="p-4 sm:p-6 lg:p-7">
+                  <div className="flex items-start justify-between gap-2.5 sm:gap-3">
+                    <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
+                      {/* Avatar with fixed aspect square and shrink-0 */}
+                      <div className="flex h-11 w-11 sm:h-13 sm:w-13 shrink-0 aspect-square items-center justify-center rounded-2xl bg-gradient-to-tr from-purple-100 via-pink-100 to-rose-100 border border-purple-200/50 text-purple-700 font-extrabold text-sm sm:text-base shadow-2xs">
                         {post.author ? post.author.substring(0, 2) : 'CS'}
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2.5 flex-wrap">
-                          <h4 className="font-bold text-slate-900 text-base sm:text-lg">{post.author || 'แอดมินระบบ'}</h4>
+
+                      {/* Author & meta container */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                          <h4 className="font-bold text-slate-900 text-sm sm:text-base truncate max-w-[150px] sm:max-w-none">
+                            {post.author || 'แอดมินระบบ'}
+                          </h4>
                           {post.isAvailableForMentorship && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 shadow-2xs">
+                            <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 shadow-2xs shrink-0 whitespace-nowrap">
                               💬 ยินดีให้คำแนะนำ
                             </span>
                           )}
                           {post.pinned && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-pink-50 px-3 py-0.5 text-xs font-semibold text-pink-600 border border-pink-100">
-                              <Pin className="h-3.5 w-3.5" /> ปักหมุด
+                            <span className="inline-flex items-center gap-1 rounded-full bg-pink-50 px-2.5 py-0.5 text-[10px] sm:text-xs font-semibold text-pink-600 border border-pink-100 shrink-0 whitespace-nowrap">
+                              <Pin className="h-3 w-3" /> ปักหมุด
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-400 mt-1">
-                          <span>{new Date(post.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                        <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1 flex-wrap">
+                          <span className="whitespace-nowrap">{new Date(post.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                           <span>•</span>
                           {post.category && (
-                            <span className="rounded-full bg-slate-100 px-3 py-0.5 text-xs font-medium text-slate-600">
+                            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 shrink-0 whitespace-nowrap">
                               {post.category}
                             </span>
                           )}
@@ -963,12 +1015,12 @@ export function FeedList({
                     </div>
 
                     {/* Post Header Right: Admin Quick Action & Dropdown Menu */}
-                    <div className="flex items-center gap-2 relative">
-                      {/* Admin Quick Delete Button */}
+                    <div className="flex items-center gap-1 sm:gap-2 shrink-0 relative">
+                      {/* Admin Quick Delete Button (Desktop only - mobile has it in 3-dots dropdown) */}
                       {activeRole === 'admin' && (
                         <button
                           onClick={() => setPostToDelete(post)}
-                          className="flex items-center gap-1.5 rounded-full bg-rose-50 hover:bg-rose-100/90 text-rose-600 border border-rose-200/90 px-3.5 py-1.5 text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-2xs"
+                          className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-rose-50 hover:bg-rose-100/90 text-rose-600 border border-rose-200/90 px-3 py-1.5 text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-2xs"
                           title="ลบโพสต์ข่าวนี้ (เฉพาะแอดมิน)"
                         >
                           <Trash2 className="h-3.5 w-3.5 text-rose-500" />
@@ -987,14 +1039,14 @@ export function FeedList({
                         }`}
                         title="ตัวเลือกเพิ่มเติม"
                       >
-                        <MoreHorizontal className="h-6 w-6" />
+                        <MoreHorizontal className="h-5 w-5" />
                       </button>
 
                       {/* Options Dropdown Popover */}
                       {isMenuOpen && (
                         <div
                           onClick={(e) => e.stopPropagation()}
-                          className="absolute right-0 top-12 z-30 w-52 overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-1.5 shadow-hero animate-fade-in text-xs font-medium"
+                          className="absolute right-0 top-11 z-30 w-52 overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-1.5 shadow-hero animate-fade-in text-xs font-medium"
                         >
                           <button
                             onClick={() => {
@@ -1031,13 +1083,12 @@ export function FeedList({
                     </div>
                   </div>
 
-
                   {/* Post Content Box */}
-                  <div className="mt-6 space-y-3 bg-slate-50/70 rounded-2xl p-6 sm:p-7 border border-slate-200/70 shadow-xs/30">
+                  <div className="mt-4 space-y-2 bg-slate-50/70 rounded-2xl p-4 sm:p-6 border border-slate-200/70 shadow-xs/30">
                     {post.title && (
-                      <h3 className="text-lg sm:text-xl font-bold text-slate-900 leading-snug">{post.title}</h3>
+                      <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">{post.title}</h3>
                     )}
-                    <p className="text-base sm:text-lg leading-relaxed text-slate-700 whitespace-pre-line">{post.body}</p>
+                    <p className="text-sm sm:text-base leading-relaxed text-slate-700 whitespace-pre-line">{post.body}</p>
                   </div>
 
                   {/* Poll Box (Interactive Real Voting) */}
@@ -1174,17 +1225,17 @@ export function FeedList({
                   </div>
 
                   {/* ===== ACTION BUTTONS & EMOJI REACTION POPUP ===== */}
-                  <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3 text-sm sm:text-base font-medium relative">
+                  <div className="mt-4 flex items-center justify-between gap-1.5 sm:gap-3 border-t border-slate-100 pt-3 text-xs sm:text-sm font-medium relative">
 
                     {/* Cute Emoji Reaction Popup Picker */}
                     {activeReactionPicker === post.id && (
-                      <div className="absolute left-0 -top-14 z-20 flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-md border border-pink-100 animate-fade-in">
+                      <div className="absolute left-0 -top-14 z-20 flex items-center gap-1.5 sm:gap-2 rounded-full bg-white px-3 sm:px-4 py-1.5 sm:py-2 shadow-lg border border-pink-100 animate-fade-in">
                         {EMOJI_REACTIONS.map((item) => (
                           <button
                             key={item.emoji}
                             onClick={(e) => handleSelectEmojiReaction(post.id, item, e)}
                             title={item.label}
-                            className="text-2xl transition-transform hover:scale-135 hover:-translate-y-1 active:scale-100 p-1"
+                            className="text-xl sm:text-2xl transition-transform hover:scale-135 hover:-translate-y-1 active:scale-100 p-1"
                           >
                             {item.emoji}
                           </button>
@@ -1196,30 +1247,30 @@ export function FeedList({
                       <button
                         onClick={(e) => handleToggleLike(post.id, e)}
                         onMouseEnter={() => setActiveReactionPicker(post.id)}
-                        className={`w-full flex items-center justify-center gap-2 rounded-full py-3 transition-all ${isLiked
+                        className={`w-full flex items-center justify-center gap-1.5 sm:gap-2 rounded-full py-2 sm:py-2.5 transition-all ${isLiked
                             ? 'bg-rose-50 text-rose-500 font-bold shadow-2xs'
                             : 'bg-slate-50 text-slate-600 hover:bg-rose-50/60 hover:text-rose-500'
                           }`}
                       >
-                        <span className="text-lg">{currentEmoji}</span>
+                        <span className="text-base sm:text-lg">{currentEmoji}</span>
                         <span>{isLiked ? 'ถูกใจแล้ว' : 'ส่งหัวใจ'}</span>
                       </button>
                     </div>
 
                     <button
                       onClick={() => toggleCommentBox(post.id)}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-full py-3 bg-slate-50 text-slate-600 hover:bg-purple-50/60 hover:text-purple-600 transition-all"
+                      className="flex flex-1 items-center justify-center gap-1.5 sm:gap-2 rounded-full py-2 sm:py-2.5 bg-slate-50 text-slate-600 hover:bg-purple-50/60 hover:text-purple-600 transition-all"
                     >
-                      <MessageCircle className="h-5 w-5" />
+                      <MessageCircle className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
                       <span>คอมเมนต์</span>
                     </button>
 
                     <button
                       onClick={() => handleShare(post.id)}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-full py-3 bg-slate-50 text-slate-600 hover:bg-sky-50/60 hover:text-sky-600 transition-all"
+                      className="flex flex-1 items-center justify-center gap-1.5 sm:gap-2 rounded-full py-2 sm:py-2.5 bg-slate-50 text-slate-600 hover:bg-sky-50/60 hover:text-sky-600 transition-all"
                     >
-                      <Share2 className="h-5 w-5" />
-                      <span>{copiedId === post.id ? 'ก๊อปแล้ว ✨' : 'แชร์'}</span>
+                      <Share2 className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
+                      <span>{copiedId === post.id ? 'ก๊อปแล้ว' : 'แชร์'}</span>
                     </button>
                   </div>
 
@@ -1274,7 +1325,7 @@ export function FeedList({
                                       <div className="flex items-center gap-1.5 flex-wrap">
                                         <p className="text-xs font-bold text-indigo-700">{comment.author}</p>
                                         {comment.isAvailableForMentorship && (
-                                          <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200 shadow-2xs">
+                                          <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 shadow-2xs">
                                             💬 ยินดีให้คำแนะนำ
                                           </span>
                                         )}
@@ -1632,7 +1683,7 @@ export function FeedList({
               <div className="flex items-center justify-between text-slate-500">
                 <span className="font-semibold text-rose-700">ผู้โพสต์: {postToDelete.author || 'แอดมิน'}</span>
                 {postToDelete.category && (
-                  <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600 border border-rose-100">
+                  <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-slate-600 border border-rose-100">
                     {postToDelete.category}
                   </span>
                 )}

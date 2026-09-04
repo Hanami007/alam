@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { notifyPointsUpdated } from '@/lib/events';
 import {
   Trophy,
   Crown,
@@ -19,6 +20,10 @@ import {
   TrendingUp,
   Loader2,
   RotateCcw,
+  LayoutList,
+  LayoutGrid,
+  Award,
+  Flame,
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════
@@ -42,7 +47,7 @@ interface HallOfFameGridProps {
 }
 
 /* ═══════════════════════════════════════════════
-   MOCK / DEFAULT DATA
+   MOCK / DEFAULT DATA (Rich dataset)
 ═══════════════════════════════════════════════ */
 const DEFAULT_CANDIDATES: Candidate[] = [
   {
@@ -52,22 +57,22 @@ const DEFAULT_CANDIDATES: Candidate[] = [
     company: 'Tech Thailand Group',
     position: 'Chief Technology Officer (CTO)',
     avatar_url: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=500&auto=format&fit=crop&q=80',
-    description: 'ผู้พัฒนาโซลูชัน AI ทางการแพทย์ และศิษย์เก่าผู้สร้างคุณประโยชน์ให้สถาบัน',
+    description: 'ผู้พัฒนาโซลูชัน AI ทางการแพทย์ และศิษย์เก่าผู้สร้างคุณประโยชน์ให้สถาบันอย่างต่อเนื่อง',
     generation_label: 'รุ่น 35',
     generationNumber: 35,
-    votes: 184,
+    votes: 248,
   },
   {
     id: 102,
     name: 'ณิชาภัทร อัศวไพศาล',
     studentId: '61010045',
-    company: 'Innovate Soft',
+    company: 'Innovate Soft Co., Ltd.',
     position: 'Senior Lead Software Engineer',
     avatar_url: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=500&auto=format&fit=crop&q=80',
-    description: 'ผู้ก่อตั้งสตาร์ทอัพเทคโนโลยีศิษย์เก่าและวิทยากรพิเศษบรรยายให้นักศึกษา',
+    description: 'ผู้ก่อตั้งสตาร์ทอัพเทคโนโลยีศิษย์เก่าและวิทยากรพิเศษบรรยายสร้างแรงบันดาลใจให้นักศึกษา',
     generation_label: 'รุ่น 38',
     generationNumber: 38,
-    votes: 156,
+    votes: 196,
   },
   {
     id: 103,
@@ -76,22 +81,22 @@ const DEFAULT_CANDIDATES: Candidate[] = [
     company: 'CyberGuard Corp',
     position: 'Head of Cybersecurity',
     avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=80',
-    description: 'ผู้เชี่ยวชาญด้านความปลอดภัยไซเบอร์ระดับประเทศ และที่ปรึกษาองค์กร',
+    description: 'ผู้เชี่ยวชาญด้านความปลอดภัยไซเบอร์ระดับประเทศ และที่ปรึกษาองค์กรภาครัฐและเอกชน',
     generation_label: 'รุ่น 40',
     generationNumber: 40,
-    votes: 128,
+    votes: 164,
   },
   {
     id: 104,
     name: 'แพรวา สุวรรณรัตน์',
     studentId: '62010030',
-    company: 'DataMetrics Ltd.',
+    company: 'DataMetrics Global',
     position: 'Principal Data Scientist',
     avatar_url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80',
-    description: 'ผู้บุกเบิกการวิเคราะห์ข้อมูล Big Data เพื่อสังคม',
+    description: 'ผู้บุกเบิกการวิเคราะห์ข้อมูล Big Data เพื่อสังคมและขับเคลื่อนโครงการ Open Data',
     generation_label: 'รุ่น 41',
     generationNumber: 41,
-    votes: 95,
+    votes: 132,
   },
   {
     id: 105,
@@ -100,10 +105,10 @@ const DEFAULT_CANDIDATES: Candidate[] = [
     company: 'CloudWorks TH',
     position: 'DevOps & Infrastructure Lead',
     avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80',
-    description: 'ผู้จัดการระบบคลาวด์ขนาดใหญ่และสนับสนุนทุนการศึกษาศิษย์เก่า',
+    description: 'ผู้จัดการระบบคลาวด์สเกลใหญ่และผู้สนับสนุนทุนการศึกษาแก่น้องๆ สาขาวิทยาการคอมพิวเตอร์',
     generation_label: 'รุ่น 42',
     generationNumber: 42,
-    votes: 72,
+    votes: 108,
   },
   {
     id: 106,
@@ -112,22 +117,22 @@ const DEFAULT_CANDIDATES: Candidate[] = [
     company: 'UX Design Studio',
     position: 'Head of Product Design',
     avatar_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80',
-    description: 'ผู้ออกแบบแอปพลิเคชันที่มีผู้ใช้งานกว่า 1 ล้านคนทั่วประเทศ',
+    description: 'ผู้ออกแบบแอปพลิเคชันที่มีผู้ใช้งานกว่า 1 ล้านคน และอาจารย์พิเศษด้าน Human-Computer Interaction',
     generation_label: 'รุ่น 43',
     generationNumber: 43,
-    votes: 48,
+    votes: 92,
   },
   {
     id: 107,
     name: 'วรพล ทองคำ',
     studentId: '57010088',
     company: 'Kasikorn Bank',
-    position: 'VP, Digital Banking',
+    position: 'VP, Digital Banking Platform',
     avatar_url: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&auto=format&fit=crop&q=80',
-    description: 'นักพัฒนาระบบธนาคารดิจิทัลชั้นนำของประเทศ',
+    description: 'นักพัฒนาระบบธนาคารดิจิทัลชั้นนำของประเทศและผู้ร่วมจัดกิจกรรม Alumni Hackathon',
     generation_label: 'รุ่น 33',
     generationNumber: 33,
-    votes: 61,
+    votes: 84,
   },
   {
     id: 108,
@@ -136,10 +141,34 @@ const DEFAULT_CANDIDATES: Candidate[] = [
     company: 'LINE MAN Wongnai',
     position: 'Senior Product Manager',
     avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
-    description: 'ผู้บริหารผลิตภัณฑ์ดิจิทัลที่มียอดใช้งานหลักล้านคนต่อวัน',
+    description: 'ผู้บริหารผลิตภัณฑ์ดิจิทัลยอดนิยม และผู้จัดกิจกรรม Mentorship ให้คำปรึกษารุ่นน้อง',
     generation_label: 'รุ่น 44',
     generationNumber: 44,
-    votes: 39,
+    votes: 68,
+  },
+  {
+    id: 109,
+    name: 'อนันต์ ทรงเจริญ',
+    studentId: '56010041',
+    company: 'AgriTech Solutions',
+    position: 'Founder & Managing Director',
+    avatar_url: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&auto=format&fit=crop&q=80',
+    description: 'ผู้ก่อตั้งระบบสมาร์ทฟาร์มด้วย IoT ผสานเกษตรกรรมกับเทคโนโลยีตามอัตลักษณ์แม่โจ้',
+    generation_label: 'รุ่น 32',
+    generationNumber: 32,
+    votes: 55,
+  },
+  {
+    id: 110,
+    name: 'ชิดชนก นิลพาณิชย์',
+    studentId: '65010018',
+    company: 'Shopee E-Commerce',
+    position: 'Frontend Tech Lead',
+    avatar_url: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400&auto=format&fit=crop&q=80',
+    description: 'วิศวกรซอฟต์แวร์รุ่นใหม่ไฟแรง ผู้ชนะรางวัลนวัตกรรมซอฟต์แวร์ระดับเยาวชนแห่งชาติ',
+    generation_label: 'รุ่น 45',
+    generationNumber: 45,
+    votes: 43,
   },
 ];
 
@@ -153,7 +182,7 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
       initialCandidates && initialCandidates.length >= 3
         ? initialCandidates.map((c, i) => ({
             ...c,
-            votes: c.votes && c.votes > 0 ? c.votes : Math.max(10, 184 - i * 28),
+            votes: c.votes && c.votes > 0 ? c.votes : Math.max(10, 248 - i * 22),
           }))
         : DEFAULT_CANDIDATES;
     return [...raw].sort((a, b) => (b.votes || 0) - (a.votes || 0));
@@ -167,8 +196,17 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
   const [votingId, setVotingId] = useState<number | null>(null);
   const [selectedGen, setSelectedGen] = useState<number | null>(null);
   const [voteAnimId, setVoteAnimId] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  /* ── Sync candidates when initial changes ── */
+  useEffect(() => {
+    if (query.trim() === '') {
+      setCandidates(mergedInitial);
+    }
+  }, [mergedInitial, query]);
 
   /* ── Generation list derived from merged data ── */
   const generations = useMemo(() => {
@@ -197,7 +235,7 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
         if (data.results && data.results.length > 0) {
           setCandidates([...data.results].sort((a, b) => (b.votes || 0) - (a.votes || 0)));
         } else {
-          // Client-side fallback: search by name OR studentId
+          // Client-side fallback: search by name, studentId, company, position
           const q = query.toLowerCase().trim();
           const filtered = mergedInitial.filter(
             (c) =>
@@ -211,7 +249,6 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
           setCandidates(filtered);
         }
       } catch {
-        // Fallback search on error
         const q = query.toLowerCase().trim();
         const filtered = mergedInitial.filter(
           (c) =>
@@ -225,8 +262,10 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
       } finally {
         setIsSearchLoading(false);
       }
-    }, 280);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    }, 250);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [query, mergedInitial]);
 
   /* ── Vote handler ── */
@@ -246,11 +285,15 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
     setVotedIds((prev) => ({ ...prev, [candidateId]: true }));
 
     try {
-      await fetch('/api/hof/vote', {
+      const res = await fetch('/api/hof/vote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ candidateId }),
       });
+      const data = await res.json();
+      if (data.success) {
+        notifyPointsUpdated(data.pointsAwarded || 10);
+      }
     } catch (err) {
       console.error('Vote failed:', err);
     } finally {
@@ -261,169 +304,126 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
   /* ── Derived display data ── */
   const isSearchActive = query.trim().length > 0;
 
-  // Top 3 from sorted full list (only when not searching)
+  // Top 3 from sorted full list
   const top1 = mergedInitial[0];
   const top2 = mergedInitial[1];
   const top3 = mergedInitial[2];
   const maxVotes = top1?.votes || 1;
 
-  // Grid cards: filtered by generation + search
-  const gridCandidates = useMemo(() => {
+  // List candidates for table (when no filter/search, show #4 onwards; when filtered/searched, show filtered items)
+  const remainingCandidates = useMemo(() => {
     let list = isSearchActive ? candidates : mergedInitial;
     if (!isSearchActive && selectedGen !== null) {
       list = list.filter((c) => c.generationNumber === selectedGen);
     }
     if (!isSearchActive && selectedGen === null) {
-      list = list.slice(3); // hide top 3 when showing all (they're in podium)
+      list = list.slice(3); // Rank 4 onwards
     }
     return list;
   }, [isSearchActive, candidates, mergedInitial, selectedGen]);
 
+  const totalVotesCount = useMemo(() => {
+    return candidates.reduce((sum, c) => sum + (c.votes || 0), 0);
+  }, [candidates]);
+
   const hasActiveFilter = isSearchActive || selectedGen !== null;
-
-  /* ── Vote button renderer ── */
-  const VoteButton = ({
-    candidate,
-    size = 'sm',
-  }: {
-    candidate: Candidate;
-    size?: 'sm' | 'lg';
-  }) => {
-    const voted = votedIds[candidate.id];
-    const isVoting = votingId === candidate.id;
-    const animating = voteAnimId === candidate.id;
-
-    return (
-      <button
-        onClick={(e) => handleVote(e, candidate.id)}
-        disabled={voted || isVoting}
-        style={{ transform: animating ? 'scale(0.88)' : 'scale(1)', transition: 'transform 0.15s ease' }}
-        className={`inline-flex items-center gap-1.5 font-bold rounded-full transition-all duration-200 shadow-sm cursor-pointer disabled:cursor-default
-          ${size === 'lg' ? 'px-5 py-2.5 text-sm' : 'px-3.5 py-1.5 text-xs'}
-          ${
-            voted
-              ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-              : 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white hover:opacity-90 active:scale-95'
-          }`}
-      >
-        {isVoting ? (
-          <Loader2 className={`animate-spin ${size === 'lg' ? 'h-4 w-4' : 'h-3.5 w-3.5'}`} />
-        ) : voted ? (
-          <CheckCircle2 className={size === 'lg' ? 'h-4 w-4' : 'h-3.5 w-3.5'} />
-        ) : (
-          <Heart className={size === 'lg' ? 'h-4 w-4' : 'h-3.5 w-3.5'} />
-        )}
-        <span>{voted ? 'โหวตแล้ว' : 'โหวต'}</span>
-      </button>
-    );
-  };
 
   /* ═══════════════════════════════════════════
      RENDER
   ═══════════════════════════════════════════ */
   return (
-    <div className="space-y-8 max-w-7xl mx-auto px-2 sm:px-4 py-2">
+    <div className="space-y-6 sm:space-y-8 max-w-6xl mx-auto px-2 sm:px-4 py-2">
 
       {/* ╔══════════════════════════════════════════╗
-          ║  1. HERO BANNER                          ║
+          ║  1. HERO BANNER - SOFT PASTEL THEME      ║
           ╚══════════════════════════════════════════╝ */}
-      <div
-        className="relative overflow-hidden rounded-3xl text-white shadow-xl"
-        style={{
-          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 40%, #0f3460 70%, #533483 100%)',
-        }}
-      >
-        {/* Decorative blobs */}
-        <div
-          className="absolute -top-12 -right-12 h-64 w-64 rounded-full opacity-20 blur-3xl pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #f59e0b, transparent)' }}
-        />
-        <div
-          className="absolute -bottom-16 -left-8 h-56 w-56 rounded-full opacity-15 blur-3xl pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #a855f7, transparent)' }}
-        />
-        {/* Dot pattern */}
-        <div
-          className="absolute inset-0 opacity-5 pointer-events-none"
-          style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.6) 1px, transparent 1px)', backgroundSize: '28px 28px' }}
-        />
+      <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-violet-100 via-pink-50 to-amber-100 border border-pink-200/60 p-6 sm:p-8 shadow-sm">
+        {/* Soft pastel decorative glow circles */}
+        <div className="absolute -top-12 -right-12 h-56 w-56 rounded-full bg-rose-200/40 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-12 left-1/4 h-48 w-48 rounded-full bg-violet-200/40 blur-2xl pointer-events-none" />
+        <div className="absolute top-0 left-0 h-40 w-40 rounded-full bg-amber-200/30 blur-2xl pointer-events-none" />
+        
+        {/* Floating subtle star sparkles */}
+        <div className="absolute top-5 right-8 text-pink-300 hidden sm:block animate-pulse">
+          <Sparkles className="h-6 w-6" />
+        </div>
+        <div className="absolute bottom-5 left-1/3 text-amber-300/80 hidden sm:block">
+          <Star className="h-4 w-4 fill-amber-200" />
+        </div>
 
-        <div className="relative z-10 p-6 sm:p-10">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
-            <div className="space-y-2 max-w-2xl">
-              <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold border border-amber-400/30 bg-amber-500/15 text-amber-300 backdrop-blur-sm">
-                <Crown className="h-3.5 w-3.5" />
-                <span>ทำเนียบเกียรติยศ • CS MJU</span>
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-                ศิษย์เก่าดีเด่น{' '}
-                <span
-                  style={{
-                    background: 'linear-gradient(90deg, #fbbf24, #f97316)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                  }}
-                >
-                  Hall of Fame
-                </span>
-              </h1>
-              <p className="text-sm text-white/70 leading-relaxed">
-                ร่วมเชิดชูเกียรติและโหวตสนับสนุนศิษย์เก่าผู้สร้างคุณประโยชน์อันโดดเด่นแก่สังคมและสถาบัน
-              </p>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2 max-w-2xl">
+            <div className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-bold bg-white/80 backdrop-blur-sm border border-violet-200/70 text-violet-700 shadow-2xs">
+              <Crown className="h-3.5 w-3.5 text-amber-500 fill-amber-400" />
+              <span>ทำเนียบเกียรติยศ • CS แม่โจ้</span>
             </div>
 
-            <div className="flex gap-3 shrink-0">
-              <div className="flex flex-col items-center justify-center bg-white/10 backdrop-blur-md rounded-2xl px-5 py-3 border border-white/15">
-                <span className="text-2xl font-black text-amber-300">{mergedInitial.length}</span>
-                <span className="text-[11px] text-white/60 font-semibold mt-0.5">ผู้สมัคร</span>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-800 tracking-tight leading-tight flex items-center gap-2 flex-wrap">
+              <span>ศิษย์เก่าดีเด่น</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 via-pink-500 to-amber-500 font-extrabold">
+                Hall of Fame
+              </span>
+              <span className="text-2xl">✨</span>
+            </h1>
+
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
+              ร่วมส่งกำลังใจและโหวตสนับสนุนศิษย์เก่าคนเก่ง ผู้สร้างแรงบันดาลใจและคุณประโยชน์แก่สังคม 💖
+            </p>
+          </div>
+
+          {/* Stats Pills in Soft Pastel */}
+          <div className="flex gap-2.5 shrink-0">
+            <div className="flex flex-col items-center justify-center bg-white/85 backdrop-blur-md rounded-2xl px-4 py-2.5 sm:px-5 sm:py-3 border border-pink-200/70 shadow-2xs">
+              <div className="flex items-center gap-1 text-violet-600 text-xs font-bold">
+                <Users className="h-3.5 w-3.5 text-violet-500" />
+                <span>ผู้ได้รับการเสนอชื่อ</span>
               </div>
-              <div className="flex flex-col items-center justify-center bg-white/10 backdrop-blur-md rounded-2xl px-5 py-3 border border-white/15">
-                <span className="text-2xl font-black text-emerald-300">
-                  {Object.values(candidates).reduce((sum, c) => sum + (c.votes || 0), 0).toLocaleString()}
-                </span>
-                <span className="text-[11px] text-white/60 font-semibold mt-0.5">คะแนนรวม</span>
+              <span className="text-xl sm:text-2xl font-black text-slate-800 mt-0.5">
+                {mergedInitial.length} <span className="text-xs font-normal text-slate-400">ท่าน</span>
+              </span>
+            </div>
+
+            <div className="flex flex-col items-center justify-center bg-white/85 backdrop-blur-md rounded-2xl px-4 py-2.5 sm:px-5 sm:py-3 border border-pink-200/70 shadow-2xs">
+              <div className="flex items-center gap-1 text-rose-600 text-xs font-bold">
+                <Heart className="h-3.5 w-3.5 fill-rose-400 text-rose-400" />
+                <span>คะแนนโหวตรวม</span>
               </div>
+              <span className="text-xl sm:text-2xl font-black text-slate-800 mt-0.5">
+                {totalVotesCount.toLocaleString()} <span className="text-xs font-normal text-slate-400">โหวต</span>
+              </span>
             </div>
           </div>
         </div>
       </div>
 
       {/* ╔══════════════════════════════════════════╗
-          ║  2. TOP 3 PODIUM                         ║
+          ║  2. TOP 3 - FLOATING CIRCULAR AVATARS    ║
           ╚══════════════════════════════════════════╝ */}
-      {!isSearchActive && top1 && top2 && top3 && (
-        <section
-          className="relative overflow-hidden rounded-3xl border shadow-xl p-6 sm:p-10"
-          style={{
-            background: 'linear-gradient(160deg, #fffbeb 0%, #ffffff 50%, #fff7ed 100%)',
-            borderColor: 'rgba(251,191,36,0.3)',
-          }}
-        >
-          {/* Subtle sparkle dots */}
-          <div
-            className="absolute inset-0 pointer-events-none opacity-30"
-            style={{ backgroundImage: 'radial-gradient(rgba(251,191,36,0.4) 1.2px, transparent 1.2px)', backgroundSize: '36px 36px' }}
-          />
+      {!isSearchActive && selectedGen === null && top1 && top2 && top3 && (
+        <section className="relative rounded-[36px] border border-violet-100 bg-gradient-to-b from-white via-violet-50/30 to-pink-50/20 p-6 sm:p-9 shadow-xs overflow-hidden">
+          {/* Subtle background pastel glow aura */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-72 w-96 rounded-full bg-gradient-to-r from-amber-100/60 via-pink-100/50 to-violet-100/60 blur-3xl pointer-events-none" />
 
-          {/* Section header */}
-          <div className="relative z-10 mb-8 text-center">
-            <div className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-1.5 text-xs font-bold text-white shadow-md mb-3">
-              <Trophy className="h-4 w-4" />
-              <span>อันดับสูงสุดจากคะแนนโหวต</span>
+          {/* Section Header */}
+          <div className="relative z-10 text-center mb-8 space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-white/90 border border-amber-200/80 px-3.5 py-1 text-xs font-bold text-amber-700 shadow-2xs">
+              <Sparkles className="h-3.5 w-3.5 text-amber-500 fill-amber-400" />
+              <span>TOP 3 LEADERBOARD</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-              ผู้นำตารางคะแนน Top 3 🏆
+            <h2 className="text-xl sm:text-2xl font-black text-slate-800 flex items-center justify-center gap-2">
+              <span>ผู้นำคะแนนโหวต 3 อันดับแรก</span>
+              <span>🏆</span>
             </h2>
-            <p className="mt-1.5 text-sm text-slate-500">
-              ผู้ได้รับการโหวตสูงสุดจากศิษย์เก่าและนักศึกษาทุกรุ่น
+            <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
+              ศิษย์เก่าที่ได้รับคะแนนโหวตและกำลังใจสูงสุดจากพี่น้องทุกรุ่น
             </p>
           </div>
 
-          {/* Podium: 2nd | 1st | 3rd */}
-          <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-5 items-end max-w-4xl mx-auto">
-
-            {/* ── Rank 2 (Silver / Left) ── */}
-            <PodiumCard
+          {/* Floating Circular Top 3 Cards (2nd | 1st | 3rd) */}
+          <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6 items-end max-w-4xl mx-auto">
+            
+            {/* 🥈 Rank 2 (Left / Floating Pastel Sky-Lavender) */}
+            <FloatingTopCard
               candidate={top2}
               rank={2}
               maxVotes={maxVotes}
@@ -431,23 +431,13 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
               isVoting={votingId === top2.id}
               animating={voteAnimId === top2.id}
               onVote={(e) => handleVote(e, top2.id)}
-              podiumHeight="h-14"
-              podiumColors="from-slate-300 to-slate-200"
-              podiumTextColor="text-slate-600"
-              cardBorder="border-slate-200"
-              cardRing=""
-              badgeColors="from-slate-400 to-slate-300"
-              avatarRing="ring-slate-200"
-              genBg="bg-slate-100"
-              genText="text-slate-600"
-              voteCountColor="text-slate-700"
-              voteButtonColors="from-slate-700 to-slate-900"
+              onSelect={() => setSelectedCandidate(top2)}
+              theme="silver"
               className="order-2 md:order-1"
-              imgSize="h-24 w-24"
             />
 
-            {/* ── Rank 1 (Gold / Center) ── */}
-            <PodiumCard
+            {/* 🥇 Rank 1 (Center / Floating Pastel Gold - Center Stage) */}
+            <FloatingTopCard
               candidate={top1}
               rank={1}
               maxVotes={maxVotes}
@@ -455,24 +445,14 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
               isVoting={votingId === top1.id}
               animating={voteAnimId === top1.id}
               onVote={(e) => handleVote(e, top1.id)}
-              podiumHeight="h-24"
-              podiumColors="from-amber-400 to-amber-300"
-              podiumTextColor="text-amber-900"
-              cardBorder="border-amber-400"
-              cardRing="ring-4 ring-amber-100"
-              badgeColors="from-amber-500 to-yellow-400"
-              avatarRing="ring-amber-400"
-              genBg="bg-amber-100"
-              genText="text-amber-800"
-              voteCountColor="text-amber-600"
-              voteButtonColors="from-amber-500 to-orange-500"
-              className="order-1 md:order-2 md:-mt-8 z-10"
-              imgSize="h-28 w-28"
+              onSelect={() => setSelectedCandidate(top1)}
+              theme="gold"
               isChampion
+              className="order-1 md:order-2 md:-translate-y-4 z-10"
             />
 
-            {/* ── Rank 3 (Bronze / Right) ── */}
-            <PodiumCard
+            {/* 🥉 Rank 3 (Right / Floating Pastel Peach-Rose) */}
+            <FloatingTopCard
               candidate={top3}
               rank={3}
               maxVotes={maxVotes}
@@ -480,81 +460,104 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
               isVoting={votingId === top3.id}
               animating={voteAnimId === top3.id}
               onVote={(e) => handleVote(e, top3.id)}
-              podiumHeight="h-10"
-              podiumColors="from-orange-300 to-amber-200"
-              podiumTextColor="text-orange-900"
-              cardBorder="border-orange-200"
-              cardRing=""
-              badgeColors="from-amber-700 to-orange-400"
-              avatarRing="ring-orange-200"
-              genBg="bg-orange-100"
-              genText="text-orange-700"
-              voteCountColor="text-slate-700"
-              voteButtonColors="from-orange-600 to-amber-700"
+              onSelect={() => setSelectedCandidate(top3)}
+              theme="bronze"
               className="order-3 md:order-3"
-              imgSize="h-24 w-24"
             />
           </div>
         </section>
       )}
 
       {/* ╔══════════════════════════════════════════╗
-          ║  3. SEARCH BAR                           ║
+          ║  3. SEARCH & FILTER TOOLBAR              ║
           ╚══════════════════════════════════════════╝ */}
-      <section className="bg-white rounded-3xl border border-slate-200/90 shadow-md p-4 sm:p-5 space-y-3">
+      <section className="bg-white rounded-3xl border border-slate-200/70 shadow-xs p-4 sm:p-5 space-y-3.5">
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-          {/* Label */}
-          <div className="shrink-0">
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-amber-500" />
-              ค้นหาและโหวตศิษย์เก่าดีเด่น
+          <div>
+            <h3 className="text-sm sm:text-base font-extrabold text-slate-800 flex items-center gap-2">
+              <Award className="h-4 w-4 text-violet-500" />
+              <span>รายชื่อศิษย์เก่าดีเด่น</span>
+              {!isSearchActive && selectedGen === null && (
+                <span className="text-xs font-bold text-violet-700 bg-violet-50 border border-violet-200/70 px-2.5 py-0.5 rounded-full">
+                  อันดับ 4 เป็นต้นไป
+                </span>
+              )}
             </h3>
-            <p className="text-xs text-slate-500 mt-0.5">ค้นหาจากชื่อหรือรหัสนักศึกษา แล้วร่วมโหวตสนับสนุน</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              ค้นหาตามชื่อ รหัสนักศึกษา หรือเลือกกรองตามรุ่น
+            </p>
           </div>
 
-          {/* Search input */}
-          <div className="relative flex-1 sm:max-w-sm">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="ชื่อ หรือ รหัสนักศึกษา เช่น 60010001..."
-              id="hof-search-input"
-              className="w-full h-11 rounded-2xl border border-slate-200 bg-slate-50/70 pl-10 pr-9 text-sm text-slate-800 placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-100 transition-all shadow-xs"
-            />
-            {isSearchLoading && (
-              <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-amber-500 animate-spin" />
-            )}
-            {query && !isSearchLoading && (
+          <div className="flex items-center gap-2.5">
+            {/* Search Input */}
+            <div className="relative flex-1 sm:w-72">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="ค้นหาชื่อ หรือ รหัสนักศึกษา..."
+                id="hof-search-input"
+                className="w-full h-10 rounded-2xl border border-slate-200 bg-slate-50/70 pl-9 pr-8 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-100 transition-all"
+              />
+              {isSearchLoading && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-violet-500 animate-spin" />
+              )}
+              {query && !isSearchLoading && (
+                <button
+                  onClick={() => setQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* View Mode Toggle */}
+            <div className="hidden sm:flex items-center bg-slate-100/80 p-1 rounded-2xl border border-slate-200/60">
               <button
-                onClick={() => setQuery('')}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                onClick={() => setViewMode('table')}
+                title="มุมมองตาราง/รายการ"
+                className={`p-1.5 rounded-xl transition-all cursor-pointer ${
+                  viewMode === 'table'
+                    ? 'bg-white text-violet-700 shadow-xs font-bold'
+                    : 'text-slate-400 hover:text-slate-600'
+                }`}
               >
-                <X className="h-4 w-4" />
+                <LayoutList className="h-4 w-4" />
               </button>
-            )}
+              <button
+                onClick={() => setViewMode('cards')}
+                title="มุมมองการ์ด"
+                className={`p-1.5 rounded-xl transition-all cursor-pointer ${
+                  viewMode === 'cards'
+                    ? 'bg-white text-violet-700 shadow-xs font-bold'
+                    : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Generation filter chips */}
+        {/* Generation Filter Chips in Soft Pastel */}
         {!isSearchActive && (
-          <div className="flex items-center gap-2 pt-2 border-t border-slate-100 overflow-x-auto scrollbar-hide pb-1">
-            <span className="text-xs font-bold text-slate-500 shrink-0 flex items-center gap-1">
-              <GraduationCap className="h-3.5 w-3.5" />
-              เลือกรุ่น:
+          <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100 overflow-x-auto scrollbar-hide pb-0.5">
+            <span className="text-xs font-bold text-slate-400 shrink-0 flex items-center gap-1 mr-1">
+              <GraduationCap className="h-3.5 w-3.5 text-slate-400" />
+              รุ่น:
             </span>
 
-            {/* All generations chip */}
             <button
               onClick={() => setSelectedGen(null)}
-              className={`shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+              className={`shrink-0 px-3.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 selectedGen === null
-                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
               }`}
             >
-              ทุกรุ่น
+              ทั้งหมด
             </button>
 
             {generations.map((genNum) => {
@@ -563,113 +566,219 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
                 <button
                   key={genNum}
                   onClick={() => setSelectedGen(genNum === selectedGen ? null : genNum)}
-                  className={`shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                  className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     selectedGen === genNum
-                      ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200'
+                      ? 'bg-violet-600 text-white shadow-xs'
+                      : 'bg-violet-50/70 text-violet-800 border border-violet-200/60 hover:bg-violet-100/80'
                   }`}
                 >
                   รุ่น {genNum}
-                  {count > 0 && (
-                    <span
-                      className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-black ${
-                        selectedGen === genNum ? 'bg-white/25 text-white' : 'bg-amber-100 text-amber-700'
-                      }`}
-                    >
-                      {count}
-                    </span>
-                  )}
+                  <span
+                    className={`inline-flex items-center justify-center text-[10px] font-black px-1.5 py-0.2 rounded-full ${
+                      selectedGen === genNum ? 'bg-white/30 text-white' : 'bg-violet-200/80 text-violet-900'
+                    }`}
+                  >
+                    {count}
+                  </span>
                 </button>
               );
             })}
 
             {hasActiveFilter && (
               <button
-                onClick={() => { setSelectedGen(null); setQuery(''); }}
-                className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 transition-colors cursor-pointer"
+                onClick={() => {
+                  setSelectedGen(null);
+                  setQuery('');
+                }}
+                className="shrink-0 ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 transition-colors cursor-pointer"
               >
                 <RotateCcw className="h-3 w-3" />
-                รีเซ็ต
+                ล้างตัวกรอง
               </button>
             )}
-
-            <span className="ml-auto text-[11px] font-semibold text-slate-400 shrink-0 hidden sm:inline">
-              แสดง {isSearchActive ? candidates.length : (selectedGen !== null ? gridCandidates.length : mergedInitial.length)} รายการ
-            </span>
           </div>
         )}
       </section>
 
       {/* ╔══════════════════════════════════════════╗
-          ║  4. GENERATION SECTION HEADER            ║
+          ║  4. LEADERBOARD TABLE / LIST (RANK 4+)   ║
           ╚══════════════════════════════════════════╝ */}
-      {!isSearchActive && selectedGen !== null && (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-1.5 rounded-full bg-gradient-to-b from-amber-500 to-orange-500" />
-            <div>
-              <h3 className="font-extrabold text-slate-900 text-base">
-                ศิษย์เก่าดีเด่น รุ่น {selectedGen}
-              </h3>
-              <p className="text-xs text-slate-500">{gridCandidates.length} รายชื่อ</p>
-            </div>
+      {remainingCandidates.length === 0 && !isSearchLoading ? (
+        <div className="bg-white rounded-3xl border border-slate-100 p-12 text-center shadow-xs">
+          <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-500 mb-3">
+            <Trophy className="h-7 w-7" />
           </div>
-          <button
-            onClick={() => setSelectedGen(null)}
-            className="text-xs text-indigo-600 font-bold hover:text-indigo-800 transition-colors cursor-pointer flex items-center gap-1"
-          >
-            ดูทุกรุ่น <ChevronRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
-
-      {isSearchActive && (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-1.5 rounded-full bg-gradient-to-b from-indigo-500 to-purple-500" />
-            <div>
-              <h3 className="font-extrabold text-slate-900 text-base">
-                ผลการค้นหา "{query}"
-              </h3>
-              <p className="text-xs text-slate-500">พบ {candidates.length} รายชื่อ</p>
-            </div>
-          </div>
-          <button
-            onClick={() => setQuery('')}
-            className="text-xs text-rose-500 font-bold hover:text-rose-700 transition-colors cursor-pointer flex items-center gap-1"
-          >
-            <X className="h-3.5 w-3.5" /> ล้างการค้นหา
-          </button>
-        </div>
-      )}
-
-      {/* ╔══════════════════════════════════════════╗
-          ║  5. CARDS GRID                           ║
-          ╚══════════════════════════════════════════╝ */}
-      {gridCandidates.length === 0 && !isSearchLoading ? (
-        <div className="bg-white rounded-3xl border border-slate-100 p-14 text-center shadow-xs">
-          <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 mb-4">
-            <Trophy className="h-8 w-8 text-slate-300" />
-          </div>
-          <h3 className="text-base font-bold text-slate-700">ไม่พบข้อมูลที่ตรงกับเงื่อนไข</h3>
+          <h3 className="text-base font-bold text-slate-800">ไม่พบรายชื่อที่ตรงกับการค้นหา</h3>
           <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
             {isSearchActive
-              ? `ไม่พบศิษย์เก่าจากคำค้น "${query}" ลองค้นหาด้วยชื่อหรือรหัสนักศึกษา`
-              : `รุ่น ${selectedGen} ยังไม่มีข้อมูลในระบบ`}
+              ? `ไม่พบข้อมูลจากคำค้นหา "${query}" ลองค้นหาด้วยชื่ออื่น`
+              : `ยังไม่มีข้อมูลเพิ่มเติมในหมวดหมู่นี้`}
           </p>
           <button
-            onClick={() => { setQuery(''); setSelectedGen(null); }}
-            className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-full hover:bg-indigo-700 transition-colors cursor-pointer"
+            onClick={() => {
+              setQuery('');
+              setSelectedGen(null);
+            }}
+            className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-full hover:bg-slate-800 transition-colors cursor-pointer shadow-xs"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             แสดงทั้งหมด
           </button>
         </div>
+      ) : viewMode === 'table' ? (
+        /* ── TABLE / ROW LIST VIEW (Minimal & Clean) ── */
+        <div className="bg-white rounded-[28px] border border-slate-200/80 shadow-xs overflow-hidden">
+          {/* Desktop Table Header */}
+          <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3.5 bg-slate-50/90 border-b border-slate-200/70 text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+            <div className="col-span-1 text-center">อันดับ</div>
+            <div className="col-span-5">ศิษย์เก่า</div>
+            <div className="col-span-3">ตำแหน่ง & องค์กร</div>
+            <div className="col-span-3 text-right pr-2">คะแนนโหวต & สนับสนุน</div>
+          </div>
+
+          {/* List Rows */}
+          <div className="divide-y divide-slate-100">
+            {remainingCandidates.map((c, index) => {
+              const rankInFull = mergedInitial.findIndex((x) => x.id === c.id) + 1;
+              const displayRank = isSearchActive
+                ? index + 1
+                : selectedGen !== null
+                ? index + 1
+                : rankInFull;
+
+              const voted = votedIds[c.id];
+              const isVoting = votingId === c.id;
+              const animating = voteAnimId === c.id;
+              const votePercent = Math.min(100, Math.round(((c.votes || 0) / maxVotes) * 100));
+
+              return (
+                <div
+                  key={c.id}
+                  id={`hof-row-${c.id}`}
+                  onClick={() => setSelectedCandidate(c)}
+                  className="group p-4 sm:px-6 sm:py-3.5 transition-colors duration-150 hover:bg-violet-50/40 cursor-pointer flex flex-col md:grid md:grid-cols-12 md:gap-4 md:items-center gap-3"
+                >
+                  {/* Rank (Mobile & Desktop) */}
+                  <div className="flex items-center justify-between md:justify-center md:col-span-1">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex items-center justify-center font-black rounded-xl text-xs sm:text-sm ${
+                          displayRank <= 3
+                            ? 'h-8 w-8 bg-amber-50 text-amber-800 border border-amber-200/80 shadow-2xs'
+                            : 'h-7 w-7 sm:h-8 sm:w-8 bg-slate-100 text-slate-600 border border-slate-200/80'
+                        }`}
+                      >
+                        #{displayRank}
+                      </span>
+                      {displayRank === 4 && (
+                        <span className="md:hidden inline-flex items-center gap-1 text-[11px] font-bold text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full border border-pink-200/70">
+                          <Flame className="h-3 w-3 fill-pink-500 text-pink-500" />
+                          กำลังมาแรง
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Mobile Vote button (Top Right on Mobile) */}
+                    <div className="md:hidden">
+                      <VoteButton
+                        voted={voted}
+                        isVoting={isVoting}
+                        animating={animating}
+                        onVote={(e) => handleVote(e, c.id)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Alumni Info with Circular Avatar */}
+                  <div className="md:col-span-5 flex items-center gap-3.5 min-w-0">
+                    <div className="relative shrink-0">
+                      <img
+                        src={c.avatar_url}
+                        alt={c.name}
+                        className="h-11 w-11 sm:h-12 sm:w-12 rounded-full object-cover ring-2 ring-violet-100 group-hover:ring-violet-300 transition-all shadow-2xs"
+                      />
+                      {voted && (
+                        <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white rounded-full p-0.5 shadow-xs">
+                          <CheckCircle2 className="h-3 w-3" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-extrabold text-slate-800 text-sm sm:text-base leading-snug group-hover:text-violet-700 transition-colors truncate">
+                          {c.name}
+                        </h4>
+                        <span className="shrink-0 text-[10px] font-bold bg-violet-50 text-violet-700 px-2 py-0.5 rounded-md border border-violet-200/70">
+                          {c.generation_label}
+                        </span>
+                      </div>
+
+                      {c.studentId && (
+                        <p className="text-[11px] font-mono text-slate-400 mt-0.5">
+                          รหัส: {c.studentId}
+                        </p>
+                      )}
+
+                      <p className="text-xs text-slate-500 truncate mt-0.5 md:hidden">
+                        {c.position} • {c.company}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Position & Company (Desktop) */}
+                  <div className="hidden md:block md:col-span-3 min-w-0">
+                    <p className="text-xs font-bold text-slate-800 truncate">{c.position}</p>
+                    <p className="text-xs text-violet-600 font-medium truncate flex items-center gap-1 mt-0.5">
+                      <Building2 className="h-3 w-3 shrink-0 text-violet-400" />
+                      <span>{c.company}</span>
+                    </p>
+                  </div>
+
+                  {/* Vote Progress & Action (Desktop & Mobile) */}
+                  <div className="md:col-span-3 flex items-center justify-between md:justify-end gap-3.5">
+                    {/* Progress Bar & Count */}
+                    <div className="flex-1 md:max-w-[120px] text-left md:text-right">
+                      <div className="flex items-center justify-between md:justify-end gap-1.5 mb-1">
+                        <span className="text-[11px] text-slate-400 font-medium md:hidden">คะแนน</span>
+                        <span className="text-xs font-black text-slate-800">
+                          {c.votes || 0} <span className="text-[10px] font-normal text-slate-400">โหวต</span>
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden w-full">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-violet-400 via-pink-400 to-amber-400 transition-all duration-500"
+                          style={{ width: `${votePercent}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Desktop Vote Button */}
+                    <div className="hidden md:block shrink-0">
+                      <VoteButton
+                        voted={voted}
+                        isVoting={isVoting}
+                        animating={animating}
+                        onVote={(e) => handleVote(e, c.id)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       ) : (
-        <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {gridCandidates.map((c, index) => {
+        /* ── CARD GRID VIEW (Optional switch) ── */
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {remainingCandidates.map((c, index) => {
             const rankInFull = mergedInitial.findIndex((x) => x.id === c.id) + 1;
-            const displayRank = isSearchActive ? index + 1 : selectedGen !== null ? index + 1 : rankInFull;
+            const displayRank = isSearchActive
+              ? index + 1
+              : selectedGen !== null
+              ? index + 1
+              : rankInFull;
+
             const voted = votedIds[c.id];
             const isVoting = votingId === c.id;
             const animating = voteAnimId === c.id;
@@ -677,124 +786,193 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
             return (
               <div
                 key={c.id}
-                id={`hof-card-${c.id}`}
-                className="group flex flex-col justify-between rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:border-amber-200"
+                onClick={() => setSelectedCandidate(c)}
+                className="group flex flex-col justify-between rounded-3xl border border-slate-200/70 bg-white p-4 sm:p-5 shadow-2xs transition-all duration-200 hover:-translate-y-1 hover:shadow-md hover:border-violet-300 cursor-pointer"
               >
                 <div>
-                  {/* Image + Rank + Generation badge */}
-                  <div className="relative mb-4 overflow-hidden rounded-2xl bg-slate-100 aspect-[4/3]">
+                  <div className="relative mb-3.5 overflow-hidden rounded-2xl bg-slate-100 aspect-[4/3]">
                     <img
                       src={c.avatar_url}
                       alt={c.name}
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
-                    {/* Rank badge */}
-                    <div className="absolute top-3 left-3 flex h-7 w-7 items-center justify-center rounded-xl bg-slate-900/80 backdrop-blur-sm text-white font-black text-xs shadow-md">
+                    <div className="absolute top-2.5 left-2.5 flex h-7 w-7 items-center justify-center rounded-xl bg-slate-900/80 backdrop-blur-sm text-white font-black text-xs shadow-2xs">
                       #{displayRank}
                     </div>
-                    {/* Generation badge */}
-                    {c.generation_label && (
-                      <div className="absolute top-3 right-3">
-                        <span className="rounded-full bg-white/90 backdrop-blur-sm px-2.5 py-0.5 text-xs font-bold text-slate-700 shadow-sm">
-                          {c.generation_label}
-                        </span>
-                      </div>
-                    )}
-                    {/* Voted overlay */}
-                    {voted && (
-                      <div className="absolute inset-0 bg-emerald-600/10 flex items-end justify-end p-3">
-                        <span className="rounded-full bg-emerald-500 text-white text-[10px] font-black px-2 py-0.5 flex items-center gap-1 shadow">
-                          <CheckCircle2 className="h-3 w-3" /> โหวตแล้ว
-                        </span>
-                      </div>
-                    )}
+                    <div className="absolute top-2.5 right-2.5">
+                      <span className="rounded-full bg-white/90 backdrop-blur-sm px-2.5 py-0.5 text-xs font-bold text-slate-700 shadow-2xs">
+                        {c.generation_label}
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Info */}
-                  <div className="space-y-1.5">
-                    <h4 className="font-extrabold text-slate-900 text-base leading-snug group-hover:text-amber-600 transition-colors">
-                      {c.name}
-                    </h4>
-                    {c.studentId && (
-                      <p className="text-[10px] font-mono text-slate-400">
-                        รหัสนักศึกษา: {c.studentId}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                      <Briefcase className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                      <span className="truncate">{c.position}</span>
-                    </div>
-                    {c.company && (
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600">
-                        <Building2 className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{c.company}</span>
-                      </div>
-                    )}
-                    {c.description && (
-                      <p className="mt-2 text-xs text-slate-500 line-clamp-2 leading-relaxed bg-slate-50 rounded-xl p-2.5 border border-slate-100">
-                        {c.description}
-                      </p>
-                    )}
-                  </div>
+                  <h4 className="font-extrabold text-slate-800 text-sm sm:text-base leading-snug group-hover:text-violet-700 transition-colors">
+                    {c.name}
+                  </h4>
+                  {c.studentId && (
+                    <p className="text-[11px] font-mono text-slate-400 mt-0.5">
+                      รหัสนักศึกษา: {c.studentId}
+                    </p>
+                  )}
+                  <p className="text-xs text-slate-600 truncate mt-1 flex items-center gap-1">
+                    <Briefcase className="h-3 w-3 text-slate-400 shrink-0" />
+                    <span>{c.position}</span>
+                  </p>
+                  <p className="text-xs text-violet-600 font-semibold truncate flex items-center gap-1 mt-0.5">
+                    <Building2 className="h-3 w-3 text-violet-400 shrink-0" />
+                    <span>{c.company}</span>
+                  </p>
                 </div>
 
-                {/* Vote footer */}
-                <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3.5">
-                  {/* Vote bar */}
-                  <div className="flex-1 mr-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] text-slate-400 font-medium">คะแนนโหวต</span>
-                      <span className="text-sm font-black text-slate-800">{c.votes || 0}</span>
-                    </div>
-                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-400 transition-all duration-700"
-                        style={{ width: `${Math.round(((c.votes || 0) / maxVotes) * 100)}%` }}
-                      />
-                    </div>
+                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-medium">คะแนนโหวต</span>
+                    <p className="text-sm font-black text-slate-800">{c.votes || 0}</p>
                   </div>
-
-                  {/* Vote button */}
-                  <button
-                    onClick={(e) => handleVote(e, c.id)}
-                    disabled={voted || isVoting}
-                    style={{ transform: animating ? 'scale(0.85)' : 'scale(1)', transition: 'transform 0.15s ease' }}
-                    className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition-all shadow-xs cursor-pointer disabled:cursor-default
-                      ${voted
-                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                        : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:opacity-90 active:scale-95'
-                      }`}
-                  >
-                    {isVoting ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : voted ? (
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                    ) : (
-                      <Heart className="h-3.5 w-3.5" />
-                    )}
-                    {voted ? 'โหวตแล้ว' : 'โหวต'}
-                  </button>
+                  <VoteButton
+                    voted={voted}
+                    isVoting={isVoting}
+                    animating={animating}
+                    onVote={(e) => handleVote(e, c.id)}
+                  />
                 </div>
               </div>
             );
           })}
-        </section>
+        </div>
       )}
 
-      {/* Show "rest" label when showing all (no filter, no search) */}
-      {!isSearchActive && selectedGen === null && gridCandidates.length === 0 && mergedInitial.length >= 3 && (
-        <p className="text-center text-xs text-slate-400 py-4">
-          ✨ ศิษย์เก่าดีเด่นอันดับ 1–3 แสดงอยู่ในพื้นที่ Podium ด้านบน
-        </p>
+      {/* ╔══════════════════════════════════════════╗
+          ║  5. CANDIDATE PROFILE MODAL (CUTE PASTEL)║
+          ╚══════════════════════════════════════════╝ */}
+      {selectedCandidate && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => setSelectedCandidate(null)}
+        >
+          <div
+            className="relative w-full max-w-md bg-white rounded-[32px] p-6 sm:p-7 shadow-2xl border border-violet-200/80 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setSelectedCandidate(null)}
+              className="absolute top-4 right-4 h-8 w-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            {/* Profile Circular Avatar + Badges */}
+            <div className="flex flex-col items-center text-center">
+              <div className="relative mb-3.5">
+                <img
+                  src={selectedCandidate.avatar_url}
+                  alt={selectedCandidate.name}
+                  className="h-24 w-24 rounded-full object-cover ring-4 ring-violet-200 shadow-md"
+                />
+                <span className="absolute -bottom-1 -right-1 text-xs font-bold bg-violet-600 text-white px-2.5 py-0.5 rounded-full shadow-xs">
+                  {selectedCandidate.generation_label}
+                </span>
+              </div>
+
+              <h3 className="text-lg font-black text-slate-800">{selectedCandidate.name}</h3>
+              {selectedCandidate.studentId && (
+                <p className="text-xs font-mono text-slate-400 mt-0.5">
+                  รหัสนักศึกษา: {selectedCandidate.studentId}
+                </p>
+              )}
+
+              <div className="mt-2 text-xs text-slate-600 font-medium">
+                <p>{selectedCandidate.position}</p>
+                <p className="text-violet-600 font-bold mt-0.5">{selectedCandidate.company}</p>
+              </div>
+
+              {/* Bio description */}
+              <div className="mt-4 p-3.5 bg-violet-50/60 rounded-2xl border border-violet-100 text-xs text-slate-600 leading-relaxed text-left w-full">
+                <p className="font-bold text-violet-900 mb-1 flex items-center gap-1">
+                  <Award className="h-3.5 w-3.5 text-violet-600" /> ผลงานและคุณประโยชน์:
+                </p>
+                {selectedCandidate.description}
+              </div>
+
+              {/* Vote Info & Action */}
+              <div className="mt-5 w-full flex items-center justify-between pt-3 border-t border-slate-100">
+                <div className="text-left">
+                  <span className="text-[11px] text-slate-400 font-medium">คะแนนโหวตปัจจุบัน</span>
+                  <p className="text-lg font-black text-violet-600">
+                    {selectedCandidate.votes || 0} <span className="text-xs font-normal text-slate-400">คะแนน</span>
+                  </p>
+                </div>
+
+                <VoteButton
+                  size="lg"
+                  voted={votedIds[selectedCandidate.id]}
+                  isVoting={votingId === selectedCandidate.id}
+                  animating={voteAnimId === selectedCandidate.id}
+                  onVote={(e) => handleVote(e, selectedCandidate.id)}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
 /* ═══════════════════════════════════════════════
-   SUB-COMPONENT: PodiumCard
+   SUB-COMPONENT: VoteButton
 ═══════════════════════════════════════════════ */
-interface PodiumCardProps {
+function VoteButton({
+  voted,
+  isVoting,
+  animating,
+  onVote,
+  size = 'sm',
+}: {
+  voted?: boolean;
+  isVoting?: boolean;
+  animating?: boolean;
+  onVote: (e: React.MouseEvent) => void;
+  size?: 'sm' | 'lg';
+}) {
+  return (
+    <button
+      onClick={onVote}
+      disabled={voted || isVoting}
+      style={{
+        transform: animating ? 'scale(0.85)' : 'scale(1)',
+        transition: 'transform 0.15s ease',
+      }}
+      className={`inline-flex items-center gap-1.5 font-bold rounded-full transition-all duration-200 shadow-2xs cursor-pointer disabled:cursor-default shrink-0
+        ${size === 'lg' ? 'px-5 py-2 text-xs sm:text-sm' : 'px-3.5 py-1.5 text-xs'}
+        ${
+          voted
+            ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+            : 'bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 text-white hover:opacity-95 hover:shadow-md hover:shadow-pink-500/20 active:scale-95'
+        }`}
+    >
+      {isVoting ? (
+        <Loader2 className={`animate-spin ${size === 'lg' ? 'h-4 w-4' : 'h-3.5 w-3.5'}`} />
+      ) : voted ? (
+        <>
+          <CheckCircle2 className={`${size === 'lg' ? 'h-4 w-4' : 'h-3.5 w-3.5'} text-emerald-600`} />
+          <span>โหวตแล้ว ✨</span>
+        </>
+      ) : (
+        <>
+          <Heart className={`${size === 'lg' ? 'h-4 w-4' : 'h-3.5 w-3.5'} fill-white text-white`} />
+          <span>โหวต 💖</span>
+        </>
+      )}
+    </button>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   SUB-COMPONENT: FloatingTopCard (Circular Floating Avatar)
+═══════════════════════════════════════════════ */
+interface FloatingTopCardProps {
   candidate: Candidate;
   rank: 1 | 2 | 3;
   maxVotes: number;
@@ -802,23 +980,13 @@ interface PodiumCardProps {
   isVoting: boolean;
   animating: boolean;
   onVote: (e: React.MouseEvent) => void;
-  podiumHeight: string;
-  podiumColors: string;
-  podiumTextColor: string;
-  cardBorder: string;
-  cardRing: string;
-  badgeColors: string;
-  avatarRing: string;
-  genBg: string;
-  genText: string;
-  voteCountColor: string;
-  voteButtonColors: string;
-  className?: string;
-  imgSize: string;
+  onSelect: () => void;
+  theme: 'gold' | 'silver' | 'bronze';
   isChampion?: boolean;
+  className?: string;
 }
 
-function PodiumCard({
+function FloatingTopCard({
   candidate,
   rank,
   maxVotes,
@@ -826,119 +994,158 @@ function PodiumCard({
   isVoting,
   animating,
   onVote,
-  podiumHeight,
-  podiumColors,
-  podiumTextColor,
-  cardBorder,
-  cardRing,
-  badgeColors,
-  avatarRing,
-  genBg,
-  genText,
-  voteCountColor,
-  voteButtonColors,
-  className = '',
-  imgSize,
+  onSelect,
+  theme,
   isChampion = false,
-}: PodiumCardProps) {
-  const RANK_EMOJI = { 1: '🥇', 2: '🥈', 3: '🥉' };
-  const RANK_LABEL = { 1: 'อันดับ 1', 2: 'อันดับ 2', 3: 'อันดับ 3' };
+  className = '',
+}: FloatingTopCardProps) {
+  const THEME_CONFIG = {
+    gold: {
+      avatarSize: 'h-28 w-28 sm:h-32 sm:w-32',
+      glowBg: 'bg-amber-300/40',
+      ringColor: 'ring-4 ring-amber-300 ring-offset-4 ring-offset-amber-50/60',
+      cardBg: 'bg-white/95 hover:bg-white',
+      cardBorder: 'border-amber-200/90 shadow-md shadow-amber-200/40',
+      badgeBg: 'bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 text-amber-950',
+      genBadge: 'bg-amber-50 text-amber-800 border-amber-200',
+      voteCountColor: 'text-amber-600',
+      voteBar: 'from-amber-400 to-yellow-400',
+      medalIcon: '🥇',
+      rankTitle: 'อันดับ 1 ขวัญใจมหาชน',
+    },
+    silver: {
+      avatarSize: 'h-24 w-24 sm:h-28 sm:w-28',
+      glowBg: 'bg-sky-200/40',
+      ringColor: 'ring-4 ring-sky-300 ring-offset-4 ring-offset-sky-50/60',
+      cardBg: 'bg-white/90 hover:bg-white',
+      cardBorder: 'border-sky-200/80 shadow-xs shadow-sky-100',
+      badgeBg: 'bg-gradient-to-r from-sky-300 via-blue-200 to-sky-300 text-sky-950',
+      genBadge: 'bg-sky-50 text-sky-800 border-sky-200',
+      voteCountColor: 'text-sky-700',
+      voteBar: 'from-sky-400 to-blue-400',
+      medalIcon: '🥈',
+      rankTitle: 'อันดับ 2',
+    },
+    bronze: {
+      avatarSize: 'h-24 w-24 sm:h-28 sm:w-28',
+      glowBg: 'bg-rose-200/40',
+      ringColor: 'ring-4 ring-rose-300 ring-offset-4 ring-offset-rose-50/60',
+      cardBg: 'bg-white/90 hover:bg-white',
+      cardBorder: 'border-rose-200/80 shadow-xs shadow-rose-100',
+      badgeBg: 'bg-gradient-to-r from-rose-300 via-pink-200 to-rose-300 text-rose-950',
+      genBadge: 'bg-rose-50 text-rose-800 border-rose-200',
+      voteCountColor: 'text-rose-700',
+      voteBar: 'from-rose-400 to-pink-400',
+      medalIcon: '🥉',
+      rankTitle: 'อันดับ 3',
+    },
+  }[theme];
+
+  const votePercent = Math.min(100, Math.round(((candidate.votes || 0) / maxVotes) * 100));
 
   return (
-    <div className={`flex flex-col items-center ${className}`}>
-      <div
-        className={`w-full rounded-[28px] border-2 bg-white/95 p-5 text-center shadow-lg transition-transform duration-200 hover:-translate-y-1 ${cardBorder} ${cardRing}`}
-      >
-        {/* Champion badge (only rank 1) */}
+    <div className={`flex flex-col items-center group ${className}`}>
+      {/* ─── 1. FLOATING CIRCULAR AVATAR WITH GLOW & BADGE ─── */}
+      <div className="relative mb-3 flex flex-col items-center">
+        {/* Floating Halo Glow Circle */}
+        <div
+          className={`absolute -inset-2 rounded-full ${THEME_CONFIG.glowBg} blur-lg group-hover:scale-110 transition-transform duration-300 pointer-events-none`}
+        />
+
+        {/* Floating Crown above Avatar for Rank 1 */}
         {isChampion && (
-          <div className="mb-2 flex justify-center">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-1 text-xs font-black text-white shadow-md">
-              <Crown className="h-3.5 w-3.5" />
-              อันดับ 1 ยอดนิยม
+          <div className="mb-1.5 -mt-3 flex items-center gap-1 animate-bounce duration-1000">
+            <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 to-yellow-400 px-3 py-0.5 text-[11px] font-black text-amber-950 shadow-xs border border-amber-200">
+              <Crown className="h-3 w-3 fill-amber-700 text-amber-700" />
+              <span>{THEME_CONFIG.rankTitle}</span>
             </span>
           </div>
         )}
 
-        {/* Avatar + Medal badge */}
-        <div className="relative mx-auto mb-3 inline-block">
+        {/* Circular Avatar Container */}
+        <div
+          onClick={onSelect}
+          className="relative cursor-pointer transition-transform duration-300 group-hover:-translate-y-1"
+        >
           <img
             src={candidate.avatar_url}
             alt={candidate.name}
-            className={`${imgSize} rounded-2xl object-cover ring-4 shadow-md ${avatarRing}`}
+            className={`${THEME_CONFIG.avatarSize} rounded-full object-cover shadow-lg ${THEME_CONFIG.ringColor} transition-transform duration-300 group-hover:scale-105`}
           />
+
+          {/* Floating Circular Medal Badge */}
           <div
-            className={`absolute -bottom-2.5 -right-2.5 flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr ${badgeColors} font-black text-sm shadow-md border-2 border-white`}
+            className={`absolute -bottom-1 -right-1 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full ${THEME_CONFIG.badgeBg} border-2 border-white font-black text-xs sm:text-sm shadow-md`}
           >
-            {RANK_EMOJI[rank]}
+            {THEME_CONFIG.medalIcon}
           </div>
         </div>
+      </div>
 
-        {/* Generation */}
-        <span className={`inline-block rounded-full px-3 py-0.5 text-xs font-bold mb-1.5 ${genBg} ${genText}`}>
-          {candidate.generation_label}
-        </span>
+      {/* ─── 2. SOFT PASTEL CARD CONTENT ─── */}
+      <div
+        onClick={onSelect}
+        className={`w-full rounded-[28px] border ${THEME_CONFIG.cardBg} ${THEME_CONFIG.cardBorder} p-4 sm:p-5 text-center transition-all duration-200 hover:-translate-y-1 hover:shadow-lg cursor-pointer backdrop-blur-xs`}
+      >
+        {/* Generation Pill */}
+        <div>
+          <span
+            className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${THEME_CONFIG.genBadge}`}
+          >
+            {candidate.generation_label}
+          </span>
+        </div>
 
         {/* Name */}
-        <h3 className={`font-extrabold text-slate-900 leading-tight truncate ${isChampion ? 'text-lg' : 'text-base'}`}>
+        <h3
+          className={`font-black text-slate-800 leading-tight mt-1.5 truncate group-hover:text-violet-700 transition-colors ${
+            isChampion ? 'text-base sm:text-lg' : 'text-sm sm:text-base'
+          }`}
+        >
           {candidate.name}
         </h3>
-        {candidate.studentId && (
-          <p className="text-[10px] font-mono text-slate-400 mt-0.5">รหัส {candidate.studentId}</p>
-        )}
-        <p className="text-xs font-medium text-slate-500 mt-1 line-clamp-1">{candidate.position}</p>
-        <p className="text-xs font-semibold text-indigo-600 truncate">{candidate.company}</p>
 
-        {/* Description */}
-        <p className="mt-2.5 text-xs text-slate-600 line-clamp-2 leading-relaxed bg-slate-50/80 rounded-xl p-2 text-left">
+        {candidate.studentId && (
+          <p className="text-[10px] font-mono text-slate-400 mt-0.5">
+            รหัส {candidate.studentId}
+          </p>
+        )}
+
+        <p className="text-xs text-slate-600 font-medium mt-1 truncate">{candidate.position}</p>
+        <p className="text-xs text-violet-600 font-bold truncate">{candidate.company}</p>
+
+        {/* Quote-style Bio Description */}
+        <p className="mt-2 text-xs text-slate-500 line-clamp-2 leading-relaxed bg-slate-50/80 rounded-xl p-2 text-left border border-slate-100 shadow-2xs">
           "{candidate.description}"
         </p>
 
-        {/* Vote progress bar */}
+        {/* Progress Bar */}
         <div className="mt-3 space-y-1">
           <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
             <div
-              className={`h-full rounded-full bg-gradient-to-r ${voteButtonColors} transition-all duration-700`}
-              style={{ width: `${Math.round(((candidate.votes || 0) / maxVotes) * 100)}%` }}
+              className={`h-full rounded-full bg-gradient-to-r ${THEME_CONFIG.voteBar} transition-all duration-700`}
+              style={{ width: `${votePercent}%` }}
             />
           </div>
         </div>
 
-        {/* Vote footer */}
-        <div className={`mt-4 flex items-center justify-between border-t pt-3 ${isChampion ? 'border-amber-100' : 'border-slate-100'}`}>
+        {/* Vote Footer */}
+        <div className="mt-3.5 flex items-center justify-between border-t border-slate-100/90 pt-3">
           <div className="text-left">
-            <span className="text-xs text-slate-400 font-medium">คะแนนโหวต</span>
-            <p className={`${isChampion ? 'text-xl' : 'text-base'} font-black ${voteCountColor}`}>
+            <span className="text-[10px] text-slate-400 font-medium">คะแนนโหวต</span>
+            <p className={`font-black ${isChampion ? 'text-lg sm:text-xl' : 'text-base'} ${THEME_CONFIG.voteCountColor}`}>
               {candidate.votes || 0}
             </p>
           </div>
 
-          <button
-            onClick={onVote}
-            disabled={voted || isVoting}
-            style={{ transform: animating ? 'scale(0.85)' : 'scale(1)', transition: 'transform 0.15s ease' }}
-            className={`inline-flex items-center gap-1.5 rounded-full font-bold transition-all shadow-sm cursor-pointer disabled:cursor-default
-              ${isChampion ? 'px-5 py-2.5 text-xs font-black' : 'px-4 py-2 text-xs'}
-              ${voted
-                ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                : `bg-gradient-to-r ${voteButtonColors} text-white hover:opacity-90 active:scale-95`
-              }`}
-          >
-            {isVoting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : voted ? (
-              <><CheckCircle2 className="h-3.5 w-3.5" /> โหวตแล้ว</>
-            ) : (
-              <><Heart className="h-3.5 w-3.5" /> {isChampion ? 'โหวตเกียรติยศ' : 'โหวต'}</>
-            )}
-          </button>
+          <VoteButton
+            size={isChampion ? 'lg' : 'sm'}
+            voted={voted}
+            isVoting={isVoting}
+            animating={animating}
+            onVote={onVote}
+          />
         </div>
-      </div>
-
-      {/* Podium base (desktop only) */}
-      <div
-        className={`hidden md:flex w-full ${podiumHeight} bg-gradient-to-t ${podiumColors} rounded-t-2xl items-center justify-center font-black ${podiumTextColor} shadow-inner text-sm`}
-      >
-        {RANK_EMOJI[rank]} {RANK_LABEL[rank]}
       </div>
     </div>
   );

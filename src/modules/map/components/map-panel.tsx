@@ -152,30 +152,26 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
   const provincesWithDataCount = sortedProvinces.filter(([_, list]) => list.length > 0).length;
   const topProvince = sortedProvinces[0] || null;
 
-  // Pastel Color generator for Heatmap
+  // Pastel Color generator for Heatmap (Distinct Pastel Palette)
   function getProvinceFillColor(count: number, isSelected: boolean, isHovered: boolean) {
     if (isSelected) {
-      return isHometown ? '#6366F1' : '#0D9488'; // Vibrant Pastel Focus
+      return '#8B5CF6'; // ม่วงเน้นจังหวัดที่เลือก (Vibrant Violet Focus)
     }
     if (isHovered) {
-      return isHometown ? '#A5B4FC' : '#5EEAD4'; // Soft Glow on Hover
+      return '#DDD6FE'; // ลาเวนเดอร์พาสเทลสว่างตอน Hover
     }
     if (count === 0) {
-      return '#F8FAFC'; // Clean cloud white
+      return '#F8FAFC'; // ขาวนวลสะอาด
     }
 
-    const ratio = count / maxCount;
-    if (isHometown) {
-      if (ratio > 0.6) return '#6366F1'; // Pastel Indigo Rich
-      if (ratio > 0.35) return '#818CF8'; // Soft Lavender Indigo
-      if (ratio > 0.15) return '#A5B4FC'; // Pastel Periwinkle
-      return '#E0E7FF'; // Very Soft Lavender
-    } else {
-      if (ratio > 0.6) return '#0D9488'; // Mint Teal Rich
-      if (ratio > 0.35) return '#14B8A6'; // Soft Mint
-      if (ratio > 0.15) return '#5EEAD4'; // Pastel Aqua
-      return '#CCFBF1'; // Soft Fresh Mint
+    // ระดับความหนาแน่น: พาสเทลต่างเฉดกันชัดเจน
+    if (count >= 5 || (maxCount > 1 && count / maxCount > 0.55)) {
+      return '#FB7185'; // พาสเทลชมพูกุหลาบ / คอรัล (หนาแน่น)
     }
+    if (count >= 2 || (maxCount > 1 && count / maxCount > 0.25)) {
+      return '#FDE047'; // พาสเทลเหลืองวนิลา / ส้มพีช (ปานกลาง)
+    }
+    return '#86EFAC'; // พาสเทลเขียวมิ้นต์ (น้อย)
   }
 
   // Active SVG ViewBox
@@ -192,27 +188,27 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
 
   return (
     <div className="animate-fade-in space-y-6">
-      {/* ─── 1. HERO HEADER: SOFT PASTEL GLASSMORPHISM ─────────────────── */}
-      <section className={`relative overflow-hidden rounded-[36px] p-7 sm:p-9 text-white shadow-hero transition-all duration-500 ${
+      {/* ─── 1. HERO HEADER: BALANCED GLASSMORPHISM ─────────────────── */}
+      <section className={`relative overflow-hidden rounded-[28px] sm:rounded-[32px] p-5 sm:p-7 text-white shadow-hero transition-all duration-500 ${
         isHometown
           ? 'bg-gradient-to-br from-indigo-950 via-purple-900/95 to-slate-900'
           : 'bg-gradient-to-br from-teal-950 via-emerald-900/95 to-slate-900'
       }`}>
         {/* Decorative Floating Glowing Orbs */}
-        <div className={`absolute -top-12 -right-12 h-64 w-64 rounded-full blur-3xl pointer-events-none transition-colors duration-700 ${
+        <div className={`absolute -top-12 -right-12 h-56 w-56 rounded-full blur-3xl pointer-events-none transition-colors duration-700 ${
           isHometown ? 'bg-purple-400/25' : 'bg-teal-400/25'
         }`} />
-        <div className={`absolute -bottom-10 -left-10 h-56 w-56 rounded-full blur-3xl pointer-events-none transition-colors duration-700 ${
+        <div className={`absolute -bottom-10 -left-10 h-48 w-48 rounded-full blur-3xl pointer-events-none transition-colors duration-700 ${
           isHometown ? 'bg-indigo-400/20' : 'bg-emerald-400/20'
         }`} />
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div className="space-y-2.5 max-w-xl">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-xs font-bold backdrop-blur-md border border-white/20 text-white shadow-xs">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4 sm:gap-6">
+          <div className="space-y-2 max-w-xl">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3.5 py-1 text-xs font-bold backdrop-blur-md border border-white/20 text-white shadow-xs">
               <Compass className={`h-3.5 w-3.5 animate-spin-slow ${isHometown ? 'text-indigo-300' : 'text-teal-300'}`} />
               <span>Interactive Alumni Network Map ✨</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight">
               แผนที่เครือข่ายศิษย์เก่าทั่วประเทศ 🗺️
             </h2>
             <p className="text-xs sm:text-sm text-white/85 leading-relaxed font-medium">
@@ -220,20 +216,20 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
             </p>
           </div>
 
-          {/* Pill Switcher สลับโหมดนุ่มนวล */}
+          {/* Pill Switcher สลับโหมด */}
           <div className="flex items-center gap-1.5 rounded-full bg-black/20 p-1.5 backdrop-blur-md border border-white/15 shadow-inner shrink-0 self-start md:self-auto">
             <button
               onClick={() => {
                 setMode('hometown');
                 setSelectedProvince(null);
               }}
-              className={`group flex items-center gap-2 rounded-full px-5 py-2.5 text-xs sm:text-sm font-extrabold transition-all duration-300 cursor-pointer active:scale-95 ${
+              className={`group flex items-center gap-2 rounded-full px-4.5 py-2 text-xs sm:text-sm font-extrabold transition-all duration-300 cursor-pointer active:scale-95 ${
                 isHometown
-                  ? 'bg-white text-indigo-900 shadow-md shadow-indigo-950/20 scale-[1.02]'
+                  ? 'bg-white text-indigo-900 shadow-md scale-[1.02]'
                   : 'text-white/80 hover:text-white hover:bg-white/10'
               }`}
             >
-              <span className="text-base transition-transform duration-200 group-hover:scale-125">🏡</span>
+              <span className="text-base transition-transform duration-200 group-hover:scale-120">🏡</span>
               <span>ภูมิลำเนา</span>
             </button>
             <button
@@ -241,58 +237,58 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                 setMode('workplace');
                 setSelectedProvince(null);
               }}
-              className={`group flex items-center gap-2 rounded-full px-5 py-2.5 text-xs sm:text-sm font-extrabold transition-all duration-300 cursor-pointer active:scale-95 ${
+              className={`group flex items-center gap-2 rounded-full px-4.5 py-2 text-xs sm:text-sm font-extrabold transition-all duration-300 cursor-pointer active:scale-95 ${
                 !isHometown
-                  ? 'bg-white text-teal-900 shadow-md shadow-teal-950/20 scale-[1.02]'
+                  ? 'bg-white text-teal-900 shadow-md scale-[1.02]'
                   : 'text-white/80 hover:text-white hover:bg-white/10'
               }`}
             >
-              <span className="text-base transition-transform duration-200 group-hover:scale-125">💼</span>
+              <span className="text-base transition-transform duration-200 group-hover:scale-120">💼</span>
               <span>ที่ทำงานศิษย์เก่า</span>
             </button>
           </div>
         </div>
 
         {/* ─── Metric Mini Bubbles ─────────────────────────────────────────── */}
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 pt-6 border-t border-white/15">
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 pt-5 border-t border-white/15">
           {/* Card 1 */}
-          <div className="rounded-[22px] bg-white/10 p-4 backdrop-blur-md border border-white/15 hover:bg-white/15 transition-all duration-200">
+          <div className="rounded-2xl bg-white/10 p-3.5 sm:p-4 backdrop-blur-md border border-white/15 hover:bg-white/15 transition-all duration-200">
             <div className="flex items-center gap-2 text-xs font-semibold text-white/80">
-              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-400/30 text-indigo-200">
-                <Users className="h-3.5 w-3.5" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-indigo-400/30 text-indigo-200">
+                <Users className="h-4 w-4" />
               </div>
               <span>จำนวนบนแผนที่</span>
             </div>
-            <p className="text-xl sm:text-2xl font-black text-white mt-2 tracking-tight">
+            <p className="text-lg sm:text-2xl font-black text-white mt-1.5 tracking-tight">
               {totalCount} <span className="text-xs font-bold text-white/70">คน</span>
             </p>
           </div>
 
           {/* Card 2 */}
-          <div className="rounded-[22px] bg-white/10 p-4 backdrop-blur-md border border-white/15 hover:bg-white/15 transition-all duration-200">
+          <div className="rounded-2xl bg-white/10 p-3.5 sm:p-4 backdrop-blur-md border border-white/15 hover:bg-white/15 transition-all duration-200">
             <div className="flex items-center gap-2 text-xs font-semibold text-white/80">
-              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-teal-400/30 text-teal-200">
-                <MapPin className="h-3.5 w-3.5" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-teal-400/30 text-teal-200">
+                <MapPin className="h-4 w-4" />
               </div>
               <span>ครอบคลุม</span>
             </div>
-            <p className="text-xl sm:text-2xl font-black text-white mt-2 tracking-tight">
+            <p className="text-lg sm:text-2xl font-black text-white mt-1.5 tracking-tight">
               {provincesWithDataCount} <span className="text-xs font-bold text-white/70">/ 77 จังหวัด</span>
             </p>
           </div>
 
-          {/* Card 3: Top 1 Province with Radar Ping Badge */}
-          <div className="rounded-[22px] bg-white/10 p-4 backdrop-blur-md border border-white/15 hover:bg-white/15 transition-all duration-200 relative overflow-hidden">
+          {/* Card 3: Top 1 Province */}
+          <div className="rounded-2xl bg-white/10 p-3.5 sm:p-4 backdrop-blur-md border border-white/15 hover:bg-white/15 transition-all duration-200">
             <div className="flex items-center gap-2 text-xs font-semibold text-white/80">
-              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-400/30 text-amber-200">
-                <Award className="h-3.5 w-3.5" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-amber-400/30 text-amber-200">
+                <Award className="h-4 w-4" />
               </div>
               <span>จังหวัดอันดับ 1 ✨</span>
             </div>
-            <p className="text-sm sm:text-base font-extrabold text-white mt-2 truncate flex items-center gap-1.5">
+            <p className="text-sm sm:text-base font-extrabold text-white mt-1.5 truncate flex items-center gap-1.5">
               <span>{topProvince ? topProvince[0] : '-'}</span>
               {topProvince && (
-                <span className="rounded-full bg-amber-400/30 text-amber-200 border border-amber-300/40 px-2 py-0.5 text-[11px] font-black">
+                <span className="rounded-full bg-amber-400/30 text-amber-200 border border-amber-300/40 px-2 py-0.5 text-[10px] font-black">
                   {topProvince[1].length} คน
                 </span>
               )}
@@ -300,14 +296,14 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
           </div>
 
           {/* Card 4 */}
-          <div className="rounded-[22px] bg-white/10 p-4 backdrop-blur-md border border-white/15 hover:bg-white/15 transition-all duration-200">
+          <div className="rounded-2xl bg-white/10 p-3.5 sm:p-4 backdrop-blur-md border border-white/15 hover:bg-white/15 transition-all duration-200">
             <div className="flex items-center gap-2 text-xs font-semibold text-white/80">
-              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-pink-400/30 text-pink-200">
-                <Sparkles className="h-3.5 w-3.5" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-pink-400/30 text-pink-200">
+                <Sparkles className="h-4 w-4" />
               </div>
               <span>โหมดแสดงผล</span>
             </div>
-            <p className="text-xs sm:text-sm font-extrabold text-white mt-2 truncate">
+            <p className="text-xs sm:text-sm font-extrabold text-white mt-1.5 truncate">
               {isHometown ? '🏡 ภูมิลำเนา (ศิษย์เก่า+นศ.)' : '💼 ที่ทำงาน (ศิษย์เก่า)'}
             </p>
           </div>
@@ -515,20 +511,20 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
           </div>
 
           {/* Map Legend Bar */}
-          <div className="mt-3 pt-3.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 font-medium">
-            <div className="flex items-center gap-3 flex-wrap">
+          <div className="mt-3 pt-3.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 font-medium">
+            <div className="flex items-center gap-3.5 flex-wrap">
               <span className="font-bold text-slate-700">ระดับความหนาแน่น:</span>
               <span className="flex items-center gap-1.5">
-                <span className="h-3.5 w-3.5 rounded-full bg-[#F8FAFC] border border-slate-200" /> 0 คน
+                <span className="h-3.5 w-3.5 rounded-full bg-[#F8FAFC] border border-slate-300 shadow-2xs" /> 0 คน
               </span>
               <span className="flex items-center gap-1.5">
-                <span className={`h-3.5 w-3.5 rounded-full ${isHometown ? 'bg-[#E0E7FF]' : 'bg-[#CCFBF1]'}`} /> น้อย
+                <span className="h-3.5 w-3.5 rounded-full bg-[#86EFAC] border border-emerald-300 shadow-2xs" /> น้อย
               </span>
               <span className="flex items-center gap-1.5">
-                <span className={`h-3.5 w-3.5 rounded-full ${isHometown ? 'bg-[#818CF8]' : 'bg-[#14B8A6]'}`} /> ปานกลาง
+                <span className="h-3.5 w-3.5 rounded-full bg-[#FDE047] border border-amber-300 shadow-2xs" /> ปานกลาง
               </span>
               <span className="flex items-center gap-1.5">
-                <span className={`h-3.5 w-3.5 rounded-full ${isHometown ? 'bg-[#6366F1]' : 'bg-[#0D9488]'}`} /> หนาแน่น
+                <span className="h-3.5 w-3.5 rounded-full bg-[#FB7185] border border-rose-300 shadow-2xs" /> หนาแน่น
               </span>
             </div>
 
@@ -619,14 +615,14 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                           )}
                           <div>
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <h4 className="font-bold text-slate-900 text-sm">{alumnus.name}</h4>
+                              <h4 className="font-bold text-slate-900 text-sm sm:text-base">{alumnus.name}</h4>
                               {alumnus.generation && (
-                                <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-extrabold text-indigo-600 border border-indigo-100">
+                                <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-600 border border-indigo-100">
                                   🏷️ {alumnus.generation}
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                            <p className="text-xs text-slate-500 font-medium mt-0.5">
                               {alumnus.student_status === 'alumni' ? '🎓 ศิษย์เก่า' : '🎒 นักศึกษาปัจจุบัน'}
                             </p>
                           </div>
@@ -637,14 +633,14 @@ export function MapPanel({ hometownData = [], workplaceData = [] }: MapPanelProp
                         <div className="flex items-center gap-2 text-xs text-slate-600 flex-wrap pt-1.5 border-t border-slate-200/50">
                           {alumnus.company && (
                             <span className="flex items-center gap-1 font-semibold text-slate-700">
-                              <Building2 className="h-3 w-3 text-slate-400" /> {alumnus.company}
+                              <Building2 className="h-3.5 w-3.5 text-slate-400" /> {alumnus.company}
                             </span>
                           )}
                           {alumnus.position && (
-                            <span className="text-slate-400">• {alumnus.position}</span>
+                            <span className="text-slate-500">• {alumnus.position}</span>
                           )}
                           {alumnus.career_type && (
-                            <span className="ml-auto rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600">
+                            <span className="ml-auto rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600">
                               {alumnus.career_type}
                             </span>
                           )}

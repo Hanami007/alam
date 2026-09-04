@@ -1,5 +1,6 @@
 'use client';
 import { useState, useMemo, useEffect, Fragment } from 'react';
+import { notifyPointsUpdated } from '@/lib/events';
 import {
   Lock,
   Unlock,
@@ -203,6 +204,7 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
       const data = await res.json();
 
       if (data.success) {
+        notifyPointsUpdated(10);
         setGenUnlockSuccess(true);
         setUnlockedGenerations((prev) => [...prev, selectedGen]);
         setTimeout(() => {
@@ -321,7 +323,7 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
                 <FolderTree className="h-4 w-4 text-indigo-600" />
                 <span>ธรรมเนียมรุ่น 20 - ปัจจุบัน</span>
               </div>
-              <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-600 font-extrabold">
+              <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs text-indigo-600 font-extrabold">
                 {catalogPhotos.length} รูป
               </span>
             </div>
@@ -391,7 +393,7 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
                                 setSelectedYear(genInfo.year);
                                 setSelectedSubfolder(sub);
                               }}
-                              className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 cursor-pointer text-[11px] transition-colors ${
+                              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 cursor-pointer text-xs transition-colors ${
                                 isSubActive
                                   ? 'bg-indigo-100/70 text-indigo-800 font-bold'
                                   : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
@@ -629,7 +631,7 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
                               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md border border-white/30 text-white shadow-md">
                                 <Lock className="h-4 w-4" />
                               </div>
-                              <span className="rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-semibold text-white">
+                              <span className="rounded-full bg-black/60 px-2.5 py-0.5 text-xs font-semibold text-white">
                                 ตอบคำถามเพื่อดู
                               </span>
                             </div>

@@ -8,7 +8,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'ข้อมูลไม่ครบถ้วน' }, { status: 400 });
     }
     const comment = await addPostComment(Number(postId), Number(userId), content.trim());
-    return NextResponse.json({ success: true, comment });
+    return NextResponse.json({ success: true, comment, pointsAwarded: 1 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

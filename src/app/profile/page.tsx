@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ProfileCard } from '@/modules/profile/components/profile-card';
 import { AppShell } from '@/components/layout/app-shell';
 import { api } from '@/lib/api-client';
+import { USER_POINTS_UPDATED_EVENT } from '@/lib/events';
 
 export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
@@ -12,15 +13,14 @@ export default function ProfilePage() {
   const [activityLog, setActivityLog] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function loadProfile() {
-      try {
-        setLoading(true);
-        const [profileRes, activityRes, galleryRes] = await Promise.allSettled([
-          api.user.getProfile(),
-          api.user.getActivity(),
-          api.gallery.getItems(),
-        ]);
+  const loadProfile = useCallback(async (isSilent = false) => {
+    try {
+      if (!isSilent) setLoading(true);
+      const [profileRes, activityRes, galleryRes] = await Promise.allSettled([
+        api.user.getProfile(),
+        api.user.getActivity(),
+        api.gallery.getItems(),
+      ]);
 
         if (profileRes.status === 'fulfilled' && profileRes.value && !profileRes.value.error) {
           const u = profileRes.value;
@@ -38,6 +38,8 @@ export default function ProfilePage() {
             total_points: u.totalPoints ?? u.total_points ?? 16,
             avatar_url: u.avatarUrl || u.avatar_url || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=600&q=80',
             is_available_for_mentorship: Boolean(u.isAvailableForMentorship ?? u.is_available_for_mentorship),
+            show_hometown_on_map: Boolean(u.showHometownOnMap ?? u.show_hometown_on_map),
+            show_workplace_on_map: Boolean(u.showWorkplaceOnMap ?? u.show_workplace_on_map),
           });
         } else {
           // Fallback mock profile for preview
@@ -55,6 +57,8 @@ export default function ProfilePage() {
             total_points: 16,
             avatar_url: 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=600&q=80',
             is_available_for_mentorship: false,
+            show_hometown_on_map: false,
+            show_workplace_on_map: false,
           });
         }
 
@@ -86,12 +90,34 @@ export default function ProfilePage() {
       } catch (err) {
         console.error('[ProfilePage] Error loading profile:', err);
       } finally {
-        setLoading(false);
+        if (!isSilent) setLoading(false);
       }
+    },
+    []
+  );
+
+  useEffect(() => {
+    loadProfile();
+
+    function handlePointsUpdated(e: Event) {
+      const customEvent = e as CustomEvent<{ pointsAdded?: number }>;
+      const added = customEvent.detail?.pointsAdded ?? 1;
+
+      setUser((prev: any) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          total_points: (prev.total_points ?? 0) + added,
+        };
+      });
+
+      // Refetch full profile and activity log quietly in background
+      loadProfile(true);
     }
 
-    loadProfile();
-  }, []);
+    window.addEventListener(USER_POINTS_UPDATED_EVENT, handlePointsUpdated);
+    return () => window.removeEventListener(USER_POINTS_UPDATED_EVENT, handlePointsUpdated);
+  }, [loadProfile]);
 
   return (
     <AppShell>

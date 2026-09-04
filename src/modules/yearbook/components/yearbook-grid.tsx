@@ -23,6 +23,8 @@ import {
   ChevronDown,
   Upload,
   Image as ImageIcon,
+  Building2,
+  MessageCircle,
 } from 'lucide-react';
 import { api } from '@/lib/api-client';
 
@@ -623,51 +625,100 @@ export function YearbookGrid() {
     setSelectedProvince('all');
   };
 
-  return (
-    <div className="space-y-4 max-w-7xl mx-auto px-2 sm:px-4 py-2">
-      {/* ─── HERO HEADER BANNER ────────────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 text-white p-5 sm:p-6 shadow-xl border border-indigo-700/40">
-        <div className="absolute -right-10 -bottom-10 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
-        <div className="absolute left-1/2 -top-10 h-48 w-48 rounded-full bg-purple-500/10 blur-2xl pointer-events-none" />
+  // Pastel color palette per card index
+  const PASTEL_GRADIENTS = [
+    'from-rose-100 via-pink-50 to-white',
+    'from-sky-100 via-blue-50 to-white',
+    'from-violet-100 via-purple-50 to-white',
+    'from-emerald-100 via-teal-50 to-white',
+    'from-amber-100 via-yellow-50 to-white',
+    'from-indigo-100 via-blue-50 to-white',
+    'from-fuchsia-100 via-pink-50 to-white',
+    'from-cyan-100 via-sky-50 to-white',
+  ];
+  const PASTEL_RINGS = [
+    'ring-rose-300',
+    'ring-sky-300',
+    'ring-violet-300',
+    'ring-emerald-300',
+    'ring-amber-300',
+    'ring-indigo-300',
+    'ring-fuchsia-300',
+    'ring-cyan-300',
+  ];
+  const PASTEL_BADGES = [
+    'bg-rose-100 text-rose-700 border-rose-200',
+    'bg-sky-100 text-sky-700 border-sky-200',
+    'bg-violet-100 text-violet-700 border-violet-200',
+    'bg-emerald-100 text-emerald-700 border-emerald-200',
+    'bg-amber-100 text-amber-700 border-amber-200',
+    'bg-indigo-100 text-indigo-700 border-indigo-200',
+    'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200',
+    'bg-cyan-100 text-cyan-700 border-cyan-200',
+  ];
 
-        <div className="relative z-10 space-y-1.5 max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-indigo-200 text-xs font-semibold backdrop-blur-md border border-white/15">
-            <GraduationCap className="h-4 w-4 text-amber-300" />
-            <span>ทำเนียบหนังสือรุ่นศิษย์เก่า CS MJU</span>
+  return (
+    <div className="space-y-5 max-w-7xl mx-auto px-2 sm:px-4 py-2">
+      {/* ─── HERO HEADER BANNER — Soft Pastel ─────────────────────────── */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-100 via-pink-50 to-sky-100 border border-pink-200/60 p-6 sm:p-8 shadow-sm">
+        {/* Decorative blobs */}
+        <div className="absolute -right-8 -top-8 h-48 w-48 rounded-full bg-rose-200/40 blur-3xl pointer-events-none" />
+        <div className="absolute left-1/3 -bottom-8 h-40 w-40 rounded-full bg-violet-200/40 blur-2xl pointer-events-none" />
+        <div className="absolute left-0 top-0 h-32 w-32 rounded-full bg-sky-200/30 blur-2xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/70 text-violet-700 text-xs font-bold backdrop-blur-sm border border-violet-200/60 shadow-xs">
+              <GraduationCap className="h-3.5 w-3.5 text-violet-500" />
+              <span>ทำเนียบหนังสือรุ่นศิษย์เก่า CS MJU</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight leading-tight">
+              ความทรงจำ &amp; สายสัมพันธ์
+              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-pink-500">ศิษย์เก่าแม่โจ้ ✨</span>
+            </h1>
+            <p className="text-sm text-slate-500 leading-relaxed max-w-lg">
+              รวมเรื่องราว คำคมสุดจำ และทำเนียบศิษย์เก่าภาควิชาวิทยาการคอมพิวเตอร์
+            </p>
           </div>
-          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-            ความทรงจำ & สายสัมพันธ์ศิษย์เก่า <span className="text-amber-300">แม่โจ้</span>
-          </h1>
-          <p className="text-xs sm:text-sm text-indigo-200/90 leading-relaxed">
-            รวมเรื่องราว คำคมสุดจำ และทำเนียบศิษย์เก่าภาควิชาวิทยาการคอมพิวเตอร์ มหาวิทยาลัยแม่โจ้
-          </p>
+
+          {/* Stats pills */}
+          <div className="flex sm:flex-col gap-2 shrink-0">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl px-4 py-2 border border-violet-200/50 text-center shadow-xs">
+              <p className="text-xs font-bold text-violet-600 tracking-wide">ศิษย์เก่าทั้งหมด</p>
+              <p className="text-lg font-black text-slate-800">{alumniList.length} คน</p>
+            </div>
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl px-4 py-2 border border-pink-200/50 text-center shadow-xs">
+              <p className="text-xs font-bold text-pink-600 tracking-wide">แสดงอยู่</p>
+              <p className="text-lg font-black text-slate-800">{filteredAlumni.length} คน</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* ─── ACTION BUTTONS BAR (OUTSIDE BANNER) ────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-1 pb-1">
+      {/* ─── ACTION BUTTONS BAR ────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         {/* ปุ่มสำหรับกดเลือกรุ่น */}
         <button
           onClick={() => setIsGenModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white border border-indigo-200 text-indigo-900 text-xs sm:text-sm font-extrabold hover:bg-indigo-50 hover:border-indigo-400 transition-all shadow-sm cursor-pointer active:scale-95"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-white border border-violet-200 text-violet-800 text-xs sm:text-sm font-bold hover:bg-violet-50 hover:border-violet-400 hover:shadow-md transition-all shadow-sm cursor-pointer active:scale-95"
         >
-          <GraduationCap className="h-4 sm:h-5 w-4 sm:w-5 text-indigo-600" />
+          <GraduationCap className="h-4 w-4 text-violet-500" />
           <span>
             {selectedGeneration === 'all'
-              ? '🎓 เลือกรุ่น (แสดงทุกรุ่น)'
-              : `กำลังดู: รุ่น ${selectedGeneration} (กดเพื่อเปลี่ยนรุ่น)`}
+              ? '🎓 เลือกรุ่น (ทุกรุ่น)'
+              : `กำลังดู: รุ่น ${selectedGeneration}`}
           </span>
-          <ChevronDown className="h-4 w-4 text-indigo-400" />
+          <ChevronDown className="h-3.5 w-3.5 text-violet-400" />
         </button>
 
-        {/* ปุ่มเพิ่ม / แก้ไขข้อมูลหนังสือรุ่นของฉัน (1 บัญชีสร้างได้ 1 ครั้ง) */}
+        {/* ปุ่มเพิ่ม / แก้ไขข้อมูลหนังสือรุ่นของฉัน */}
         <button
           onClick={handleOpenMyModal}
-          className="inline-flex items-center gap-2 rounded-2xl bg-amber-400 text-slate-950 px-4.5 py-2.5 text-xs sm:text-sm font-extrabold hover:bg-amber-300 transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
+          className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-violet-500 to-pink-500 text-white px-5 py-2.5 text-xs sm:text-sm font-bold hover:opacity-90 hover:shadow-lg transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
         >
           <Edit3 className="h-4 w-4" />
           <span>
-            {myExistingEntry ? '✏️ แก้ไขข้อมูลหนังสือรุ่นของฉัน' : '+ เพิ่มข้อมูลหนังสือรุ่นของฉัน'}
+            {myExistingEntry ? '✏️ แก้ไขข้อมูลของฉัน' : '✨ เพิ่มข้อมูลหนังสือรุ่น'}
           </span>
         </button>
       </div>
@@ -676,174 +727,171 @@ export function YearbookGrid() {
 
       {/* ─── ALUMNI DISPLAY CONTAINER ─────────────────────────────────── */}
       {filteredAlumni.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center space-y-3 shadow-xs">
-          <BookOpen className="h-12 w-12 text-slate-300 mx-auto" />
+        <div className="bg-gradient-to-br from-violet-50 to-pink-50 rounded-3xl border border-pink-200/60 p-14 text-center space-y-4 shadow-xs">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm mx-auto">
+            <BookOpen className="h-8 w-8 text-violet-400" />
+          </div>
           <h3 className="text-base font-bold text-slate-700">ไม่พบข้อมูลศิษย์เก่าตามเงื่อนไขที่ค้นหา</h3>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+          <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
             ลองปรับเปลี่ยนคำค้นหา หรือกดปุ่มรีเซ็ตเพื่อแสดงผลศิษย์เก่าทั้งหมด
           </p>
           <button
             onClick={resetFilters}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-gradient-to-r from-violet-500 to-pink-500 text-white text-xs font-bold hover:opacity-90 transition-all cursor-pointer shadow-md"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             <span>แสดงผลศิษย์เก่าทั้งหมด</span>
           </button>
         </div>
       ) : viewMode === 'grid' ? (
-        /* CLASSIC YEARBOOK SEPARATED CARDS GRID VIEW */
+        /* ── PASTEL HORIZONTAL GRID VIEW ── */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
-          {filteredAlumni.map((alumnus) => {
+          {filteredAlumni.map((alumnus, idx) => {
             const isMe =
               currentUser &&
               (String(alumnus.id) === String(currentUser.id) || alumnus.studentId === currentUser.student_id);
+            const pastelGrad = isMe ? 'from-amber-50 via-yellow-50 to-white' : PASTEL_GRADIENTS[idx % PASTEL_GRADIENTS.length];
+            const pastelRing = isMe ? 'ring-amber-300' : PASTEL_RINGS[idx % PASTEL_RINGS.length];
+            const pastelBadge = isMe ? 'bg-amber-100 text-amber-700 border-amber-200' : PASTEL_BADGES[idx % PASTEL_BADGES.length];
 
             return (
               <div
                 key={alumnus.id}
                 onClick={() => setSelectedAlumnus(alumnus)}
-                className={`group flex flex-row bg-white border rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer relative ${
-                  isMe
-                    ? 'bg-amber-50/70 border-amber-300 ring-2 ring-amber-200'
-                    : 'border-slate-200/90 hover:border-indigo-300 hover:-translate-y-0.5'
-                }`}
+                className={`group relative flex flex-row items-stretch gap-0 bg-gradient-to-r ${pastelGrad} border border-white/80 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 cursor-pointer overflow-hidden`}
               >
+                {/* Decorative blob */}
+                <div className="absolute -right-6 -bottom-6 h-20 w-20 rounded-full bg-white/40 blur-xl pointer-events-none" />
+
                 {/* Own Card Badge */}
                 {isMe && (
-                  <div className="absolute top-1.5 right-1.5 z-10 bg-amber-400 text-slate-950 text-[8px] font-extrabold px-1.5 py-0.5 rounded-full border border-amber-300 shadow-xs">
+                  <div className="absolute top-2 right-2 z-10 bg-amber-400 text-amber-900 text-[10px] sm:text-xs font-extrabold px-2.5 py-0.5 rounded-full shadow-xs border border-amber-300">
                     ✨ ของฉัน
                   </div>
                 )}
 
-                {/* 1. รูปภาพ (Portrait Photo) */}
-                <div className="relative shrink-0 w-[95px] sm:w-[105px] overflow-hidden bg-slate-100 border-r border-slate-200/80">
+                {/* 1. รูปภาพสี่เหลี่ยม (ด้านซ้าย ยืดเต็มความสูง มี rounded ซ้ายตามการ์ด) */}
+                <div className="relative shrink-0 w-[96px] sm:w-[110px] overflow-hidden rounded-l-2xl">
                   <img
                     src={alumnus.avatarUrl}
                     alt={alumnus.name}
-                    className="w-full h-full object-cover object-top transition-transform duration-300 group-hover:scale-105"
-                    style={{ minHeight: '115px', maxHeight: '135px' }}
+                    className="w-full h-full object-cover object-top"
+                    style={{ minHeight: '135px' }}
                   />
+                  {alumnus.isAvailableForMentorship && (
+                    <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-emerald-500 text-white text-[10px] sm:text-xs font-extrabold px-2 py-0.5 rounded-full shadow-xs border border-white">
+                      💬
+                    </span>
+                  )}
                 </div>
 
-                {/* RIGHT CONTENT: รุ่น + ชื่อ + คำคม */}
-                <div className="flex flex-col justify-center px-3.5 py-3 flex-1 min-w-0 space-y-1.5">
-                  {/* 2. รุ่น (Generation Badge) */}
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="inline-block text-[10px] font-extrabold tracking-wider uppercase text-indigo-600 bg-indigo-50/80 px-2 py-0.5 rounded-md border border-indigo-100/80">
-                      {alumnus.generation}
-                    </span>
-                    {alumnus.isAvailableForMentorship && (
-                      <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200 shadow-2xs">
-                        💬 ยินดีให้คำแนะนำ
-                      </span>
-                    )}
-                  </div>
+                {/* RIGHT: badge + ชื่อ + คำคม + ปุ่มใจ */}
+                <div className="flex flex-col min-w-0 flex-1 gap-1.5 relative z-10 px-4 py-3.5 justify-center">
+                  {/* 2. รุ่น Badge */}
+                  <span className={`inline-block self-start text-[10px] sm:text-[11px] font-extrabold tracking-wider uppercase px-2.5 py-0.5 rounded-full border ${pastelBadge}`}>
+                    {alumnus.generation}
+                  </span>
 
-                  {/* 3. ชื่อ (Name & Nickname) */}
-                  <h3
-                    className="text-sm font-bold text-slate-900 leading-tight tracking-wide truncate"
-                    style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
-                  >
-                    {alumnus.name} {alumnus.nickname ? `(${alumnus.nickname})` : ''}
+                  {/* 3. ชื่อ */}
+                  <h3 className="text-sm sm:text-base font-bold text-slate-800 leading-snug truncate">
+                    {alumnus.name}
+                    {alumnus.nickname ? <span className="text-xs sm:text-sm font-medium text-slate-500 ml-1">({alumnus.nickname})</span> : null}
                   </h3>
 
-                  {/* 4. คำคม (Senior Quote) */}
-                  <p
-                    className="text-[11px] text-slate-600 leading-snug line-clamp-3 italic"
-                    style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
-                  >
+                  {/* 4. คำคม */}
+                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed line-clamp-2 italic">
                     &ldquo;{alumnus.quote}&rdquo;
                   </p>
 
                   {/* 5. ปุ่มกดใจ */}
-                  <div className="flex items-center pt-1">
-                    <button
-                      onClick={(e) => handleReact(e, alumnus.id, 'likes')}
-                      className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-xl transition-all duration-200 active:scale-90 ${
+                  <button
+                    onClick={(e) => handleReact(e, alumnus.id, 'likes')}
+                    className={`self-start mt-1 inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full transition-all duration-200 active:scale-90 ${
+                      likedIds.has(String(alumnus.id))
+                        ? 'bg-rose-100 text-rose-600 border border-rose-200 shadow-xs'
+                        : 'bg-white/80 text-slate-500 hover:bg-rose-50 hover:text-rose-500 border border-white shadow-xs'
+                    }`}
+                  >
+                    <Heart
+                      className={`h-3.5 w-3.5 transition-all duration-200 ${
                         likedIds.has(String(alumnus.id))
-                          ? 'bg-rose-100 text-rose-600 border border-rose-200'
-                          : 'bg-slate-100 text-slate-500 hover:bg-rose-50 hover:text-rose-500 border border-transparent'
+                          ? 'fill-rose-500 text-rose-500 scale-110'
+                          : 'fill-transparent text-rose-300'
                       }`}
-                    >
-                      <Heart
-                        className={`h-3.5 w-3.5 transition-all duration-200 ${
-                          likedIds.has(String(alumnus.id))
-                            ? 'fill-rose-500 text-rose-500 scale-110'
-                            : 'fill-transparent text-rose-400'
-                        }`}
-                      />
-                      <span>{getReactionCount(alumnus, 'likes')}</span>
-                    </button>
-                  </div>
+                    />
+                    <span>{getReactionCount(alumnus, 'likes')}</span>
+                  </button>
                 </div>
               </div>
             );
           })}
         </div>
       ) : (
-        /* COMPACT LIST VIEW */
-        <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs divide-y divide-slate-100">
-          {filteredAlumni.map((alumnus) => {
+        /* ── PASTEL LIST VIEW ── */
+        <div className="bg-white/80 backdrop-blur-sm rounded-3xl border border-violet-100 overflow-hidden shadow-xs divide-y divide-violet-50">
+          {filteredAlumni.map((alumnus, idx) => {
             const isMe =
               currentUser &&
               (String(alumnus.id) === String(currentUser.id) || alumnus.studentId === currentUser.student_id);
+            const pastelRing = isMe ? 'ring-amber-300' : PASTEL_RINGS[idx % PASTEL_RINGS.length];
 
             return (
               <div
                 key={alumnus.id}
                 onClick={() => setSelectedAlumnus(alumnus)}
-                className={`p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-indigo-50/40 transition-colors cursor-pointer ${
-                  isMe ? 'bg-amber-50/50' : ''
+                className={`px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-violet-50/50 transition-colors cursor-pointer ${
+                  isMe ? 'bg-amber-50/40' : ''
                 }`}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  {/* 1. รูปภาพ */}
+                <div className="flex items-center gap-3.5 min-w-0">
+                  {/* 1. รูปภาพวงกลม */}
                   <img
                     src={alumnus.avatarUrl}
                     alt={alumnus.name}
-                    className="h-11 w-11 rounded-2xl object-cover ring-2 ring-slate-100 shrink-0"
+                    className={`h-12 w-12 rounded-full object-cover ring-2 ring-offset-1 ${pastelRing} shrink-0 shadow-xs`}
                   />
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       {/* 2. ชื่อ */}
-                      <h4 className="text-sm font-bold text-slate-900 truncate">
+                      <h4 className="text-sm sm:text-base font-bold text-slate-800 truncate">
                         {alumnus.name} {alumnus.nickname ? `(${alumnus.nickname})` : ''}
                       </h4>
                       {/* 3. รุ่น */}
-                      <span className="text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 shrink-0">
+                      <span className="text-xs font-extrabold text-violet-600 bg-violet-50 px-2.5 py-0.5 rounded-full border border-violet-100 shrink-0">
                         {alumnus.generation}
                       </span>
                       {alumnus.isAvailableForMentorship && (
-                        <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200 shrink-0">
-                          💬 ยินดีให้คำแนะนำ
+                        <span className="text-[11px] sm:text-xs font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
+                          💬 ให้คำแนะนำ
                         </span>
                       )}
                       {isMe && (
-                        <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-md shrink-0">
-                          ฉัน
+                        <span className="text-[11px] sm:text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full shrink-0">
+                          ✨ ฉัน
                         </span>
                       )}
                     </div>
-                  </div>
-                </div>
-
-                {/* 4. คำคม */}
-                <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                  <div className="text-right hidden md:block">
-                    <p className="text-xs font-semibold text-slate-700 truncate max-w-[280px] italic">
+                    <p className="text-xs sm:text-sm text-slate-600 italic mt-0.5 truncate max-w-xs sm:max-w-md leading-relaxed">
                       &ldquo;{alumnus.quote}&rdquo;
                     </p>
                   </div>
+                </div>
 
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={(e) => handleReact(e, alumnus.id, 'likes')}
-                      className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer"
-                    >
-                      <Heart className="h-3.5 w-3.5 text-rose-500 fill-rose-500/20" />
-                      <span>{getReactionCount(alumnus, 'likes')}</span>
-                    </button>
-                  </div>
+                {/* Like button */}
+                <div className="flex items-center justify-end shrink-0">
+                  <button
+                    onClick={(e) => handleReact(e, alumnus.id, 'likes')}
+                    className={`inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full transition-all cursor-pointer ${
+                      likedIds.has(String(alumnus.id))
+                        ? 'bg-rose-100 text-rose-600 border border-rose-200'
+                        : 'bg-slate-50 text-slate-500 hover:bg-rose-50 hover:text-rose-500 border border-slate-200'
+                    }`}
+                  >
+                    <Heart className={`h-3.5 w-3.5 transition-all ${
+                      likedIds.has(String(alumnus.id)) ? 'fill-rose-500 text-rose-500' : 'fill-transparent text-rose-400'
+                    }`} />
+                    <span>{getReactionCount(alumnus, 'likes')}</span>
+                  </button>
                 </div>
               </div>
             );
@@ -1044,40 +1092,102 @@ export function YearbookGrid() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-md bg-white p-6 shadow-2xl rounded-[36px] border border-slate-100 text-center space-y-4 animate-scale-up"
+            className="relative w-full max-w-md bg-white p-6 sm:p-7 shadow-2xl rounded-[36px] border border-slate-100 space-y-4 animate-scale-up max-h-[90vh] overflow-y-auto"
           >
             <button
               onClick={() => setSelectedAlumnus(null)}
-              className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors cursor-pointer"
+              className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors cursor-pointer z-10"
             >
               <X className="h-4 w-4" />
             </button>
 
-            {/* 1. รูปภาพ (Photo) */}
-            <img
-              src={selectedAlumnus.avatarUrl}
-              alt={selectedAlumnus.name}
-              className="h-36 w-36 rounded-3xl object-cover mx-auto ring-4 ring-amber-100 shadow-md"
-            />
+            {/* Profile Header (Photo, Gen, Name) */}
+            <div className="text-center space-y-3">
+              <div className="relative inline-block">
+                <img
+                  src={selectedAlumnus.avatarUrl}
+                  alt={selectedAlumnus.name}
+                  className="h-32 w-32 rounded-3xl object-cover mx-auto ring-4 ring-indigo-100 shadow-md"
+                />
+                {selectedAlumnus.isAvailableForMentorship && (
+                  <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-emerald-500 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full shadow-sm flex items-center gap-1 border-2 border-white">
+                    <MessageCircle className="h-3 w-3" /> ยินดีให้คำแนะนำ
+                  </span>
+                )}
+              </div>
 
-            <div>
-              {/* 2. รุ่น (Generation) */}
-              <span className="inline-block bg-indigo-50 text-indigo-700 px-3.5 py-1 text-xs font-extrabold rounded-full mb-1.5 border border-indigo-100">
-                {selectedAlumnus.generation}
-              </span>
-              {/* 3. ชื่อ (Name & Nickname) */}
-              <h2 className="text-xl font-bold text-slate-900">
-                {selectedAlumnus.name} {selectedAlumnus.nickname ? `(${selectedAlumnus.nickname})` : ''}
-              </h2>
+              <div>
+                <div className="flex flex-wrap items-center justify-center gap-1.5 mb-1.5">
+                  <span className="inline-block bg-indigo-50 text-indigo-700 px-3 py-0.5 text-xs font-extrabold rounded-full border border-indigo-100">
+                    {selectedAlumnus.generation}
+                  </span>
+                  {selectedAlumnus.gradYear && (
+                    <span className="inline-block bg-slate-100 text-slate-600 px-2.5 py-0.5 text-xs font-medium rounded-full">
+                      จบปี {selectedAlumnus.gradYear}
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-xl font-bold text-slate-900">
+                  {selectedAlumnus.name} {selectedAlumnus.nickname ? `(${selectedAlumnus.nickname})` : ''}
+                </h2>
+                {selectedAlumnus.studentId && (
+                  <p className="text-xs text-slate-500 font-mono mt-0.5">
+                    รหัส: {selectedAlumnus.studentId}
+                  </p>
+                )}
+              </div>
             </div>
 
-            {/* 4. คำคม (Senior Quote) */}
-            <div className="rounded-2xl bg-amber-50/80 p-4 border border-amber-200/60 text-center shadow-2xs relative">
-              <Quote className="h-4 w-4 text-amber-500 mx-auto mb-1" />
-              <p className="text-sm font-serif italic font-bold text-amber-950 leading-relaxed">
-                &ldquo;{selectedAlumnus.quote}&rdquo;
-              </p>
+            {/* Workplace & Position Info Card (ข้อมูลที่ทำงานและตำแหน่งงาน) */}
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 space-y-3 text-left">
+              <div className="flex items-start gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 mt-0.5">
+                  <Briefcase className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">ตำแหน่งงาน</p>
+                  <p className="text-sm font-bold text-slate-800 break-words">
+                    {selectedAlumnus.position || 'ไม่ได้ระบุ'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-600 mt-0.5">
+                  <Building2 className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">สถานที่ทำงาน / องค์กร</p>
+                  <p className="text-sm font-bold text-slate-800 break-words">
+                    {selectedAlumnus.company || 'ไม่ได้ระบุ'}
+                  </p>
+                </div>
+              </div>
+
+              {(selectedAlumnus.province || selectedAlumnus.careerType) && (
+                <div className="flex items-start gap-3 pt-2 border-t border-slate-200/60">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 mt-0.5">
+                    <MapPin className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">พื้นที่ & ประเภทสายงาน</p>
+                    <p className="text-xs sm:text-sm font-semibold text-slate-700">
+                      {selectedAlumnus.province || 'ไม่ระบุจังหวัด'} {selectedAlumnus.careerType ? `• ${selectedAlumnus.careerType}` : ''}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* Senior Quote (คำคมประจำใจ) */}
+            {selectedAlumnus.quote && (
+              <div className="rounded-2xl bg-amber-50/80 p-4 border border-amber-200/60 text-center shadow-2xs relative">
+                <Quote className="h-4 w-4 text-amber-500 mx-auto mb-1" />
+                <p className="text-sm font-serif italic font-bold text-amber-950 leading-relaxed">
+                  &ldquo;{selectedAlumnus.quote}&rdquo;
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1164,17 +1274,17 @@ export function YearbookGrid() {
                           : 'bg-slate-50/90 text-slate-600 border-slate-200/70 hover:bg-slate-100 hover:text-slate-900'
                       }`}
                     >
-                      <span className="font-black text-xs">รุ่น {genNum}</span>
+                      <span className="font-black text-xs sm:text-sm">รุ่น {genNum}</span>
                       {count > 0 ? (
                         <span
-                          className={`text-[9px] px-1.5 py-0.2 rounded-full mt-0.5 font-bold ${
+                          className={`text-[10px] sm:text-xs px-2 py-0.5 rounded-full mt-0.5 font-bold ${
                             isSelected ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-700'
                           }`}
                         >
                           {count} คน
                         </span>
                       ) : (
-                        <span className="text-[8px] text-slate-400 mt-0.5 font-normal">ไม่มีข้อมูล</span>
+                        <span className="text-[10px] sm:text-xs text-slate-400 mt-0.5 font-normal">ไม่มีข้อมูล</span>
                       )}
                     </button>
                   );

@@ -16,9 +16,13 @@ export async function GET(req: Request) {
         COALESCE(u.company, '') as company,
         COALESCE(u.position, '') as position,
         COALESCE(u.is_available_for_mentorship, false) as "isAvailableForMentorship",
+        prov.label as province,
+        ct.label as "careerType",
         u.created_at
       FROM users u
       LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
+      LEFT JOIN lookup_options prov ON prov.id = u.province_option_id
+      LEFT JOIN lookup_options ct ON ct.id = u.career_option_id
       ORDER BY u.id DESC
     `);
 

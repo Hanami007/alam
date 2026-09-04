@@ -244,10 +244,25 @@ export class FeedDbService {
       return { liked: false };
     } else {
       await pool.query(
-        `INSERT INTO post_interactions (post_id, user_id, type) VALUES ($1, $2, 'like')`,
+        `INSERT INTO post_interactions (post_id, user_id, type, points_earned) VALUES ($1, $2, 'like', 1)`,
         [postId, userId]
       );
-      return { liked: true };
+
+      // ให้คะแนนผู้ใช้ +1
+      await pool.query(
+        `UPDATE users SET total_points = total_points + 1 WHERE id = $1`,
+        [userId]
+      );
+
+      try {
+        await pool.query(
+          `INSERT INTO point_transactions (user_id, points, reason, reference_id)
+           VALUES ($1, 1, 'like_post', $2)`,
+          [userId, String(postId)]
+        );
+      } catch {}
+
+      return { liked: true, pointsAwarded: 1 };
     }
   }
 

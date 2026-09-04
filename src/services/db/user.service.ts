@@ -91,6 +91,7 @@ export class UserDbService {
     return rows.map((r) => {
       let desc = 'ได้รับคะแนนกิจกรรม';
       if (r.reason === 'comment_post') desc = 'แสดงความคิดเห็นในโพสต์ (+1 แต้ม)';
+      else if (r.reason === 'like_post') desc = 'ถูกใจโพสต์ในกระดานข่าวสาร (+1 แต้ม)';
       else if (r.reason === 'vote_poll') desc = 'ร่วมโหวตโพลสำรวจความคิดเห็น (+5 แต้ม)';
       else if (r.reason === 'hof_vote') desc = 'ร่วมโหวตศิษย์เก่าดีเด่น Hall of Fame';
       else if (r.reason === 'unlock_photo') desc = 'ตอบคำถามปลดล็อกภาพถ่ายความทรงจำ (+5 แต้ม)';

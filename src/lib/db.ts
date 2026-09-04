@@ -685,6 +685,15 @@ export async function addPostComment(postId: number, userId: number, content: st
   );
   // ให้พอยท์ผู้ใช้ +1
   await pool.query(`update users set total_points = total_points + 1 where id = $1`, [userId]);
+
+  // บันทึกประวัติแต้มสะสม
+  try {
+    await pool.query(
+      `insert into point_transactions (user_id, points, reason, reference_id)
+       values ($1, 1, 'comment_post', $2)`,
+      [userId, String(postId)]
+    );
+  } catch {}
   
   const user = await pool.query(`select name, avatar_url from users where id = $1`, [userId]);
   return {
@@ -698,7 +707,7 @@ export async function addPostComment(postId: number, userId: number, content: st
 
 export async function togglePostLike(postId: number, userId: number) {
   const { rows } = await pool.query(
-    `select id from post_interactions where post_id = $1 and user_id = $2 and type = 'reaction'`,
+    `select id from post_interactions where post_id = $1 and user_id = $2 and type in ('reaction', 'like')`,
     [postId, userId]
   );
   if (rows.length > 0) {
@@ -706,10 +715,22 @@ export async function togglePostLike(postId: number, userId: number) {
     return { liked: false };
   } else {
     await pool.query(
-      `insert into post_interactions (post_id, user_id, type, points_earned) values ($1, $2, 'reaction', 0)`,
+      `insert into post_interactions (post_id, user_id, type, points_earned) values ($1, $2, 'reaction', 1)`,
       [postId, userId]
     );
-    return { liked: true };
+    // เพิ่มแต้ม +1 ให้ผู้ใช้
+    await pool.query(`update users set total_points = total_points + 1 where id = $1`, [userId]);
+
+    // บันทึกประวัติแต้มสะสม
+    try {
+      await pool.query(
+        `insert into point_transactions (user_id, points, reason, reference_id)
+         values ($1, 1, 'like_post', $2)`,
+        [userId, String(postId)]
+      );
+    } catch {}
+
+    return { liked: true, pointsAwarded: 1 };
   }
 }
 
