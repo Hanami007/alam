@@ -21,7 +21,20 @@ export async function POST(req: Request) {
       workProvinceId,
       showWorkplaceOnMap = true,
       bio,
+      consentPdpa,
+      consentTerms,
+      consentVerification,
+      consentYearbook = true,
+      consentCommunications = true,
     } = body;
+
+    // ตรวจสอบความยินยอมที่จำเป็น
+    if (!consentPdpa || !consentTerms || !consentVerification) {
+      return NextResponse.json(
+        { error: 'กรุณายอมรับข้อกำหนด นโยบายความเป็นส่วนตัว (PDPA) และการยินยอมตรวจสอบตัวตนก่อนลงทะเบียน' },
+        { status: 400 }
+      );
+    }
 
     // ตรวจสอบฟิลด์ที่จำเป็น
     if (!studentId || !name || !email || !password || !generationOptionId || !provinceOptionId) {
@@ -182,6 +195,32 @@ export async function POST(req: Request) {
       );
     } catch (e) {
       console.error('[Register] Error notifying batchmates:', e);
+    }
+
+    // 3. บันทึกประวัติความยินยอม (Consent Audit Trail)
+    try {
+      await pool.query(
+        `INSERT INTO audit_logs (actor_id, action, target_type, target_id, metadata)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          newUser.id,
+          'USER_REGISTER_CONSENT',
+          'user',
+          newUser.id,
+          JSON.stringify({
+            consentPdpa: Boolean(consentPdpa),
+            consentTerms: Boolean(consentTerms),
+            consentVerification: Boolean(consentVerification),
+            consentYearbook: Boolean(consentYearbook),
+            consentCommunications: Boolean(consentCommunications),
+            showHometownOnMap: Boolean(showHometownOnMap),
+            showWorkplaceOnMap: Boolean(showWorkplaceOnMap),
+            agreedAt: new Date().toISOString(),
+          }),
+        ]
+      );
+    } catch (e) {
+      console.error('[Register] Error recording consent audit log:', e);
     }
 
     // ตรวจสอบเลื่อนสถานะ 4 ปีระบบรวม
