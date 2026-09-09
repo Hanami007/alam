@@ -251,15 +251,21 @@ export function YearbookManager() {
               {filteredEntries.map((item) => (
                 <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors">
                   <td className="p-3.5">
+                    {item.avatarUrl ? (
                     <img
-                      src={item.avatarUrl || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=600&q=80'}
+                      src={item.avatarUrl}
                       alt={item.name}
                       className="h-10 w-10 rounded-xl object-cover ring-2 ring-slate-100"
                     />
+                  ) : (
+                    <div className="h-10 w-10 rounded-xl ring-2 ring-slate-100 bg-gradient-to-br from-indigo-50 to-purple-100 flex items-center justify-center">
+                      <span className="text-xs font-extrabold text-indigo-500">{item.name ? item.name.substring(0, 2) : 'CS'}</span>
+                    </div>
+                  )}
                   </td>
                   <td className="p-3.5">
                     <span className="inline-block px-2.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-extrabold text-[11px] border border-indigo-100">
-                      {item.generation || 'รุ่น 43'}
+                    {item.generation || '-'}
                     </span>
                   </td>
                   <td className="p-3.5 font-bold text-slate-900">

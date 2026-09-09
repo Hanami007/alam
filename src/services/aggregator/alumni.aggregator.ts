@@ -102,6 +102,38 @@ export class AlumniAggregatorService {
       unifiedList.push(unified);
     }
 
+    // เพิ่มผู้ใช้จาก Local DB ทั้งหมดที่ลงทะเบียนแล้ว
+    for (const u of dbUsers) {
+      if (!unifiedList.some((item) => String(item.id) === String(u.id) || (u.student_id && item.studentId === u.student_id))) {
+        const unified: UnifiedAlumniProfile = {
+          id: u.id,
+          studentId: u.student_id || '',
+          name: u.name,
+          faculty: 'คณะวิทยาศาสตร์',
+          department: 'สาขาวิชาวิทยาการคอมพิวเตอร์',
+          generation: u.generation || 'รุ่นทั่วไป',
+          generationNumber: parseInt((u.generation || '').replace(/[^0-9]/g, ''), 10) || 0,
+          admissionYear: u.admission_year || 2566,
+          graduationYear: u.expected_graduation_year || 2570,
+          status: u.status,
+          studentStatus: u.student_status || 'alumni',
+          position: u.position || 'ศิษย์เก่า',
+          company: u.company || '',
+          careerType: u.career_type || 'ทั่วไป',
+          province: u.province || 'เชียงใหม่',
+          bio: u.bio || '',
+          avatarUrl: u.avatar_url || '',
+          totalPoints: u.total_points || 0,
+          isRegisteredUser: true,
+        };
+
+        if (params.province && unified.province !== params.province) continue;
+        if (params.careerType && unified.careerType !== params.careerType) continue;
+
+        unifiedList.push(unified);
+      }
+    }
+
     return unifiedList;
   }
 

@@ -2,6 +2,7 @@
 
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import {
   GraduationCap,
   Lock,
@@ -143,6 +144,19 @@ function LoginForm() {
           )}
         </button>
       </form>
+
+      {/* Register Link */}
+      <div className="text-center pt-2 border-t border-slate-100">
+        <p className="text-xs text-slate-500">
+          ยังไม่มีบัญชีสมาชิกใช่หรือไม่?{' '}
+          <Link
+            href="/register"
+            className="font-bold text-indigo-600 hover:text-indigo-800 underline transition-colors"
+          >
+            สมัครสมาชิกใหม่ที่นี่
+          </Link>
+        </p>
+      </div>
 
       {/* Quick Login Helper Box */}
       <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100 space-y-2.5">

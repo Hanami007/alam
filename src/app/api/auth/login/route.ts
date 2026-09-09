@@ -23,6 +23,26 @@ export async function POST(req: Request) {
       );
     }
 
+    if (user.status === 'pending') {
+      return NextResponse.json(
+        {
+          error: 'บัญชีของคุณอยู่ระหว่างรอการอนุมัติจากผู้ดูแลระบบหรือเพื่อนร่วมรุ่น',
+          status: 'pending',
+        },
+        { status: 403 }
+      );
+    }
+
+    if (user.status === 'rejected') {
+      return NextResponse.json(
+        {
+          error: 'บัญชีนี้ไม่ผ่านการอนุมัติการเข้าใช้งานระบบ กรุณาติดต่อผู้ดูแลระบบ',
+          status: 'rejected',
+        },
+        { status: 403 }
+      );
+    }
+
     // สร้าง session ใหม่
     const sessionId = await createSession(user.id);
 
