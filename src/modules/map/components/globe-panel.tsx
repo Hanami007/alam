@@ -18,6 +18,12 @@ import {
   Home,
   ZoomIn,
   ZoomOut,
+  Compass,
+  Map as MapIcon,
+  Eye,
+  Moon,
+  Sun,
+  Layers,
 } from 'lucide-react';
 import {
   GLOBE_CLUSTERS,
@@ -27,38 +33,80 @@ import {
   type GlobeCountryCluster,
   type GlobeAlumni,
 } from '@/lib/globe-data';
+import { getProvinceCoords, THAILAND_PROVINCE_COORDS } from '@/lib/thailand-province-coords';
+import { THAILAND_PROVINCE_PATHS } from '@/lib/thailand-province-paths';
 
 // ─── Dynamic import (ssr: false) สำหรับ react-globe.gl ───────────────────────
 const ReactGlobe = dynamic(() => import('react-globe.gl').then((m) => m.default ?? m), {
   ssr: false,
   loading: () => (
-    <div className="flex flex-col items-center justify-center w-full h-full gap-4">
+    <div className="flex flex-col items-center justify-center w-full h-full gap-4 bg-slate-950">
       <div className="relative w-20 h-20">
-        <div className="absolute inset-0 rounded-full border-4 border-indigo-400/30 animate-ping" />
-        <div className="absolute inset-2 rounded-full border-4 border-indigo-600/50 animate-spin" style={{ animationDuration: '2s' }} />
-        <div className="absolute inset-4 rounded-full bg-indigo-50 backdrop-blur-sm" />
+        <div className="absolute inset-0 rounded-full border-4 border-cyan-400/30 animate-ping" />
+        <div className="absolute inset-2 rounded-full border-4 border-indigo-500/50 animate-spin" style={{ animationDuration: '2s' }} />
+        <div className="absolute inset-4 rounded-full bg-indigo-950/60 backdrop-blur-sm" />
       </div>
-      <p className="text-slate-600 text-sm font-semibold tracking-wider animate-pulse">กำลังโหลดแผนที่โลก 3D...</p>
+      <p className="text-cyan-300 text-sm font-bold tracking-wider animate-pulse">กำลังโหลดแผนที่โลกสมจริง 3D & เขตแดนจังหวัด...</p>
     </div>
   ),
 });
 
-type MapMode = 'hometown' | 'workplace';
-type RegionKey = 'all' | 'thailand' | 'asia' | 'americas' | 'europe' | 'oceania' | 'middleeast';
+export type MapMode = 'hometown' | 'workplace';
+export type RegionKey = 'all' | 'thailand' | 'asia' | 'americas' | 'europe' | 'oceania' | 'middleeast';
+export type GlobeTheme = 'satellite' | 'night' | 'clean';
 
-interface GlobePanelProps {
-  hometownData?: any[];
-  workplaceData?: any[];
+export interface MapPoint {
+  id: number;
+  name: string;
+  avatar_url?: string;
+  position?: string;
+  company?: string;
+  generation?: string;
+  career_type?: string;
+  student_status?: string;
+  province_id: number;
+  province_name: string;
+  region: string;
+  metro: boolean;
 }
 
-// ─── Regional Colors (Clean, Modern Light-theme Friendly) ─────────────────────
+export interface GlobePanelProps {
+  hometownData?: MapPoint[];
+  workplaceData?: MapPoint[];
+  onSwitchToThailand?: (province?: string) => void;
+}
+
+// ─── Bangkok & Metro Provinces ──────────────────────────────────────────────
+const METRO_PROVINCES = ['กรุงเทพมหานคร', 'นนทบุรี', 'ปทุมธานี', 'สมุทรปราการ', 'สมุทรสาคร', 'นครปฐม'];
+
+// ─── 3D Separated/Exploded Bangkok & Perimeter Coordinate Settings ───────────
+const METRO_3D_ORIGIN = { lng: 100.45, lat: 13.80 };
+const METRO_3D_TARGET = { lng: 93.20, lat: 13.80 };
+const METRO_3D_SCALE = 2.8;
+
+function transformCoords(
+  coords: any,
+  scale = METRO_3D_SCALE,
+  origLng = METRO_3D_ORIGIN.lng,
+  origLat = METRO_3D_ORIGIN.lat,
+  targetLng = METRO_3D_TARGET.lng,
+  targetLat = METRO_3D_TARGET.lat
+): any {
+  if (typeof coords[0] === 'number') {
+    const [lng, lat] = coords;
+    return [targetLng + (lng - origLng) * scale, targetLat + (lat - origLat) * scale];
+  }
+  return coords.map((c: any) => transformCoords(c, scale, origLng, origLat, targetLng, targetLat));
+}
+
+// ─── Regional Colors ─────────────────────────────────────────────────────────
 const REGION_COLORS: Record<GlobeCountryCluster['region'], { ring: string; glow: string; bg: string; label: string }> = {
-  thailand:   { ring: '#4F46E5', glow: 'rgba(79,70,229,0.25)',  bg: '#EEF2FF', label: 'ไทย' },
-  asia:       { ring: '#0D9488', glow: 'rgba(13,148,136,0.25)', bg: '#F0FDFA', label: 'เอเชีย' },
-  americas:   { ring: '#D97706', glow: 'rgba(217,119,6,0.25)',  bg: '#FFFBEB', label: 'อเมริกา' },
-  europe:     { ring: '#9333EA', glow: 'rgba(147,51,234,0.25)', bg: '#FAF5FF', label: 'ยุโรป' },
-  oceania:    { ring: '#16A34A', glow: 'rgba(22,163,74,0.25)',  bg: '#F0FDF4', label: 'โอเชียเนีย' },
-  middleeast: { ring: '#DC2626', glow: 'rgba(220,38,38,0.25)',  bg: '#FEF2F2', label: 'ตะวันออกกลาง' },
+  thailand:   { ring: '#06B6D4', glow: 'rgba(6,182,212,0.35)',  bg: '#ECFEFF', label: 'ไทย' },
+  asia:       { ring: '#10B981', glow: 'rgba(16,185,129,0.35)', bg: '#ECFDF5', label: 'เอเชีย' },
+  americas:   { ring: '#F59E0B', glow: 'rgba(245,158,11,0.35)', bg: '#FFFBEB', label: 'อเมริกา' },
+  europe:     { ring: '#A855F7', glow: 'rgba(168,85,247,0.35)', bg: '#FAF5FF', label: 'ยุโรป' },
+  oceania:    { ring: '#22C55E', glow: 'rgba(34,197,94,0.35)',  bg: '#F0FDF4', label: 'โอเชียเนีย' },
+  middleeast: { ring: '#EF4444', glow: 'rgba(239,68,68,0.35)',  bg: '#FEF2F2', label: 'ตะวันออกกลาง' },
 };
 
 // ─── Natural Earth Country Name / ISO Mapping ────────────────────────────────
@@ -80,8 +128,12 @@ const COUNTRY_GEO_MAP: Record<string, string[]> = {
   TW: ['TW', 'TWN', 'Taiwan'],
 };
 
-function getClusterForFeature(feature: any): GlobeCountryCluster | undefined {
+function getClusterForFeature(feature: any, clusters: GlobeCountryCluster[]): GlobeCountryCluster | undefined {
   const p = feature.properties || {};
+  if (p.isProvince && p.name_th) {
+    return clusters.find((c) => c.country_code === 'TH' && c.city === p.name_th);
+  }
+
   const iso2 = p.ISO_A2;
   const iso3 = p.ISO_A3 || p.ADM0_A3;
   const name = p.NAME || p.NAME_LONG;
@@ -92,71 +144,246 @@ function getClusterForFeature(feature: any): GlobeCountryCluster | undefined {
       (iso3 && aliases.includes(iso3)) ||
       (name && aliases.includes(name))
     ) {
-      return GLOBE_CLUSTERS.find((c) => c.country_code === code);
+      return clusters.find((c) => c.country_code === code);
     }
   }
   return undefined;
 }
 
-// ─── Map Pin & Data Helpers ──────────────────────────────────────────────────
-
-
-// การ์ดศิษย์เก่าในธีมสว่าง
-function AlumniCard({ alumni }: { alumni: GlobeAlumni }) {
+// ─── การ์ดศิษย์เก่า ──────────────────────────────────────────────────────────
+function AlumniCard({ alumni, onClick }: { alumni: GlobeAlumni; onClick?: () => void }) {
   return (
-    <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 hover:bg-indigo-50/50 border border-slate-200/80 hover:border-indigo-200 transition-colors group">
+    <div
+      onClick={onClick}
+      className="flex items-start gap-3 p-3.5 rounded-2xl bg-slate-50 hover:bg-indigo-50/60 border border-slate-200/80 hover:border-indigo-300 transition-all group cursor-pointer active:scale-[0.99] shadow-2xs hover:shadow-sm"
+    >
       <div className="relative shrink-0">
         {alumni.avatar_url ? (
-          <img src={alumni.avatar_url} alt={alumni.name} className="w-10 h-10 rounded-full object-cover ring-2 ring-indigo-200" />
+          <img
+            src={alumni.avatar_url}
+            alt={alumni.name}
+            className="w-11 h-11 rounded-2xl object-cover ring-2 ring-indigo-200/80 group-hover:ring-indigo-400 transition-all shadow-2xs"
+          />
         ) : (
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-extrabold text-sm shadow-2xs">
             {alumni.name.charAt(0)}
           </div>
         )}
         <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center shadow-xs">
-          <GraduationCap className="w-2 h-2 text-white" />
+          <GraduationCap className="w-2.5 h-2.5 text-white" />
         </div>
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-slate-900 font-bold text-sm truncate">{alumni.name}</p>
-        <p className="text-slate-600 text-xs truncate">{alumni.position}</p>
+        <div className="flex items-center gap-1.5 justify-between">
+          <p className="text-slate-900 font-extrabold text-sm truncate group-hover:text-indigo-600 transition-colors">
+            {alumni.name}
+          </p>
+          {alumni.generation && (
+            <span className="shrink-0 px-2 py-0.5 rounded-md bg-indigo-100/80 text-indigo-700 text-[11px] font-black">
+              {alumni.generation}
+            </span>
+          )}
+        </div>
+        <p className="text-slate-600 text-xs truncate mt-0.5 font-medium">{alumni.position || 'ศิษย์เก่า CSMJU'}</p>
         {alumni.company && (
-          <div className="flex items-center gap-1 mt-0.5">
+          <div className="flex items-center gap-1.5 mt-1">
             <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
             <p className="text-slate-500 text-xs truncate">{alumni.company}</p>
           </div>
         )}
-        {alumni.generation && (
-          <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
-            {alumni.generation}
-          </span>
-        )}
+        <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-cyan-600 font-bold">
+          <MapPin className="w-3 h-3 shrink-0" />
+          <span className="truncate">{alumni.city}</span>
+        </div>
       </div>
     </div>
   );
 }
 
-export function GlobePanel({ hometownData = [], workplaceData = [] }: GlobePanelProps) {
+// ─── Modal แสดงโปรไฟล์ศิษย์เก่าฉบับเต็ม ─────────────────────────────────────────
+function AlumniProfileModal({
+  alumni,
+  onClose,
+}: {
+  alumni: GlobeAlumni;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md animate-fade-in"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-md bg-white p-6 sm:p-7 shadow-2xl rounded-[32px] border border-slate-100 space-y-4 animate-scale-up max-h-[90vh] overflow-y-auto"
+      >
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors cursor-pointer z-10"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        {/* Profile Header */}
+        <div className="text-center space-y-3">
+          <div className="relative inline-block">
+            {alumni.avatar_url ? (
+              <img
+                src={alumni.avatar_url}
+                alt={alumni.name}
+                className="h-28 w-28 rounded-3xl object-cover mx-auto ring-4 ring-indigo-100 shadow-md"
+              />
+            ) : (
+              <div className="h-28 w-28 rounded-3xl bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-black text-4xl flex items-center justify-center mx-auto ring-4 ring-indigo-100 shadow-md">
+                {alumni.name.charAt(0)}
+              </div>
+            )}
+            <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-emerald-500 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full shadow-sm flex items-center gap-1 border-2 border-white">
+              <GraduationCap className="h-3 w-3" /> ศิษย์เก่า CSMJU
+            </span>
+          </div>
+
+          <div className="pt-1">
+            <div className="flex flex-wrap items-center justify-center gap-1.5 mb-1">
+              {alumni.generation && (
+                <span className="inline-block bg-indigo-50 text-indigo-700 px-3 py-0.5 text-xs font-black rounded-full border border-indigo-100">
+                  {alumni.generation}
+                </span>
+              )}
+              <span className="inline-block bg-slate-100 text-slate-600 px-2.5 py-0.5 text-xs font-bold rounded-full">
+                {alumni.country_name}
+              </span>
+            </div>
+            <h2 className="text-xl font-extrabold text-slate-900">{alumni.name}</h2>
+            <p className="text-xs text-indigo-600 font-bold mt-0.5 flex items-center justify-center gap-1">
+              <MapPin className="h-3.5 w-3.5" />
+              <span>{alumni.city} • {alumni.country_name}</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Job & Location Details */}
+        <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 space-y-3 text-left">
+          {alumni.position && (
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 mt-0.5">
+                <Briefcase className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">ตำแหน่งงาน</p>
+                <p className="text-sm font-extrabold text-slate-800 break-words">{alumni.position}</p>
+              </div>
+            </div>
+          )}
+
+          {alumni.company && (
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-teal-100 text-teal-600 mt-0.5">
+                <Building2 className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">บริษัท / หน่วยงาน</p>
+                <p className="text-sm font-extrabold text-slate-800 break-words">{alumni.company}</p>
+              </div>
+            </div>
+          )}
+
+          {alumni.career_type && (
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-600 mt-0.5">
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">กลุ่มสายอาชีพ</p>
+                <p className="text-sm font-extrabold text-slate-800 break-words">{alumni.career_type}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={onClose}
+          className="w-full py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-sm shadow-md shadow-indigo-200 transition-all cursor-pointer"
+        >
+          ปิดหน้าต่าง
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function GlobePanel({
+  hometownData = [],
+  workplaceData = [],
+  onSwitchToThailand,
+}: GlobePanelProps) {
   const globeRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 720, height: 620 });
   const [mode, setMode] = useState<MapMode>('hometown');
+  const [globeTheme, setGlobeTheme] = useState<GlobeTheme>('clean');
   const [selectedRegion, setSelectedRegion] = useState<RegionKey>('all');
   const [selectedCluster, setSelectedCluster] = useState<GlobeCountryCluster | null>(null);
+  const [selectedArea, setSelectedArea] = useState<GlobeCountryCluster | null>(null);
+  const [selectedAlumnus, setSelectedAlumnus] = useState<GlobeAlumni | null>(null);
   const [isZoomedIn, setIsZoomedIn] = useState(false);
   const [autoRotate, setAutoRotate] = useState(true);
   const [globeReady, setGlobeReady] = useState(false);
-  const [countries, setCountries] = useState<any[]>([]);
+  const [allPolygons, setAllPolygons] = useState<any[]>([]);
+  const [hoveredMetroProvince, setHoveredMetroProvince] = useState<string | null>(null);
 
-  // Fetch world countries GeoJSON
+  // ─── Fetch GeoJSON: World Countries + Thailand 77 Provinces ─────────────────
   useEffect(() => {
-    fetch('https://raw.githubusercontent.com/vasturiano/react-globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson')
-      .then((r) => r.json())
-      .then((data) => setCountries(data.features ?? []))
-      .catch(() => setCountries([]));
+    Promise.all([
+      fetch('https://raw.githubusercontent.com/vasturiano/react-globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson')
+        .then((r) => r.json())
+        .catch(() => ({ features: [] })),
+      fetch('/thailand-provinces.geojson')
+        .then((r) => r.json())
+        .catch(() => ({ features: [] })),
+    ]).then(([worldData, thaiData]) => {
+      // Filter out Thailand from world polygon so Thailand is divided into all 77 real province territories!
+      const otherCountries = (worldData.features || []).filter((f: any) => {
+        const p = f.properties || {};
+        const iso = p.ISO_A2 || p.ISO_A3;
+        const name = p.NAME || p.NAME_LONG;
+        return iso !== 'TH' && iso !== 'THA' && name !== 'Thailand';
+      });
+
+      // Mark Thai features with isProvince = true and ensure name_th is present
+      const thaiProvinces = (thaiData.features || []).map((f: any) => ({
+        ...f,
+        properties: {
+          ...f.properties,
+          isProvince: true,
+          country_code: 'TH',
+        },
+      }));
+
+      // สร้างรูปทรง 3D แยกขยายสำหรับ กทม. และ 5 จังหวัดปริมณฑล ในน่านน้ำทะเลอันดามัน
+      const metro3DProvinces = (thaiData.features || [])
+        .filter((f: any) => METRO_PROVINCES.includes(f.properties?.name_th))
+        .map((f: any) => ({
+          type: 'Feature',
+          properties: {
+            ...f.properties,
+            isProvince: true,
+            isMetro3D: true,
+            country_code: 'TH',
+            name_th: f.properties?.name_th,
+            name: `${f.properties?.name_th} (3D ขยาย)`,
+          },
+          geometry: {
+            type: f.geometry.type,
+            coordinates: transformCoords(f.geometry.coordinates),
+          },
+        }));
+
+      setAllPolygons([...otherCountries, ...thaiProvinces, ...metro3DProvinces]);
+    });
   }, []);
 
-  // Responsive container measurement (ให้ลูกโลกขยายเต็มกรอบ 100% เสมอ)
+  // Responsive container measurement
   useEffect(() => {
     if (!containerRef.current) return;
     const update = () => {
@@ -174,12 +401,66 @@ export function GlobePanel({ hometownData = [], workplaceData = [] }: GlobePanel
     return () => ro.disconnect();
   }, []);
 
-  // สเปกพื้นผิวลูกโลกธีมสว่าง (Clean Soft Sky-Blue Ocean)
+  // ─── Dynamically Build Clusters from Thailand DB + International Mock ───────
+  const activeClusters = useMemo(() => {
+    const intlClusters = GLOBE_CLUSTERS.filter((c) => c.country_code !== 'TH');
+    const thaiSource = mode === 'hometown' ? hometownData : workplaceData;
+
+    if (!thaiSource || thaiSource.length === 0) {
+      return GLOBE_CLUSTERS;
+    }
+
+    // Group Thai database alumni by province
+    const provMap = new Map<string, MapPoint[]>();
+    for (const p of thaiSource) {
+      const pName = p.province_name || (p as any).provinceName;
+      if (!pName) continue;
+      const list = provMap.get(pName) ?? [];
+      list.push(p);
+      provMap.set(pName, list);
+    }
+
+    const thaiClusters: GlobeCountryCluster[] = Array.from(provMap.entries()).map(
+      ([provName, people]) => {
+        const coords = getProvinceCoords(provName);
+        return {
+          country_code: 'TH',
+          country_name: 'ประเทศไทย',
+          city: provName,
+          lat: coords.lat,
+          lng: coords.lng,
+          count: people.length,
+          flag: '🇹🇭',
+          alumni: people.map((a) => ({
+            id: a.id,
+            name: a.name,
+            avatar_url: a.avatar_url,
+            position: a.position,
+            company: a.company,
+            generation: a.generation,
+            career_type: a.career_type,
+            country_code: 'TH',
+            country_name: 'ประเทศไทย',
+            city: provName,
+            lat: coords.lat,
+            lng: coords.lng,
+            student_status: (a.student_status === 'studying' ? 'student' : 'alumni') as any,
+          })),
+          region: 'thailand',
+        };
+      }
+    );
+
+    thaiClusters.sort((a, b) => b.count - a.count);
+    return [...thaiClusters, ...intlClusters];
+  }, [mode, hometownData, workplaceData]);
+
+  // Clean light material fallback
   const globeMaterial = useMemo(() => {
     return new THREE.MeshStandardMaterial({
-      color: '#dbeafe', // สีมหาสมุทรฟ้านวลสะอาดตา
-      roughness: 0.65,
-      metalness: 0.05,
+      color: '#f8fafc',
+      roughness: 0.85,
+      metalness: 0.02,
     });
   }, []);
 
@@ -187,159 +468,298 @@ export function GlobePanel({ hometownData = [], workplaceData = [] }: GlobePanel
   const handleGlobeReady = useCallback(() => {
     setGlobeReady(true);
     if (globeRef.current) {
-      globeRef.current.pointOfView({ lat: 4, lng: 100, altitude: 2.1 }, 0);
+      globeRef.current.pointOfView({ lat: 14, lng: 101, altitude: 2.0 }, 0);
     }
   }, []);
 
-  // ฟังก์ชันซูมเข้าไปยังประเทศ (Zoom-in to country ให้เต็มกรอบ)
+  // ─── ซูมเข้าไปยังประเทศ (Country Level) ──────────────────────────────────────
   const handleZoomCountry = useCallback((cluster: GlobeCountryCluster) => {
     setSelectedCluster(cluster);
+    setSelectedArea(null);
     setIsZoomedIn(true);
     setAutoRotate(false);
     if (globeRef.current) {
-      // ซูมเข้าใกล้ที่ระดับ altitude 0.28 เพื่อให้ประเทศขยายเต็มกรอบสวยงาม
       globeRef.current.pointOfView(
-        { lat: cluster.lat, lng: cluster.lng, altitude: 0.28 },
-        1500
-      );
-    }
-  }, []);
-
-  // ฟังก์ชันซูมออกกลับภาพรวมโลก (Zoom-out to global view)
-  const handleResetZoom = useCallback(() => {
-    setSelectedCluster(null);
-    setIsZoomedIn(false);
-    setAutoRotate(true);
-    if (globeRef.current) {
-      globeRef.current.pointOfView(
-        { lat: 4, lng: 100, altitude: 2.1 },
+        { lat: cluster.lat, lng: cluster.lng, altitude: 0.32 },
         1400
       );
     }
   }, []);
 
-  // บิน (fly) ไปยัง region ที่เลือก
+  // ─── ซูมเจาะจงลึกเข้าไปยังพื้นที่ / จังหวัดนั้นๆ (Area Level) ─────────────────
+  const handleSelectArea = useCallback((area: GlobeCountryCluster) => {
+    setSelectedCluster(area);
+    setSelectedArea(area);
+    setIsZoomedIn(true);
+    setAutoRotate(false);
+    if (globeRef.current) {
+      globeRef.current.pointOfView(
+        { lat: area.lat, lng: area.lng, altitude: 0.16 },
+        1200
+      );
+    }
+  }, []);
+
+  // ซูมออกกลับมุมมองประเทศ
+  const handleResetToCountry = useCallback(() => {
+    if (!selectedCluster) return;
+    setSelectedArea(null);
+    if (globeRef.current) {
+      globeRef.current.pointOfView(
+        { lat: selectedCluster.lat, lng: selectedCluster.lng, altitude: 0.32 },
+        1200
+      );
+    }
+  }, [selectedCluster]);
+
+  // ซูมออกกลับภาพรวมโลก
+  const handleResetZoom = useCallback(() => {
+    setSelectedCluster(null);
+    setSelectedArea(null);
+    setIsZoomedIn(false);
+    setAutoRotate(true);
+    if (globeRef.current) {
+      globeRef.current.pointOfView(
+        { lat: 14, lng: 101, altitude: 2.1 },
+        1400
+      );
+    }
+  }, []);
+
+  // บินไปยัง region
   const flyToRegion = useCallback((regionKey: RegionKey) => {
     const nav = GLOBE_REGION_NAVS.find((r) => r.key === regionKey);
     if (!nav || !globeRef.current) return;
     setAutoRotate(regionKey === 'all');
     setSelectedCluster(null);
+    setSelectedArea(null);
     setIsZoomedIn(false);
     globeRef.current.pointOfView({ lat: nav.lat, lng: nav.lng, altitude: nav.altitude }, 1200);
   }, []);
 
-  // รวมศิษย์เก่าของประเทศที่เลือก
-  const selectedCountryAlumni = useMemo(() => {
+  // รายชื่อพื้นที่ในประเทศที่เลือก
+  const countryAreas = useMemo(() => {
     if (!selectedCluster) return [];
-    return GLOBE_CLUSTERS.filter((c) => c.country_code === selectedCluster.country_code)
-      .flatMap((c) => c.alumni);
-  }, [selectedCluster]);
+    return activeClusters.filter((c) => c.country_code === selectedCluster.country_code);
+  }, [selectedCluster, activeClusters]);
 
-  const selectedCountryTotalCount = selectedCountryAlumni.length;
+  // รายชื่อศิษย์เก่าที่จะแสดง
+  const displayedAlumni = useMemo(() => {
+    if (!selectedCluster) return [];
+    if (selectedArea) {
+      const match = activeClusters.find(
+        (c) => c.country_code === selectedArea.country_code && c.city === selectedArea.city
+      );
+      return match ? match.alumni : [];
+    }
+    return countryAreas.flatMap((c) => c.alumni);
+  }, [selectedCluster, selectedArea, countryAreas, activeClusters]);
 
-  // รายชื่อประเทศที่มีศิษย์เก่า (สำหรับแถบทางลัด Quick Jump)
-  const uniqueCountriesWithAlumni = useMemo(() => {
-    const map = new Map<string, GlobeCountryCluster>();
-    for (const c of GLOBE_CLUSTERS) {
-      if (!map.has(c.country_code)) {
-        map.set(c.country_code, c);
+  const selectedCountryTotalCount = countryAreas.reduce((sum, c) => sum + c.count, 0);
+
+  // ─── รวบรวมข้อมูลระดับประเทศ (Country Level) สำหรับมุมมองตอนซูมออก ───────────
+  const countryLevelClusters = useMemo(() => {
+    const map = new Map<string, GlobeCountryCluster & { isCountryLevel?: boolean }>();
+    for (const c of activeClusters) {
+      const existing = map.get(c.country_code);
+      if (!existing) {
+        let cLat = c.lat;
+        let cLng = c.lng;
+        // พิกัดศูนย์กลางประเทศไทย
+        if (c.country_code === 'TH') {
+          cLat = 14.8;
+          cLng = 100.8;
+        }
+        map.set(c.country_code, {
+          country_code: c.country_code,
+          country_name: c.country_name,
+          city: c.country_name,
+          lat: cLat,
+          lng: cLng,
+          count: c.count,
+          flag: c.flag,
+          alumni: [...c.alumni],
+          region: c.region,
+          isCountryLevel: true,
+        });
+      } else {
+        existing.count += c.count;
+        existing.alumni.push(...c.alumni);
       }
     }
-    return Array.from(map.values()).sort((a, b) => {
-      const countA = GLOBE_CLUSTERS.filter((x) => x.country_code === a.country_code).reduce((sum, x) => sum + x.count, 0);
-      const countB = GLOBE_CLUSTERS.filter((x) => x.country_code === b.country_code).reduce((sum, x) => sum + x.count, 0);
-      return countB - countA;
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [activeClusters]);
+
+  // ─── ข้อมูลศิษย์เก่าในเขต กทม. และปริมณฑล สำหรับ Inset แยกขยาย ───────────────
+  const metroClusters = useMemo(() => {
+    return METRO_PROVINCES.map((pName) => {
+      const match = activeClusters.find((c) => c.country_code === 'TH' && c.city === pName);
+      if (match) return match;
+      const coords = getProvinceCoords(pName);
+      return {
+        country_code: 'TH',
+        country_name: 'ประเทศไทย',
+        city: pName,
+        lat: coords.lat,
+        lng: coords.lng,
+        count: 0,
+        flag: '🇹🇭',
+        alumni: [],
+        region: 'thailand' as const,
+      };
     });
-  }, []);
+  }, [activeClusters]);
 
-  // วงแหวนสัญญาณเรขาคณิต (Origin แม่โจ้ + วงแหวนไฮไลท์ประเทศที่เลือก)
-  const ringsData = useMemo(() => {
-    const list = [
-      {
-        lat: MAEJO_ORIGIN.lat,
-        lng: MAEJO_ORIGIN.lng,
-        color: ['rgba(245,158,11,0.95)', 'rgba(245,158,11,0.3)', 'rgba(245,158,11,0)'],
-        maxRadius: 4.5,
-      },
-    ];
-    if (selectedCluster) {
-      const col = REGION_COLORS[selectedCluster.region].ring;
-      list.push({
-        lat: selectedCluster.lat,
-        lng: selectedCluster.lng,
-        color: [col, `${col}55`, `${col}00`],
-        maxRadius: 3.5,
-      });
+  const totalMetroAlumni = metroClusters.reduce((sum, c) => sum + c.count, 0);
+
+  // ─── Polygons ที่จะแสดงบนลูกโลก 3D (รวมรูปทรง 3D แยกขยายเมื่อซูมเข้าดูประเทศไทย) ─
+  const activePolygons = useMemo(() => {
+    if (isZoomedIn && selectedCluster?.country_code === 'TH') {
+      return allPolygons;
     }
-    return list;
-  }, [selectedCluster]);
+    return allPolygons.filter((p: any) => !p.properties?.isMetro3D);
+  }, [allPolygons, isZoomedIn, selectedCluster]);
 
+
+  // ─── หมุดที่จะแสดงผลบนลูกโลก (รวมหมุด 3D Inset เมื่อซูมเข้าประเทศไทย) ─────────
+  const displayedPins = useMemo(() => {
+    // ถ้ายังไม่ได้ซูมเจาะจงประเทศใด -> แสดงเฉพาะหมุดระดับประเทศเท่านั้น!
+    if (!isZoomedIn || !selectedCluster) {
+      return countryLevelClusters;
+    }
+
+    // เมื่อกดเข้าประเทศใดแล้ว -> โชว์หมุดรายจังหวัด/พื้นที่ในประเทศนั้นๆ
+    const currentCountryAreas = activeClusters.filter(
+      (c) => c.country_code === selectedCluster.country_code
+    );
+
+    // รวมหมุดประเทศอื่นๆ ไว้เป็นจุดสังเกต
+    const otherCountries = countryLevelClusters.filter(
+      (c) => c.country_code !== selectedCluster.country_code
+    );
+
+    // ถ้ากำลังดูประเทศไทย ให้สร้างหมุด 3 มิติบนโซนแยกขยายด้วย
+    if (selectedCluster.country_code === 'TH') {
+      const metro3DPins = METRO_PROVINCES.map((pName) => {
+        const orig = getProvinceCoords(pName);
+        const transformed = transformCoords([orig.lng, orig.lat]);
+        const match = activeClusters.find((c) => c.country_code === 'TH' && c.city === pName);
+        return {
+          country_code: 'TH',
+          country_name: 'ประเทศไทย',
+          city: pName,
+          lat: transformed[1],
+          lng: transformed[0],
+          count: match?.count ?? 0,
+          flag: '🏙️',
+          alumni: match?.alumni ?? [],
+          region: 'thailand' as const,
+          isMetro3D: true,
+        };
+      });
+
+      const headerPin = {
+        country_code: 'TH',
+        country_name: 'ประเทศไทย',
+        city: 'กทม. และปริมณฑล (3D)',
+        lat: METRO_3D_TARGET.lat + 2.1,
+        lng: METRO_3D_TARGET.lng,
+        count: totalMetroAlumni,
+        flag: '🏙️',
+        alumni: [],
+        region: 'thailand' as const,
+        isMetro3DHeader: true,
+      };
+
+      return [...currentCountryAreas, ...metro3DPins, headerPin, ...otherCountries];
+    }
+
+    return [...currentCountryAreas, ...otherCountries];
+  }, [isZoomedIn, selectedCluster, countryLevelClusters, activeClusters, totalMetroAlumni]);
+
+  const uniqueCountriesWithAlumni = countryLevelClusters;
   const totalCountryCount = uniqueCountriesWithAlumni.length;
+  const totalPinsCount = activeClusters.length;
+  const totalAlumniInMode = activeClusters.reduce((sum, c) => sum + c.count, 0);
+
+  const isDarkCanvas = globeTheme === 'satellite' || globeTheme === 'night';
 
   return (
     <div className="flex flex-col gap-6">
-      {/* ─── Header (ธีมสว่าง สบายตา ทันสมัย) ─────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-indigo-50/90 via-white to-sky-50/80 p-6 sm:p-8 border border-indigo-100 shadow-sm">
+      {/* ─── Header ────────────────────────────────────────────────────────── */}
+      <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 p-6 sm:p-8 border border-slate-800 shadow-hero text-white">
+        {/* Glow backdrop */}
+        <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-cyan-500/20 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-16 -left-16 w-64 h-64 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
+
         <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="relative">
-                <div className="p-2.5 rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-200">
-                  <Globe className="h-6 w-6 text-white" />
-                </div>
+              <div className="p-2.5 rounded-2xl bg-cyan-500/20 text-cyan-400 border border-cyan-400/30 shadow-blue-glow">
+                <Globe className="h-6 w-6" />
               </div>
               <div>
-                <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-                  CSMJU Global Map
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight">
+                  CSMJU Global Network 🌍
                 </h1>
-                <p className="text-indigo-600 text-xs sm:text-sm font-semibold">แผนที่โลกศิษย์เก่า • กดที่หมุดปักเพื่อซูมดูประเทศ</p>
+                <p className="text-xs text-cyan-300 font-semibold">
+                  แผนที่เครือข่ายศิษย์ทั่วโลก • คลิกเลือกประเทศเพื่อซูมดูรายจังหวัด
+                </p>
               </div>
             </div>
+            <p className="text-xs sm:text-sm text-slate-300 max-w-xl">
+              สำรวจศิษย์เก่าแม่โจ้ที่กำลังทำงานและสร้างชื่อเสียงในนานาประเทศทั่วทุกมุมโลก
+            </p>
           </div>
 
-          {/* Stats Badges */}
-          <div className="flex gap-3 flex-wrap">
-            {[
-              { icon: Users,    value: TOTAL_ALUMNI_COUNT, label: 'ศิษย์เก่า', bg: 'bg-indigo-50 border-indigo-200/60 text-indigo-700' },
-              { icon: MapPin,   value: totalCountryCount,   label: 'ประเทศ',    bg: 'bg-teal-50 border-teal-200/60 text-teal-700' },
-              { icon: TrendingUp, value: GLOBE_CLUSTERS.length, label: 'เมือง/จุด', bg: 'bg-amber-50 border-amber-200/60 text-amber-700' },
-            ].map(({ icon: Icon, value, label, bg }) => (
-              <div key={label} className={`flex flex-col items-center px-4 py-2 rounded-2xl border ${bg}`}>
-                <Icon className="h-4 w-4 mb-0.5 opacity-80" />
-                <span className="font-black text-lg leading-none">{value}</span>
-                <span className="text-slate-500 text-xs font-medium">{label}</span>
+          {/* Quick Stats Grid */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 shrink-0 self-stretch sm:self-auto">
+            <div className="rounded-2xl bg-white/10 backdrop-blur-md p-3 border border-white/10 text-center">
+              <div className="flex items-center justify-center gap-1 text-cyan-400 mb-0.5">
+                <Globe className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-bold uppercase tracking-wider">ประเทศ</span>
               </div>
-            ))}
-          </div>
-        </div>
+              <p className="text-lg sm:text-xl font-black text-white">{totalCountryCount}</p>
+            </div>
 
-        {/* Maejo Origin callout */}
-        <div className="relative z-10 mt-4 flex items-center gap-2.5 p-3 rounded-2xl bg-emerald-50 border border-emerald-200 w-fit">
-          <div className="relative">
-            <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-sm" />
+            <div className="rounded-2xl bg-white/10 backdrop-blur-md p-3 border border-white/10 text-center">
+              <div className="flex items-center justify-center gap-1 text-emerald-400 mb-0.5">
+                <MapPin className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-bold uppercase tracking-wider">พิกัดเมือง</span>
+              </div>
+              <p className="text-lg sm:text-xl font-black text-white">{totalPinsCount}</p>
+            </div>
+
+            <div className="rounded-2xl bg-white/10 backdrop-blur-md p-3 border border-white/10 text-center">
+              <div className="flex items-center justify-center gap-1 text-amber-400 mb-0.5">
+                <Users className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-bold uppercase tracking-wider">ศิษย์เก่า</span>
+              </div>
+              <p className="text-lg sm:text-xl font-black text-white">{totalAlumniInMode}</p>
+            </div>
           </div>
-          <span className="text-emerald-800 text-xs font-bold tracking-wide">
-            🎓 จุดกำเนิด: มหาวิทยาลัยแม่โจ้ เชียงใหม่ • ปักหมุดเชื่อมโยงสู่ศิษย์เก่าทั่วโลก
-          </span>
         </div>
       </div>
 
-      {/* ─── Controls & Country Quick Switcher ──────────────────────────────── */}
-      <div className="flex flex-col gap-3">
-        {/* Mode Toggle & Reset View */}
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl border border-slate-200/80">
+      {/* ─── Control Bar ────────────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-3 rounded-[28px] bg-white p-4 sm:p-5 border border-slate-200/80 shadow-card">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Mode Tabs */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl border border-slate-200/80 shadow-xs">
             {([
-              { key: 'hometown',  icon: Home,     label: '🏡 ภูมิลำเนา' },
-              { key: 'workplace', icon: Briefcase, label: '💼 ที่ทำงาน/เรียน' },
+              { key: 'hometown', label: '🏡 ภูมิลำเนา' },
+              { key: 'workplace', label: '💼 สถานที่ทำงาน' },
             ] as const).map(({ key, label }) => (
               <button
                 key={key}
-                onClick={() => setMode(key)}
-                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all duration-200 cursor-pointer ${
+                onClick={() => {
+                  setMode(key);
+                  setSelectedArea(null);
+                }}
+                className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-200 cursor-pointer ${
                   mode === key
                     ? 'bg-white text-indigo-700 shadow-md shadow-indigo-100'
-                    : 'text-slate-500 hover:text-slate-700'
+                    : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 {label}
@@ -347,121 +767,78 @@ export function GlobePanel({ hometownData = [], workplaceData = [] }: GlobePanel
             ))}
           </div>
 
-          {/* Quick Zoom-out if currently zoomed */}
-          {isZoomedIn && (
-            <button
-              onClick={handleResetZoom}
-              className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 transition-all cursor-pointer active:scale-95"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span>ซูมออกกลับมุมมองโลก (Reset)</span>
-            </button>
-          )}
-        </div>
-
-        {/* Quick Country Pills (กดแล้วซูมเข้าไปยังประเทศนั้นทันที) */}
-        <div>
-          <div className="flex items-center gap-2 mb-1.5 text-xs font-extrabold text-slate-500 uppercase tracking-wider">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-            <span>กดหมุดประเทศที่มีคน ({totalCountryCount} ประเทศ):</span>
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            {uniqueCountriesWithAlumni.map((cluster) => {
-              const countryTotal = GLOBE_CLUSTERS.filter((x) => x.country_code === cluster.country_code)
-                .reduce((s, x) => s + x.count, 0);
-              const isSelected = selectedCluster?.country_code === cluster.country_code;
-
-              return (
-                <button
-                  key={cluster.country_code}
-                  onClick={() => handleZoomCountry(cluster)}
-                  className={`flex items-center gap-1.5 shrink-0 rounded-full px-3.5 py-1.5 text-xs font-extrabold transition-all duration-200 cursor-pointer border ${
-                    isSelected
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-200 scale-105'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-xs'
-                  }`}
-                >
-                  <span className="text-base leading-none">{cluster.flag}</span>
-                  <span>{cluster.country_name}</span>
-                  <span
-                    className={`ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                      isSelected ? 'bg-white text-indigo-700' : 'bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    {countryTotal}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Region Navigation */}
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          {GLOBE_REGION_NAVS.map((nav) => {
-            const isActive = selectedRegion === nav.key && !isZoomedIn;
-            return (
+          {/* ─── Realistic Theme Switcher (สลับมุมมองภาพแผนที่) ───── */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-900 rounded-2xl border border-slate-800 text-white shadow-xs">
+            <span className="text-[11px] font-bold text-slate-400 px-2 flex items-center gap-1">
+              <Layers className="w-3.5 h-3.5 text-cyan-400" />
+              <span>โหมดแผนที่:</span>
+            </span>
+            {([
+              { key: 'clean',     icon: Sun,   label: '🎨 ขาวคลีน (ดั้งเดิม)' },
+              { key: 'satellite', icon: Globe, label: '🛰️ ดาวเทียมสมจริง' },
+              { key: 'night',     icon: Moon,  label: '🌌 แสงไฟราตรี' },
+            ] as const).map(({ key, label }) => (
               <button
-                key={nav.key}
-                onClick={() => {
-                  setSelectedRegion(nav.key as RegionKey);
-                  flyToRegion(nav.key as RegionKey);
-                }}
-                className={`flex items-center gap-2 shrink-0 rounded-full px-4 py-2 text-xs sm:text-sm font-extrabold transition-all duration-200 cursor-pointer active:scale-95 border ${
-                  isActive
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 border-indigo-600 scale-105'
-                    : 'bg-white text-slate-600 border-slate-200/90 hover:bg-slate-50 hover:border-slate-300'
+                key={key}
+                onClick={() => setGlobeTheme(key)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                  globeTheme === key
+                    ? 'bg-cyan-500 text-slate-950 font-black shadow-blue-glow'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
                 }`}
               >
-                <span>{nav.flag}</span>
-                <span className="hidden sm:inline">{nav.label}</span>
+                {label}
               </button>
-            );
-          })}
-          <button
-            onClick={() => {
-              setAutoRotate((v) => !v);
-            }}
-            className={`flex items-center gap-2 shrink-0 rounded-full px-4 py-2 text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer border ${
-              autoRotate
-                ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-200'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            <RotateCcw className={`h-3.5 w-3.5 ${autoRotate ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
-            <span className="hidden sm:inline">{autoRotate ? 'หยุดหมุน' : 'หมุนอัตโนมัติ'}</span>
-          </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* ─── Globe + Side Panel ──────────────────────────────────────────────── */}
-      <div className="grid gap-6 lg:grid-cols-[1fr_380px] items-start">
+      <div className="grid gap-6 lg:grid-cols-[1fr_390px] items-start">
 
-        {/* Globe Canvas Container (ขยายเต็มกรอบ 100%) */}
+        {/* Globe Canvas Container */}
         <div
           ref={containerRef}
-          className="relative rounded-[32px] bg-[#dbeafe] border border-slate-200/90 overflow-hidden shadow-lg w-full"
+          className={`relative rounded-[32px] overflow-hidden shadow-hero w-full border ${
+            isDarkCanvas ? 'bg-[#020617] border-slate-800' : 'bg-white border-slate-200'
+          }`}
           style={{ height: dimensions.height }}
         >
-
           {/* Active Zoom Spotlight Banner */}
           {selectedCluster && isZoomedIn && (
-            <div className="absolute top-4 left-4 z-20 flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-white/95 border border-indigo-200 shadow-xl backdrop-blur-md">
-              <span className="text-3xl">{selectedCluster.flag}</span>
-              <div>
+            <div className="absolute top-4 left-4 z-20 flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-slate-900/90 text-white border border-cyan-500/40 shadow-xl backdrop-blur-md max-w-[90%]">
+              <span className="text-2xl sm:text-3xl shrink-0">{selectedCluster.flag}</span>
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
-                  <p className="text-indigo-600 text-[11px] font-extrabold uppercase tracking-wide">กำลังซูมเจาะจงประเทศ</p>
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shrink-0" />
+                  <p className="text-cyan-400 text-[10px] sm:text-[11px] font-black uppercase tracking-wide truncate">
+                    {selectedArea ? `กำลังดูเขตพื้นที่: ${selectedArea.city}` : `กำลังซูม: ${selectedCluster.country_name}`}
+                  </p>
                 </div>
-                <p className="text-slate-900 text-sm font-extrabold">{selectedCluster.country_name}</p>
+                <p className="text-white text-xs sm:text-sm font-extrabold truncate">
+                  {selectedArea ? `${selectedArea.city} (${selectedArea.count} คน)` : selectedCluster.country_name}
+                </p>
               </div>
-              <button
-                onClick={handleResetZoom}
-                className="ml-2 flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-200 cursor-pointer active:scale-95"
-              >
-                <ZoomOut className="w-3.5 h-3.5" />
-                ซูมออก
-              </button>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                {selectedArea && (
+                  <button
+                    onClick={handleResetToCountry}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold transition-all cursor-pointer"
+                    title="ดูทั้งประเทศ"
+                  >
+                    ทั้งประเทศ
+                  </button>
+                )}
+                <button
+                  onClick={handleResetZoom}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-black transition-all shadow-md shadow-cyan-500/30 cursor-pointer active:scale-95"
+                >
+                  <ZoomOut className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">ซูมออก</span>
+                </button>
+              </div>
             </div>
           )}
 
@@ -472,233 +849,743 @@ export function GlobePanel({ hometownData = [], workplaceData = [] }: GlobePanel
               onGlobeReady={handleGlobeReady}
               width={dimensions.width}
               height={dimensions.height}
-              backgroundColor="#dbeafe"
-              // ─── Light Theme Globe Sphere ─────────────────────────────────
+              backgroundColor={isDarkCanvas ? '#020617' : '#ffffff'}
+              globeImageUrl={
+                globeTheme === 'satellite'
+                  ? '/textures/earth-blue-marble.jpg'
+                  : globeTheme === 'night'
+                  ? '/textures/earth-night.jpg'
+                  : undefined
+              }
+              bumpImageUrl={
+                isDarkCanvas ? '/textures/earth-topology.png' : undefined
+              }
               showGlobe={true}
-              globeMaterial={globeMaterial}
-              showGraticules={true} // เส้นละติจูด/ลองจิจูดเบาๆ ให้เห็นมิติโลก
-              showAtmosphere={true}
-              atmosphereColor="#93c5fd" // แสงชั้นบรรยากาศฟ้าใส
-              atmosphereAltitude={0.12}
+              globeMaterial={globeTheme === 'clean' ? globeMaterial : undefined}
+              showGraticules={globeTheme === 'clean'}
+              showAtmosphere={isDarkCanvas}
+              atmosphereColor={globeTheme === 'night' ? '#6366f1' : '#38bdf8'}
+              atmosphereAltitude={0.16}
 
-              // ─── Polygons (แผ่นดินและประเทศสีขาว/พาสเทลสะอาดตา) ───────────
-              polygonsData={countries}
+              // ─── Polygons (แสดงเขตแดนทุกประเทศ + ฟ้าไล่เฉด + รูปทรง 3D แยกขยาย กทม. และปริมณฑล) ───────
+              polygonsData={activePolygons}
               polygonGeoJsonGeometry={(d: any) => d.geometry}
               polygonCapColor={(d: any) => {
-                const c = getClusterForFeature(d);
-                if (!c) return '#ffffff'; // ประเทศที่ไม่มีคนเป็นสีขาวเรียบ
-                if (selectedCluster?.country_code === c.country_code) {
-                  return '#c7d2fe'; // สีม่วงอ่อนเมื่อถูกเลือก
+                const p = d.properties || {};
+                const isThaiProv = p.isProvince;
+                const provName = p.name_th;
+                const isMetro3D = !!p.isMetro3D;
+
+                // ถ้าเป็นจังหวัดของไทย (ทั้งบนแผ่นดินใหญ่และรูปทรง 3D แยกขยาย)
+                if (isThaiProv) {
+                  const isAreaSel = selectedArea?.city === provName;
+                  const isHovered = hoveredMetroProvince === provName;
+                  const clusterMatch = activeClusters.find((c) => c.country_code === 'TH' && c.city === provName);
+                  const count = clusterMatch?.count ?? 0;
+
+                  if (isAreaSel) {
+                    return '#ec4899'; // สีชมพูเน้นชัดเจนเมื่อเลือก
+                  }
+                  if (isHovered && isMetro3D) {
+                    return '#06b6d4'; // สี cyan เมื่อชี้
+                  }
+                  if (count >= 5) {
+                    return isDarkCanvas ? 'rgba(3, 105, 161, 0.85)' : '#0369a1'; // ฟ้าเข้ม (หนาแน่นมาก)
+                  }
+                  if (count >= 3) {
+                    return isDarkCanvas ? 'rgba(14, 165, 233, 0.70)' : '#0ea5e9'; // ฟ้าสด (ปานกลาง)
+                  }
+                  if (count >= 1) {
+                    return isDarkCanvas ? 'rgba(56, 189, 248, 0.45)' : '#bae6fd'; // ฟ้าอ่อน (น้อย)
+                  }
+                  // จังหวัดที่ไม่มีคน: โชว์สีพื้นผิวสะอาด
+                  return isMetro3D
+                    ? (isDarkCanvas ? 'rgba(15, 23, 42, 0.85)' : '#f0f9ff')
+                    : (isDarkCanvas ? 'rgba(255, 255, 255, 0.05)' : '#ffffff');
                 }
-                return '#e0e7ff'; // สีครามพาสเทลสำหรับประเทศที่มีคน
+
+                // ประเทศอื่นๆ ในโลก
+                const c = getClusterForFeature(d, activeClusters);
+                if (!c) return isDarkCanvas ? 'rgba(255, 255, 255, 0.03)' : '#ffffff';
+                if (selectedCluster?.country_code === c.country_code) {
+                  return isDarkCanvas ? 'rgba(2, 132, 199, 0.60)' : '#bae6fd';
+                }
+                return isDarkCanvas ? 'rgba(6, 182, 212, 0.22)' : '#e0e7ff';
               }}
               polygonSideColor={(d: any) => {
-                const c = getClusterForFeature(d);
-                if (!c) return '#e2e8f0';
-                return '#a5b4fc';
+                const p = d.properties || {};
+                if (p.isMetro3D) {
+                  const isAreaSel = selectedArea?.city === p.name_th;
+                  return isAreaSel ? '#ec4899' : '#0284c7';
+                }
+                if (p.isProvince) {
+                  const isAreaSel = selectedArea?.city === p.name_th;
+                  return isAreaSel ? '#0284c7' : isDarkCanvas ? 'rgba(56, 189, 248, 0.3)' : '#cbd5e1';
+                }
+                return isDarkCanvas ? 'rgba(99, 102, 241, 0.3)' : '#cbd5e1';
               }}
               polygonStrokeColor={(d: any) => {
-                const c = getClusterForFeature(d);
-                if (!c) return '#cbd5e1'; // เส้นขอบสีเทาอ่อนสะอาด
-                if (selectedCluster?.country_code === c.country_code) {
-                  return '#4338ca';
+                const p = d.properties || {};
+                const isThaiProv = p.isProvince;
+                const provName = p.name_th;
+                const isMetro3D = !!p.isMetro3D;
+
+                if (isMetro3D) {
+                  const isAreaSel = selectedArea?.city === provName;
+                  return isAreaSel ? '#ffffff' : '#38bdf8';
                 }
-                return '#6366f1'; // เส้นขอบเด่นชัดสำหรับประเทศที่มีคน
+
+                // เส้นแบ่งเขตแดนแต่ละจังหวัดในไทย
+                if (isThaiProv) {
+                  const isAreaSel = selectedArea?.city === provName;
+                  if (isAreaSel) return '#ffffff';
+                  const clusterMatch = activeClusters.find((c) => c.country_code === 'TH' && c.city === provName);
+                  if (clusterMatch && clusterMatch.count > 0) {
+                    return isDarkCanvas ? '#38bdf8' : '#0284c7';
+                  }
+                  return isDarkCanvas ? 'rgba(255, 255, 255, 0.75)' : '#cbd5e1';
+                }
+
+                // เส้นขอบเขตประเทศ
+                const c = getClusterForFeature(d, activeClusters);
+                if (!c) return isDarkCanvas ? 'rgba(255, 255, 255, 0.35)' : '#cbd5e1';
+                if (selectedCluster?.country_code === c.country_code) {
+                  return '#0284c7';
+                }
+                return isDarkCanvas ? '#38bdf8' : '#94a3b8';
               }}
+              // ความสูงระนาบ 3D: ให้เขต 3D ขยาย ลอยตัวสูงขึ้นอย่างสวยงาม
               polygonAltitude={(d: any) => {
-                const c = getClusterForFeature(d);
-                if (!c) return 0.006; // แบนราบ
-                if (selectedCluster?.country_code === c.country_code) return 0.045; // ยกสูงเมื่อถูกซูม
-                return 0.022; // ยกตัวขึ้นเล็กน้อยให้ดูมีมิติ
+                const p = d.properties || {};
+                if (p.isMetro3D) {
+                  return selectedArea?.city === p.name_th ? 0.024 : 0.014;
+                }
+                return selectedArea?.city === p.name_th ? 0.008 : 0.005;
+              }}
+              polygonLabel={(d: any) => {
+                const p = d.properties || {};
+                if (p.isProvince && p.name_th) {
+                  const isMetro3D = !!p.isMetro3D;
+                  const clusterMatch = activeClusters.find((c) => c.country_code === 'TH' && c.city === p.name_th);
+                  const count = clusterMatch?.count ?? 0;
+
+                  if (isMetro3D) {
+                    return `
+                      <div style="
+                        background: rgba(15, 23, 42, 0.95);
+                        color: #ffffff;
+                        padding: 8px 12px;
+                        border-radius: 12px;
+                        border: 1.5px solid #38bdf8;
+                        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
+                        font-family: inherit;
+                        text-align: left;
+                      ">
+                        <div style="font-weight: 800; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                          <span>🏙️</span>
+                          <span>${p.name_th} (3D แยกขยาย)</span>
+                        </div>
+                        <div style="font-size: 11px; color: #38bdf8; margin-top: 3px; font-weight: 700;">
+                          ${count > 0 ? `👥 ศิษย์เก่า ${count} ท่าน • แตะเพื่อดูรายชื่อ` : '📍 เขตแดน 3D ขยาย'}
+                        </div>
+                      </div>
+                    `;
+                  }
+
+                  // ถ้ากำลังซูมดูประเทศไทยอยู่
+                  if (isZoomedIn && selectedCluster?.country_code === 'TH') {
+                    return `
+                      <div style="
+                        background: rgba(15, 23, 42, 0.95);
+                        color: #ffffff;
+                        padding: 8px 12px;
+                        border-radius: 12px;
+                        border: 1.5px solid rgba(56, 189, 248, 0.7);
+                        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
+                        font-family: inherit;
+                        text-align: left;
+                      ">
+                        <div style="font-weight: 800; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                          <span>🇹🇭</span>
+                          <span>เขตจังหวัด${p.name_th}</span>
+                        </div>
+                        <div style="font-size: 11px; color: #38bdf8; margin-top: 3px; font-weight: 700;">
+                          ${count > 0 ? `👥 ศิษย์เก่า ${count} ท่าน • แตะเพื่อดูรายชื่อ` : '📍 เขตแดนจังหวัด'}
+                        </div>
+                      </div>
+                    `;
+                  }
+                  // ถ้ายังไม่ได้ซูมเข้าประเทศไทย โชว์ข้อมูลภาพรวมประเทศไทย
+                  const thaiTotal = countryLevelClusters.find((c) => c.country_code === 'TH')?.count ?? 0;
+                  return `
+                    <div style="
+                      background: rgba(15, 23, 42, 0.95);
+                      color: #ffffff;
+                      padding: 8px 12px;
+                      border-radius: 12px;
+                      border: 1.5px solid rgba(6, 182, 212, 0.7);
+                      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
+                      font-family: inherit;
+                      text-align: left;
+                    ">
+                      <div style="font-weight: 800; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                        <span>🇹🇭</span>
+                        <span>ประเทศไทย (Thailand)</span>
+                      </div>
+                      <div style="font-size: 11px; color: #38bdf8; margin-top: 3px; font-weight: 700;">
+                        👥 ศิษย์เก่ารวม ${thaiTotal} ท่าน • คลิกเพื่อซูมดูรายจังหวัด
+                      </div>
+                    </div>
+                  `;
+                }
+                const c = getClusterForFeature(d, activeClusters);
+                const name = p.NAME || p.NAME_LONG || (c ? c.country_name : 'ดินแดน');
+                const count = c ? countryLevelClusters.find((x) => x.country_code === c.country_code)?.count ?? c.count : 0;
+                return `
+                  <div style="
+                    background: rgba(15, 23, 42, 0.95);
+                    color: #ffffff;
+                    padding: 8px 12px;
+                    border-radius: 12px;
+                    border: 1.5px solid rgba(99, 102, 241, 0.7);
+                    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
+                    font-family: inherit;
+                    text-align: left;
+                  ">
+                    <div style="font-weight: 800; font-size: 13px;">
+                      ${c ? c.flag + ' ' : '🌐 '}${c ? c.country_name : name}
+                    </div>
+                    <div style="font-size: 11px; color: #818cf8; margin-top: 3px; font-weight: 700;">
+                      ${count > 0 ? `👥 ศิษย์เก่า ${count} ท่าน • แตะเพื่อดู` : '🌍 คลิกเพื่อซูม'}
+                    </div>
+                  </div>
+                `;
               }}
               polygonsTransitionDuration={300}
               onPolygonClick={(d: any) => {
-                const c = getClusterForFeature(d);
+                const p = d.properties || {};
+                if (p.isProvince && p.name_th) {
+                  // ถ้ายังไม่ได้ซูมเข้าประเทศไทย ให้ซูมเข้าประเทศไทยก่อน!
+                  if (!isZoomedIn || selectedCluster?.country_code !== 'TH') {
+                    const thaiCountry = countryLevelClusters.find((c) => c.country_code === 'TH') || {
+                      country_code: 'TH',
+                      country_name: 'ประเทศไทย',
+                      city: 'ประเทศไทย',
+                      lat: 14.8,
+                      lng: 100.8,
+                      count: 0,
+                      flag: '🇹🇭',
+                      alumni: [],
+                      region: 'thailand' as const,
+                    };
+                    handleZoomCountry(thaiCountry);
+                    return;
+                  }
+
+                  // ถ้าซูมอยู่ในประเทศไทยแล้ว -> คลิกที่เขตจังหวัดเพื่อเลือกจังหวัดนั้น
+                  const clusterMatch = activeClusters.find((c) => c.country_code === 'TH' && c.city === p.name_th);
+                  if (clusterMatch) {
+                    handleSelectArea(clusterMatch);
+                  } else {
+                    const coords = getProvinceCoords(p.name_th);
+                    handleSelectArea({
+                      country_code: 'TH',
+                      country_name: 'ประเทศไทย',
+                      city: p.name_th,
+                      lat: coords.lat,
+                      lng: coords.lng,
+                      count: 0,
+                      flag: '🇹🇭',
+                      alumni: [],
+                      region: 'thailand',
+                    });
+                  }
+                  return;
+                }
+
+                const c = getClusterForFeature(d, activeClusters);
                 if (c) {
-                  handleZoomCountry(c);
+                  const matched = countryLevelClusters.find((x) => x.country_code === c.country_code) || c;
+                  handleZoomCountry(matched);
                 }
               }}
 
-              // ─── Surface Anchor Points (จุดเรืองแสงบนพื้นผิวโลก) ─────────────
-              pointsData={GLOBE_CLUSTERS}
-              pointLat="lat"
-              pointLng="lng"
-              pointAltitude={0.012}
-              pointRadius={(d: any) => selectedCluster?.country_code === d.country_code ? 0.45 : 0.25}
-              pointColor={(d: any) => selectedCluster?.country_code === d.country_code ? '#4338ca' : REGION_COLORS[d.region as GlobeCountryCluster['region']].ring}
-              onPointClick={(d: any) => handleZoomCountry(d)}
-
-              // ─── Origin & Active Pulsing Rings ────────────────────────────
-              ringsData={ringsData}
-              ringLat="lat"
-              ringLng="lng"
-              ringColor={(d: any) => d.color}
-              ringMaxRadius={(d: any) => d.maxRadius}
-              ringPropagationSpeed={2.5}
-              ringRepeatPeriod={800}
-
-              // ─── Sleek Modern Map Pins (หมุดปักแผนที่สวยงาม ขนาดพอดี ไม่บังจอ) ───
-              htmlElementsData={GLOBE_CLUSTERS}
+              // ─── Sleek Interactive Area Pins (ซูมออกโชว์แค่ประเทศ / ซูมเข้าโชว์จังหวัด) ───
+              htmlElementsData={displayedPins}
               htmlLat="lat"
               htmlLng="lng"
               htmlAltitude={0.025}
               htmlElement={(d: any) => {
                 const el = document.createElement('div');
-                const isSel = selectedCluster?.country_code === d.country_code;
-                const color = REGION_COLORS[d.region as GlobeCountryCluster['region']].ring;
+                const isCountryLevel = !!d.isCountryLevel;
+                const isMetro3DHeader = !!d.isMetro3DHeader;
+                const isMetro3D = !!d.isMetro3D;
+                const isAreaSel = !isCountryLevel && !isMetro3DHeader && selectedArea && selectedArea.city === d.city && selectedArea.country_code === d.country_code;
+                const isCountrySel = isCountryLevel && selectedCluster && selectedCluster.country_code === d.country_code;
+                const color = REGION_COLORS[d.region as GlobeCountryCluster['region']]?.ring ?? '#06B6D4';
+
                 el.style.cssText = `
                   cursor: pointer;
                   display: flex;
                   flex-direction: column;
                   align-items: center;
                   user-select: none;
-                  filter: drop-shadow(0 3px 6px rgba(15,23,42,0.18));
-                  transform: ${isSel ? 'scale(1.15) translateY(-6px)' : 'scale(1) translateY(-2px)'};
-                  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+                  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.45));
+                  transform: ${isAreaSel ? 'scale(1.28) translateY(-8px)' : isCountrySel ? 'scale(1.15) translateY(-6px)' : isCountryLevel ? 'scale(1.08) translateY(-4px)' : 'scale(1) translateY(-2px)'};
+                  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+                  z-index: ${isAreaSel ? 50 : isCountrySel ? 40 : isMetro3DHeader ? 45 : isCountryLevel ? 30 : 20};
                 `;
-                el.innerHTML = `
-                  <div style="
-                    display: flex;
-                    align-items: center;
-                    gap: 4px;
-                    background: ${isSel ? '#4338ca' : '#ffffff'};
-                    color: ${isSel ? '#ffffff' : '#0f172a'};
-                    border: 1.5px solid ${isSel ? '#4338ca' : color};
-                    border-radius: 9999px;
-                    padding: 2px 7px;
-                    white-space: nowrap;
-                    font-family: inherit;
-                  ">
-                    <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${isSel ? '#ffffff' : color};flex-shrink:0;"></span>
-                    <span style="font-size: 11px; font-weight: 800; letter-spacing: -0.2px;">${d.city}</span>
-                    <span style="
-                      background:${isSel ? '#312e81' : color};
-                      color:#ffffff;
-                      font-size: 10px;
-                      font-weight: 900;
-                      padding:0.5px 5px;
-                      border-radius:10px;
-                      line-height:1.3;
-                    ">${d.count}</span>
-                  </div>
-                  <div style="
-                    width: 0;
-                    height: 0;
-                    border-left: 4.5px solid transparent;
-                    border-right: 4.5px solid transparent;
-                    border-top: 5px solid ${isSel ? '#4338ca' : color};
-                    margin-top: -1px;
-                  "></div>
-                `;
-                el.onclick = () => handleZoomCountry(d);
-                el.onmouseenter = () => { el.style.transform = 'scale(1.22) translateY(-6px)'; };
-                el.onmouseleave = () => { el.style.transform = isSel ? 'scale(1.15) translateY(-6px)' : 'scale(1) translateY(-2px)'; };
+
+                if (isMetro3DHeader) {
+                  // ป้ายหัวข้อ 3D Header สำหรับโซนแยกขยาย
+                  el.innerHTML = `
+                    <div style="
+                      display: flex;
+                      align-items: center;
+                      gap: 6px;
+                      background: linear-gradient(135deg, #0284c7, #4f46e5);
+                      color: #ffffff;
+                      border: 2px solid #38bdf8;
+                      border-radius: 9999px;
+                      padding: 4px 12px;
+                      white-space: nowrap;
+                      font-family: inherit;
+                      box-shadow: 0 0 20px rgba(56,189,248,0.7);
+                      backdrop-filter: blur(8px);
+                    ">
+                      <span style="font-size: 13px;">🏙️</span>
+                      <span style="font-size: 11.5px; font-weight: 900; letter-spacing: -0.2px;">กทม. และปริมณฑล (3D แยกขยาย)</span>
+                      <span style="
+                        background: #0f172a;
+                        color: #38bdf8;
+                        font-size: 10px;
+                        font-weight: 900;
+                        padding: 1.5px 6.5px;
+                        border-radius: 10px;
+                        line-height: 1.3;
+                        border: 1px solid #38bdf8;
+                      ">${d.count} คน</span>
+                    </div>
+                  `;
+                  return el;
+                }
+
+                if (isCountryLevel) {
+                  // หมุดระดับประเทศ (ตอนซูมออก)
+                  el.innerHTML = `
+                    <div style="
+                      display: flex;
+                      align-items: center;
+                      gap: 6px;
+                      background: ${isCountrySel ? '#0369a1' : 'rgba(15, 23, 42, 0.92)'};
+                      color: #ffffff;
+                      border: ${isCountrySel ? '2px solid #38bdf8' : `1.8px solid ${color}`};
+                      border-radius: 9999px;
+                      padding: 3.5px 10px;
+                      white-space: nowrap;
+                      font-family: inherit;
+                      box-shadow: ${isCountrySel ? '0 0 16px rgba(6,182,212,0.7)' : '0 4px 12px rgba(0,0,0,0.3)'};
+                      backdrop-filter: blur(6px);
+                    ">
+                      <span style="font-size: 13px; line-height: 1;">${d.flag || '🌐'}</span>
+                      <span style="font-size: 12px; font-weight: 800; letter-spacing: -0.2px;">${d.country_name}</span>
+                      <span style="
+                        background: ${isCountrySel ? '#164e63' : color};
+                        color: #ffffff;
+                        font-size: 10.5px;
+                        font-weight: 900;
+                        padding: 1.5px 6.5px;
+                        border-radius: 10px;
+                        line-height: 1.3;
+                      ">${d.count}</span>
+                    </div>
+                    <div style="
+                      width: 0;
+                      height: 0;
+                      border-left: 6px solid transparent;
+                      border-right: 6px solid transparent;
+                      border-top: 7px solid ${isCountrySel ? '#0e7490' : 'rgba(15, 23, 42, 0.92)'};
+                      margin-top: -1px;
+                    "></div>
+                  `;
+                } else {
+                  // หมุดระดับจังหวัด/พื้นที่ (ตอนซูมเข้า และบนโซน 3D Inset)
+                  el.innerHTML = `
+                    <div style="
+                      display: flex;
+                      align-items: center;
+                      gap: 5px;
+                      background: ${isAreaSel ? '#ec4899' : isMetro3D ? 'rgba(15, 23, 42, 0.95)' : isCountrySel ? '#0e7490' : 'rgba(15, 23, 42, 0.9)'};
+                      color: #ffffff;
+                      border: ${isAreaSel ? '2px solid #ffffff' : isMetro3D ? '1.8px solid #38bdf8' : isCountrySel ? '2px solid #38bdf8' : `1.5px solid ${color}`};
+                      border-radius: 9999px;
+                      padding: 2.5px 8px;
+                      white-space: nowrap;
+                      font-family: inherit;
+                      box-shadow: ${isAreaSel ? '0 0 20px rgba(236,72,153,0.9)' : isMetro3D ? '0 0 10px rgba(56,189,248,0.5)' : isCountrySel ? '0 0 12px rgba(6,182,212,0.6)' : 'none'};
+                      backdrop-filter: blur(4px);
+                    ">
+                      <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${isAreaSel ? '#ffffff' : isMetro3D ? '#38bdf8' : color};flex-shrink:0;"></span>
+                      <span style="font-size: 11px; font-weight: 800; letter-spacing: -0.2px;">${d.city}</span>
+                      <span style="
+                        background:${isAreaSel ? '#9d174d' : isMetro3D ? '#0369a1' : isCountrySel ? '#164e63' : color};
+                        color:#ffffff;
+                        font-size: 10px;
+                        font-weight: 900;
+                        padding:1px 6px;
+                        border-radius:10px;
+                        line-height:1.3;
+                      ">${d.count}</span>
+                    </div>
+                    <div style="
+                      width: 0;
+                      height: 0;
+                      border-left: 5px solid transparent;
+                      border-right: 5px solid transparent;
+                      border-top: 6px solid ${isAreaSel ? '#ec4899' : isMetro3D ? '#0369a1' : isCountrySel ? '#0e7490' : color};
+                      margin-top: -1px;
+                    "></div>
+                  `;
+                }
+
+                el.onclick = (e) => {
+                  e.stopPropagation();
+                  if (isCountryLevel) {
+                    const matched = countryLevelClusters.find((c) => c.country_code === d.country_code) || d;
+                    handleZoomCountry(matched);
+                  } else {
+                    handleSelectArea(d);
+                  }
+                };
+
+                el.onmouseenter = () => {
+                  el.style.transform = isCountryLevel ? 'scale(1.22) translateY(-6px)' : 'scale(1.32) translateY(-8px)';
+                };
+                el.onmouseleave = () => {
+                  el.style.transform = isAreaSel
+                    ? 'scale(1.28) translateY(-8px)'
+                    : isCountrySel
+                    ? 'scale(1.15) translateY(-6px)'
+                    : isCountryLevel
+                    ? 'scale(1.08) translateY(-4px)'
+                    : 'scale(1) translateY(-2px)';
+                };
+
                 return el;
               }}
 
-              // ─── Interactive Controls ────────────────────────────────────
               enablePointerInteraction={true}
             />
           </div>
 
+          {/* ─── Floating Bangkok & Metro Callout Inset (แยกแผนที่ปริมณฑลออกมาในรูป 3 มิติ) ─── */}
+          {isZoomedIn && selectedCluster?.country_code === 'TH' && (
+            <div className="absolute bottom-4 left-4 z-20 w-[300px] sm:w-[340px] rounded-2xl bg-slate-900/95 text-white p-3.5 border border-sky-400/50 shadow-2xl backdrop-blur-md animate-fade-in select-none">
+              {/* Header */}
+              <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-white/10">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-base">🏙️</span>
+                  <div>
+                    <span className="text-xs font-black text-white block leading-tight">กทม. และปริมณฑล (3D ขยาย)</span>
+                    <span className="text-[10px] text-sky-300 font-medium">แยกรูปทรง 3 มิติบนลูกโลก • แตะหมุด/ปุ่ม</span>
+                  </div>
+                </div>
+                <span className="shrink-0 px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-extrabold border border-sky-400/40 shadow-xs">
+                  รวม {totalMetroAlumni} คน
+                </span>
+              </div>
+
+              {/* SVG Map of Bangkok & Perimeter */}
+              <div className="relative w-full h-[145px] bg-slate-950/70 rounded-xl border border-sky-500/25 p-2 mb-2.5 flex items-center justify-center overflow-hidden">
+                <svg
+                  viewBox="140.2 364.5 84.4 66.4"
+                  className="w-full h-full filter drop-shadow-sm transition-all duration-300"
+                >
+                  <defs>
+                    <filter id="metro-glow-selected" x="-30%" y="-30%" width="160%" height="160%">
+                      <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#38bdf8" floodOpacity="0.9" />
+                    </filter>
+                  </defs>
+                  {METRO_PROVINCES.map((provName) => {
+                    const cluster = metroClusters.find((c) => c.city === provName);
+                    const count = cluster?.count ?? 0;
+                    const isSelected = selectedArea?.city === provName;
+                    const isHovered = hoveredMetroProvince === provName;
+
+                    // Fill color based on density gradient
+                    let fill = '#0f172a';
+                    if (count >= 10) fill = '#0284c7';
+                    else if (count >= 5) fill = '#0ea5e9';
+                    else if (count >= 1) fill = '#38bdf8';
+                    else fill = '#1e293b';
+
+                    if (isSelected) fill = '#ec4899';
+                    else if (isHovered) fill = '#06b6d4';
+
+                    return (
+                      <path
+                        key={`metro-svg-${provName}`}
+                        d={THAILAND_PROVINCE_PATHS[provName]}
+                        fill={fill}
+                        stroke={isSelected ? '#ffffff' : isHovered ? '#ffffff' : '#38bdf8'}
+                        strokeWidth={isSelected ? 1.4 : isHovered ? 1.0 : 0.6}
+                        strokeLinejoin="round"
+                        filter={isSelected ? 'url(#metro-glow-selected)' : undefined}
+                        onMouseEnter={() => setHoveredMetroProvince(provName)}
+                        onMouseLeave={() => setHoveredMetroProvince(null)}
+                        onClick={() => {
+                          if (cluster) handleSelectArea(cluster);
+                        }}
+                        className="cursor-pointer transition-all duration-150 hover:opacity-95"
+                      >
+                        <title>{`${provName}: ${count} คน`}</title>
+                      </path>
+                    );
+                  })}
+                </svg>
+
+                {/* Hover Tooltip overlay on mini map */}
+                {hoveredMetroProvince && (
+                  <div className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded-md bg-slate-900/90 text-white border border-sky-400 text-[10px] font-black pointer-events-none animate-fade-in shadow-md">
+                    📍 {hoveredMetroProvince} ({metroClusters.find((c) => c.city === hoveredMetroProvince)?.count ?? 0} คน)
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Badge Chips */}
+              <div className="grid grid-cols-3 gap-1">
+                {metroClusters.map((cluster) => {
+                  const isSelected = selectedArea?.city === cluster.city;
+                  const isHovered = hoveredMetroProvince === cluster.city;
+                  return (
+                    <button
+                      key={cluster.city}
+                      onMouseEnter={() => setHoveredMetroProvince(cluster.city)}
+                      onMouseLeave={() => setHoveredMetroProvince(null)}
+                      onClick={() => handleSelectArea(cluster)}
+                      className={`flex items-center justify-between gap-1 px-2 py-1 rounded-lg text-left text-[11px] font-bold transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-pink-600 text-white font-black shadow-md shadow-pink-600/30 ring-1 ring-white'
+                          : isHovered
+                          ? 'bg-sky-500/30 text-sky-200 border border-sky-400/50'
+                          : cluster.count > 0
+                          ? 'bg-white/10 hover:bg-white/20 text-white border border-white/10'
+                          : 'bg-white/5 hover:bg-white/10 text-slate-400 border border-white/5'
+                      }`}
+                    >
+                      <span className="truncate text-[10px]">{cluster.city}</span>
+                      <span
+                        className={`shrink-0 px-1 py-0.1 rounded text-[9px] font-extrabold ${
+                          isSelected
+                            ? 'bg-slate-950 text-pink-300'
+                            : cluster.count > 0
+                            ? 'bg-sky-500/30 text-sky-200'
+                            : 'bg-slate-800 text-slate-500'
+                        }`}
+                      >
+                        {cluster.count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Auto-rotate indicator */}
           {autoRotate && (
-            <div className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/90 border border-slate-200 shadow-sm backdrop-blur-sm">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-slate-600 text-xs font-semibold">กำลังหมุนโลก</span>
+            <div className="absolute bottom-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 border border-slate-700 text-white shadow-sm backdrop-blur-sm">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-xs font-semibold">กำลังหมุนโลก</span>
             </div>
           )}
 
           {/* Hint */}
           {globeReady && (
-            <div className="absolute top-4 right-4 px-3 py-1.5 rounded-full bg-white/90 border border-slate-200 shadow-sm backdrop-blur-sm">
-              <span className="text-slate-600 text-xs font-semibold">📍 กดที่หมุดเพื่อซูมเข้า</span>
+            <div className="absolute top-4 right-4 px-3 py-1.5 rounded-full bg-slate-900/80 border border-slate-700 text-white shadow-sm backdrop-blur-sm">
+              <span className="text-xs font-semibold">🗺️ แตะที่เขตแดนหรือหมุดจังหวัดเพื่อดูศิษย์เก่า</span>
             </div>
           )}
         </div>
 
-        {/* ─── Right: Country Detail / Cluster List ────────────────────────────── */}
+        {/* ─── Right: Country Detail / Specific Area Alumni List ────────────────── */}
         <div className="flex flex-col gap-4">
 
-          {/* Zoomed Selected Country Detail Card */}
+          {/* Active Zoomed Country / Area Details */}
           {selectedCluster && (
             <div className="relative rounded-[28px] bg-white border border-indigo-200/80 shadow-xl overflow-hidden animate-fade-in">
-              {/* Accent bar */}
               <div
-                className="absolute top-0 left-0 right-0 h-1.5 rounded-t-[28px]"
-                style={{ background: REGION_COLORS[selectedCluster.region].ring }}
+                className="absolute top-0 left-0 right-0 h-2 rounded-t-[28px]"
+                style={{
+                  background: selectedArea
+                    ? '#0284c7'
+                    : REGION_COLORS[selectedCluster.region]?.ring ?? '#06B6D4',
+                }}
               />
               <div className="p-5">
-                <div className="flex items-start justify-between gap-3 mb-4">
-                  <div className="flex items-center gap-3">
-                    <span className="text-4xl leading-none">{selectedCluster.flag}</span>
-                    <div>
-                      <h3 className="text-slate-900 font-extrabold text-xl leading-tight">{selectedCluster.country_name}</h3>
-                      <p className="text-slate-500 text-xs font-medium">
-                        {selectedCluster.city} • ภูมิภาค {REGION_COLORS[selectedCluster.region].label}
+                {/* Header with Country Flag & Name */}
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-3xl sm:text-4xl leading-none shrink-0">{selectedCluster.flag}</span>
+                    <div className="min-w-0">
+                      <h3 className="text-slate-900 font-black text-lg sm:text-xl leading-tight truncate">
+                        {selectedCluster.country_name}
+                      </h3>
+                      <p className="text-slate-500 text-xs font-medium truncate">
+                        มีทั้งหมด {countryAreas.length} พื้นที่/เมือง • รวม {selectedCountryTotalCount} คน
                       </p>
                     </div>
                   </div>
                   <button
                     onClick={handleResetZoom}
-                    className="p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
-                    title="ปิด / ซูมออก"
+                    className="p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer shrink-0"
+                    title="ปิด / ซูมออกมุมมองโลก"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                <div className="flex items-center justify-between mb-4 p-3 rounded-2xl bg-indigo-50/70 border border-indigo-100">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-indigo-600 shrink-0" />
-                    <span className="text-slate-900 font-extrabold text-sm">
-                      ศิษย์เก่าในประเทศนี้ {selectedCountryTotalCount} คน
+                {/* ─── Area Selector Chips ────────────────────────────────────── */}
+                {countryAreas.length > 1 && (
+                  <div className="mb-3.5 pt-2 border-t border-slate-100">
+                    <p className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-cyan-600" />
+                      <span>เลือกเจาะจงพื้นที่ ({countryAreas.length} จุด):</span>
+                    </p>
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+                      <button
+                        onClick={handleResetToCountry}
+                        className={`flex items-center gap-1 shrink-0 rounded-full px-3 py-1 text-xs font-extrabold transition-all cursor-pointer border ${
+                          !selectedArea
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span>🌐 ทุกพื้นที่</span>
+                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                          !selectedArea ? 'bg-indigo-800 text-white' : 'bg-slate-200 text-slate-600'
+                        }`}>
+                          {selectedCountryTotalCount}
+                        </span>
+                      </button>
+
+                      {countryAreas.map((area) => {
+                        const isThisArea = selectedArea?.city === area.city;
+                        return (
+                          <button
+                            key={`area-chip-${area.city}`}
+                            onClick={() => handleSelectArea(area)}
+                            className={`flex items-center gap-1 shrink-0 rounded-full px-3 py-1 text-xs font-extrabold transition-all cursor-pointer border ${
+                              isThisArea
+                                ? 'bg-pink-600 text-white border-pink-600 shadow-sm scale-105'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            <span>📍 {area.city}</span>
+                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                              isThisArea ? 'bg-pink-800 text-white' : 'bg-slate-200 text-slate-600'
+                            }`}>
+                              {area.count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Selected Status Bar */}
+                <div className="flex items-center justify-between mb-3 p-3 rounded-2xl bg-cyan-50/80 border border-cyan-100">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Users className="h-4 w-4 text-cyan-600 shrink-0" />
+                    <span className="text-slate-900 font-extrabold text-xs sm:text-sm truncate">
+                      {selectedArea ? (
+                        <>ศิษย์เก่าในเขต <span className="text-pink-600 font-black">{selectedArea.city}</span> ({displayedAlumni.length} คน)</>
+                      ) : (
+                        <>ศิษย์เก่าใน {selectedCluster.country_name} ({displayedAlumni.length} คน)</>
+                      )}
                     </span>
                   </div>
-                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-indigo-600 text-white shadow-xs">
-                    Zoomed
-                  </span>
+                  {selectedArea && (
+                    <button
+                      onClick={handleResetToCountry}
+                      className="text-[11px] text-cyan-700 hover:text-cyan-900 font-bold underline shrink-0 cursor-pointer"
+                    >
+                      ดูทุกพื้นที่
+                    </button>
+                  )}
                 </div>
 
-                <div className="space-y-2.5 max-h-80 overflow-y-auto scrollbar-hide">
-                  {selectedCountryAlumni.map((a) => (
-                    <AlumniCard key={a.id} alumni={a} />
+                {/* Alumni List */}
+                <div className="space-y-2 max-h-80 overflow-y-auto pr-1 scrollbar-thin">
+                  {displayedAlumni.length === 0 && (
+                    <div className="p-6 text-center text-slate-400 text-xs font-medium">
+                      ยังไม่มีศิษย์เก่าปักหมุดในพื้นที่นี้
+                    </div>
+                  )}
+                  {displayedAlumni.map((a) => (
+                    <AlumniCard
+                      key={a.id}
+                      alumni={a}
+                      onClick={() => setSelectedAlumnus(a)}
+                    />
                   ))}
                 </div>
+
+                {/* Switch to 2D Map button if viewing Thailand */}
+                {selectedCluster.country_code === 'TH' && onSwitchToThailand && (
+                  <div className="mt-3.5 pt-3 border-t border-slate-100">
+                    <button
+                      onClick={() => onSwitchToThailand(selectedArea?.city)}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-cyan-50 to-indigo-50 hover:from-cyan-100 hover:to-indigo-100 text-indigo-800 text-xs font-extrabold border border-indigo-100 transition-colors cursor-pointer"
+                    >
+                      <MapIcon className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>สลับไปดูแผนที่ประเทศไทย 2D ({selectedArea?.city ? `เน้น ${selectedArea.city}` : 'ภาพรวม 77 จังหวัด'})</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* Country Cluster List */}
+          {/* Country & Area Pins Directory */}
           <div className="rounded-[28px] bg-white border border-slate-200/90 shadow-card overflow-hidden">
-            <div className="p-5 border-b border-slate-100 bg-slate-50/50">
+            <div className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/50">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-indigo-600" />
-                  <h2 className="font-extrabold text-slate-800 text-base">รายชื่อประเทศที่มีศิษย์เก่า</h2>
+                  <MapPin className="h-4 w-4 text-cyan-600" />
+                  <h2 className="font-extrabold text-slate-800 text-sm sm:text-base">พื้นที่และจังหวัดที่มีศิษย์เก่า</h2>
                 </div>
                 <span className="text-xs font-bold text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-full shadow-xs">
-                  {totalCountryCount} ประเทศ
+                  {totalPinsCount} พื้นที่
                 </span>
               </div>
             </div>
 
-            <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto scrollbar-hide">
-              {GLOBE_CLUSTERS.map((cluster) => {
-                const colors = REGION_COLORS[cluster.region];
-                const isSelected = selectedCluster?.country_code === cluster.country_code;
+            <div className="divide-y divide-slate-100 max-h-[440px] overflow-y-auto scrollbar-hide">
+              {activeClusters.map((cluster) => {
+                const colors = REGION_COLORS[cluster.region] ?? { ring: '#06B6D4', bg: '#ECFEFF' };
+                const isSelected = selectedArea?.city === cluster.city && selectedArea?.country_code === cluster.country_code;
+
                 return (
                   <button
                     key={`${cluster.country_code}-${cluster.city}`}
-                    onClick={() => handleZoomCountry(cluster)}
-                    className={`w-full flex items-center gap-3 px-5 py-3.5 text-left transition-all duration-150 cursor-pointer ${
-                      isSelected ? 'bg-indigo-50/90 border-l-4 border-indigo-600' : 'hover:bg-slate-50'
+                    onClick={() => handleSelectArea(cluster)}
+                    className={`w-full flex items-center gap-3 px-4 sm:px-5 py-3 text-left transition-all duration-150 cursor-pointer ${
+                      isSelected ? 'bg-pink-50/90 border-l-4 border-pink-600' : 'hover:bg-slate-50'
                     }`}
                   >
                     <span className="text-2xl shrink-0">{cluster.flag}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-slate-800 text-sm truncate">{cluster.city}</p>
-                      <p className="text-slate-500 text-xs truncate">{cluster.country_name}</p>
+                      <p className="font-bold text-slate-800 text-sm truncate flex items-center gap-1">
+                        <span>{cluster.city}</span>
+                        {isSelected && (
+                          <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded-md bg-pink-100 text-pink-700">
+                            Active
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-slate-400 text-xs truncate">{cluster.country_name}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span
@@ -707,7 +1594,7 @@ export function GlobePanel({ hometownData = [], workplaceData = [] }: GlobePanel
                       >
                         {cluster.count} คน
                       </span>
-                      <ZoomIn className={`w-4 h-4 transition-colors ${isSelected ? 'text-indigo-600' : 'text-slate-400'}`} />
+                      <ZoomIn className={`w-4 h-4 transition-colors ${isSelected ? 'text-pink-600' : 'text-slate-400'}`} />
                     </div>
                   </button>
                 );
@@ -717,19 +1604,37 @@ export function GlobePanel({ hometownData = [], workplaceData = [] }: GlobePanel
 
           {/* Legend */}
           <div className="rounded-[24px] bg-white border border-slate-200/80 p-4 shadow-xs">
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-3">สีหมุดปักตามภูมิภาค</p>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(REGION_COLORS).map(([key, val]) => (
-                <div key={key} className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full shrink-0 shadow-xs" style={{ background: val.ring }} />
-                  <span className="text-slate-700 text-xs font-semibold">{val.label}</span>
-                </div>
-              ))}
+            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2.5">คำอธิบายสัญลักษณ์</p>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="w-3.5 h-1 rounded-full bg-white border border-slate-400" />
+                <span className="text-slate-700 font-semibold">เส้นแบ่ง 77 จังหวัด</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3.5 h-1 rounded-full bg-cyan-400" />
+                <span className="text-slate-700 font-semibold">จังหวัดที่มีศิษย์เก่า</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-pink-500" />
+                <span className="text-slate-700 font-semibold">พื้นที่ที่กำลังดู</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-amber-400" />
+                <span className="text-slate-700 font-semibold">Origin: ม.แม่โจ้</span>
+              </div>
             </div>
           </div>
 
         </div>
       </div>
+
+      {/* ─── Profile Modal ─────────────────────────────────────────────────── */}
+      {selectedAlumnus && (
+        <AlumniProfileModal
+          alumni={selectedAlumnus}
+          onClose={() => setSelectedAlumnus(null)}
+        />
+      )}
     </div>
   );
 }
