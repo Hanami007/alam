@@ -39,6 +39,15 @@ export function middleware(req: NextRequest) {
 
   // เส้นทางที่ต้องการล็อกอิน
   if (!sessionId) {
+    // สำหรับ API routes ให้ส่งกลับเป็น JSON 401 Unauthorized เสมอ
+    // ป้องกันไม่ให้ fetch ได้รับหน้าเว็บ HTML ของ /login แล้วเกิด SyntaxError Unexpected token '<'
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: 'กรุณาเข้าสู่ระบบก่อนใช้งาน' },
+        { status: 401 }
+      );
+    }
+
     const loginUrl = new URL('/login', req.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);

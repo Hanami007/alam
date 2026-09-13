@@ -258,8 +258,8 @@ export function FeedList({
           adminId: adminIdToSend,
         }),
       });
-      const data = await res.json();
-      if (data.success) {
+      const data = await res.json().catch(() => null);
+      if (data?.success) {
         setFeedPosts((prev) => prev.filter((p) => p.id !== postToDelete.id));
         setPostToDelete(null);
         setDeleteToast({ message: 'ลบโพสต์ข่าวเรียบร้อยแล้ว ✨', type: 'success' });
@@ -324,8 +324,8 @@ export function FeedList({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pollId, optionId, userId: currentUserId }),
       });
-      const data = await res.json();
-      if (data.success) {
+      const data = await res.json().catch(() => null);
+      if (data?.success) {
         const pts = data.pointsAwarded || currentPoll.pointsPerVote || 5;
         notifyPointsUpdated(pts);
         setDeleteToast({
@@ -383,8 +383,8 @@ export function FeedList({
             : undefined,
         }),
       });
-      const data = await res.json();
-      if (data.success) {
+      const data = await res.json().catch(() => null);
+      if (data?.success) {
         setRequestStatus('success');
         setRequestForm({
           postType: 'normal',
@@ -503,8 +503,8 @@ export function FeedList({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ postId, userId: currentUserId }),
       });
-      const data = await res.json();
-      if (data.success && data.liked) {
+      const data = await res.json().catch(() => null);
+      if (data?.success && data?.liked) {
         notifyPointsUpdated(1);
         setDeleteToast({ message: `🎉 ส่งความรู้สึก ${emojiObj.emoji} สำเร็จ! คุณได้รับ +1 แต้มกิจกรรม ✨`, type: 'success' });
         setTimeout(() => setDeleteToast(null), 3000);
@@ -547,8 +547,8 @@ export function FeedList({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ postId, userId: currentUserId }),
       });
-      const data = await res.json();
-      if (data.success && data.liked) {
+      const data = await res.json().catch(() => null);
+      if (data?.success && data?.liked) {
         notifyPointsUpdated(1);
         setDeleteToast({ message: '💖 ถูกใจโพสต์สำเร็จ! คุณได้รับ +1 แต้มกิจกรรม ✨', type: 'success' });
         setTimeout(() => setDeleteToast(null), 3000);
@@ -630,8 +630,8 @@ export function FeedList({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ postId, userId: currentUserId, content: text, parentCommentId }),
       });
-      const data = await res.json();
-      if (data.success && data.comment) {
+      const data = await res.json().catch(() => null);
+      if (data?.success && data?.comment) {
         notifyPointsUpdated(1);
         setFeedPosts((prev) =>
           prev.map((post) => {

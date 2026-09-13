@@ -24,11 +24,23 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
     },
   });
 
-  const data = await res.json().catch(() => null);
+  const contentType = res.headers.get('content-type') || '';
+  const isJson = contentType.includes('application/json');
+  const data = isJson ? await res.json().catch(() => null) : null;
 
   if (!res.ok) {
+    // หากได้รับ 401 Unauthorized บน Client ให้นำทางไปยังหน้า Login พร้อม callbackUrl
+    if (res.status === 401 && typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      const currentPath = window.location.pathname + window.location.search;
+      window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`;
+    }
+
+    const fallbackMessage = isJson
+      ? `Request failed with status ${res.status}`
+      : `เซิร์ฟเวอร์เกิดข้อผิดพลาด (${res.status}: ${res.statusText || 'Internal Error'})`;
+
     throw new ApiError(
-      data?.error || `Request failed with status ${res.status}`,
+      data?.error || fallbackMessage,
       res.status,
       data
     );
