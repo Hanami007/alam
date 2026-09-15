@@ -16,7 +16,7 @@ A modular, production-ready alumni directory web application built with Next.js,
 ## Architecture notes
 - Feature-based folders live under src/modules
 - Shared UI shell is composed from layout components
-- Prisma schema is scaffolded for future PostgreSQL integration
+- PostgreSQL schema is managed with node-pg-migrate (see `migrations/`) and queried via `pg` in `src/lib/db.ts` and `src/services/db/`
 - A reusable data layer is available under src/lib
 
 ## Run locally
@@ -24,8 +24,12 @@ A modular, production-ready alumni directory web application built with Next.js,
 npm run dev
 ```
 
+## Database
+```bash
+npm run migrate:up
+npm run migrate:down
+```
+
 ## Next steps
-- Wire Prisma migrations and PostgreSQL
-- Add authentication and role-based access control
 - Integrate Supabase storage and AI tagging workflows
 - Add React Leaflet mapping and real data sources

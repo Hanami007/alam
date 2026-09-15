@@ -11,14 +11,12 @@
     "migrate:down": "node-pg-migrate down --config .node-pg-migrate.json"
   },
   "dependencies": {
-    "@prisma/client": "^7.8.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/three": "^0.185.4",
     "bcryptjs": "^3.0.3",
     "lucide-react": "^1.24.0",
     "next": "16.2.10",
     "pg": "^8.22.0",
-    "prisma": "^7.8.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-globe.gl": "^2.38.0",

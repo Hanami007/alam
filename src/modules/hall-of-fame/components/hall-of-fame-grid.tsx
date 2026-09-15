@@ -49,144 +49,16 @@ interface HallOfFameGridProps {
 }
 
 /* ═══════════════════════════════════════════════
-   MOCK / DEFAULT DATA (Rich dataset)
-═══════════════════════════════════════════════ */
-const DEFAULT_CANDIDATES: Candidate[] = [
-  {
-    id: 101,
-    name: 'ดร.สมชาย วงศ์สุวรรณ',
-    studentId: '58010101',
-    company: 'Tech Thailand Group',
-    position: 'Chief Technology Officer (CTO)',
-    avatar_url: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=500&auto=format&fit=crop&q=80',
-    description: 'ผู้พัฒนาโซลูชัน AI ทางการแพทย์ และศิษย์เก่าผู้สร้างคุณประโยชน์ให้สถาบันอย่างต่อเนื่อง',
-    generation_label: 'รุ่น 35',
-    generationNumber: 35,
-    votes: 248,
-  },
-  {
-    id: 102,
-    name: 'ณิชาภัทร อัศวไพศาล',
-    studentId: '61010045',
-    company: 'Innovate Soft Co., Ltd.',
-    position: 'Senior Lead Software Engineer',
-    avatar_url: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=500&auto=format&fit=crop&q=80',
-    description: 'ผู้ก่อตั้งสตาร์ทอัพเทคโนโลยีศิษย์เก่าและวิทยากรพิเศษบรรยายสร้างแรงบันดาลใจให้นักศึกษา',
-    generation_label: 'รุ่น 38',
-    generationNumber: 38,
-    votes: 196,
-  },
-  {
-    id: 103,
-    name: 'กิตติศักดิ์ รัตนกาญจน์',
-    studentId: '60010099',
-    company: 'CyberGuard Corp',
-    position: 'Head of Cybersecurity',
-    avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=80',
-    description: 'ผู้เชี่ยวชาญด้านความปลอดภัยไซเบอร์ระดับประเทศ และที่ปรึกษาองค์กรภาครัฐและเอกชน',
-    generation_label: 'รุ่น 40',
-    generationNumber: 40,
-    votes: 164,
-  },
-  {
-    id: 104,
-    name: 'แพรวา สุวรรณรัตน์',
-    studentId: '62010030',
-    company: 'DataMetrics Global',
-    position: 'Principal Data Scientist',
-    avatar_url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80',
-    description: 'ผู้บุกเบิกการวิเคราะห์ข้อมูล Big Data เพื่อสังคมและขับเคลื่อนโครงการ Open Data',
-    generation_label: 'รุ่น 41',
-    generationNumber: 41,
-    votes: 132,
-  },
-  {
-    id: 105,
-    name: 'ธนากร เมธากุล',
-    studentId: '63010055',
-    company: 'CloudWorks TH',
-    position: 'DevOps & Infrastructure Lead',
-    avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80',
-    description: 'ผู้จัดการระบบคลาวด์สเกลใหญ่และผู้สนับสนุนทุนการศึกษาแก่น้องๆ สาขาวิทยาการคอมพิวเตอร์',
-    generation_label: 'รุ่น 42',
-    generationNumber: 42,
-    votes: 108,
-  },
-  {
-    id: 106,
-    name: 'ศิรินทิพย์ จิระประเสริฐ',
-    studentId: '59010022',
-    company: 'UX Design Studio',
-    position: 'Head of Product Design',
-    avatar_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80',
-    description: 'ผู้ออกแบบแอปพลิเคชันที่มีผู้ใช้งานกว่า 1 ล้านคน และอาจารย์พิเศษด้าน Human-Computer Interaction',
-    generation_label: 'รุ่น 43',
-    generationNumber: 43,
-    votes: 92,
-  },
-  {
-    id: 107,
-    name: 'วรพล ทองคำ',
-    studentId: '57010088',
-    company: 'Kasikorn Bank',
-    position: 'VP, Digital Banking Platform',
-    avatar_url: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&auto=format&fit=crop&q=80',
-    description: 'นักพัฒนาระบบธนาคารดิจิทัลชั้นนำของประเทศและผู้ร่วมจัดกิจกรรม Alumni Hackathon',
-    generation_label: 'รุ่น 33',
-    generationNumber: 33,
-    votes: 84,
-  },
-  {
-    id: 108,
-    name: 'ปิยะนุช แก้วมณี',
-    studentId: '64010012',
-    company: 'LINE MAN Wongnai',
-    position: 'Senior Product Manager',
-    avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
-    description: 'ผู้บริหารผลิตภัณฑ์ดิจิทัลยอดนิยม และผู้จัดกิจกรรม Mentorship ให้คำปรึกษารุ่นน้อง',
-    generation_label: 'รุ่น 44',
-    generationNumber: 44,
-    votes: 68,
-  },
-  {
-    id: 109,
-    name: 'อนันต์ ทรงเจริญ',
-    studentId: '56010041',
-    company: 'AgriTech Solutions',
-    position: 'Founder & Managing Director',
-    avatar_url: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&auto=format&fit=crop&q=80',
-    description: 'ผู้ก่อตั้งระบบสมาร์ทฟาร์มด้วย IoT ผสานเกษตรกรรมกับเทคโนโลยีตามอัตลักษณ์แม่โจ้',
-    generation_label: 'รุ่น 32',
-    generationNumber: 32,
-    votes: 55,
-  },
-  {
-    id: 110,
-    name: 'ชิดชนก นิลพาณิชย์',
-    studentId: '65010018',
-    company: 'Shopee E-Commerce',
-    position: 'Frontend Tech Lead',
-    avatar_url: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400&auto=format&fit=crop&q=80',
-    description: 'วิศวกรซอฟต์แวร์รุ่นใหม่ไฟแรง ผู้ชนะรางวัลนวัตกรรมซอฟต์แวร์ระดับเยาวชนแห่งชาติ',
-    generation_label: 'รุ่น 45',
-    generationNumber: 45,
-    votes: 43,
-  },
-];
-
-/* ═══════════════════════════════════════════════
    MAIN COMPONENT
 ═══════════════════════════════════════════════ */
 export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) {
-  /* ── Merged initial data: ให้มีข้อมูลครบ 10 อันดับเสมอ ── */
+  /* ── Merged initial data: ข้อมูลจาก DB จริงเท่านั้น (dedupe + ใส่ default คะแนน) ── */
   const mergedInitial = useMemo<Candidate[]>(() => {
-    // 1. นำข้อมูลศิษย์เก่าจาก DB มาใส่คะแนน
-    const fromApi = (initialCandidates || []).map((c, i) => ({
+    const fromApi = (initialCandidates || []).map((c) => ({
       ...c,
-      votes: typeof c.votes === 'number' && c.votes > 0 ? c.votes : Math.max(10, 248 - i * 22),
+      votes: typeof c.votes === 'number' ? c.votes : 0,
     }));
 
-    // 2. ป้องกันชื่อซ้ำ (deduplicate)
     const seenNames = new Set<string>();
     const uniqueFromApi: Candidate[] = [];
     for (const item of fromApi) {
@@ -196,16 +68,7 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
       }
     }
 
-    // 3. เติมรายชื่อจาก DEFAULT_CANDIDATES ให้ครบอย่างน้อย 10 อันดับเสมอ
-    const filledList: Candidate[] = [...uniqueFromApi];
-    for (const def of DEFAULT_CANDIDATES) {
-      if (def.name && !seenNames.has(def.name.trim())) {
-        seenNames.add(def.name.trim());
-        filledList.push(def);
-      }
-    }
-
-    return filledList.sort((a, b) => (b.votes || 0) - (a.votes || 0));
+    return uniqueFromApi.sort((a, b) => (b.votes || 0) - (a.votes || 0));
   }, [initialCandidates]);
 
   /* ── State ── */

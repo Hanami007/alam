@@ -68,14 +68,14 @@ export class FeedDbService {
           COALESCE(admin.is_available_for_mentorship, req.is_available_for_mentorship, false) as is_available_for_mentorship,
           COALESCE(like_stat.like_count, 0)::int as like_count,
           COALESCE(comment_stat.comment_count, 0)::int as comment_count,
-          ${currentUserId ? `EXISTS(SELECT 1 FROM post_interactions WHERE post_id = p.id AND user_id = ${Number(currentUserId)} AND type IN ('like', 'reaction')) as is_liked` : 'false as is_liked'}
+          ${currentUserId ? `EXISTS(SELECT 1 FROM post_interactions WHERE post_id = p.id AND user_id = ${Number(currentUserId)} AND type = 'reaction') as is_liked` : 'false as is_liked'}
         FROM posts p
         LEFT JOIN users admin ON admin.id = p.admin_id
         LEFT JOIN users req ON req.id = p.requested_by
         LEFT JOIN (
           SELECT post_id, COUNT(*) as like_count 
           FROM post_interactions 
-          WHERE type IN ('like', 'reaction') 
+          WHERE type = 'reaction'
           GROUP BY post_id
         ) like_stat ON like_stat.post_id = p.id
         LEFT JOIN (
@@ -242,7 +242,7 @@ export class FeedDbService {
    */
   async toggleLike(postId: number, userId: number) {
     const { rows: existing } = await pool.query(
-      `SELECT id FROM post_interactions WHERE post_id = $1 AND user_id = $2 AND type IN ('like', 'reaction')`,
+      `SELECT id FROM post_interactions WHERE post_id = $1 AND user_id = $2 AND type = 'reaction'`,
       [postId, userId]
     );
 
@@ -251,7 +251,7 @@ export class FeedDbService {
       return { liked: false };
     } else {
       await pool.query(
-        `INSERT INTO post_interactions (post_id, user_id, type, points_earned) VALUES ($1, $2, 'like', 1)`,
+        `INSERT INTO post_interactions (post_id, user_id, type, points_earned) VALUES ($1, $2, 'reaction', 1)`,
         [postId, userId]
       );
 
