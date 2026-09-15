@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import * as THREE from 'three';
 import {
   Globe,
@@ -34,7 +35,6 @@ import {
   type GlobeAlumni,
 } from '@/lib/globe-data';
 import { getProvinceCoords, THAILAND_PROVINCE_COORDS } from '@/lib/thailand-province-coords';
-import { THAILAND_PROVINCE_PATHS } from '@/lib/thailand-province-paths';
 
 // ─── Dynamic import (ssr: false) สำหรับ react-globe.gl ───────────────────────
 const ReactGlobe = dynamic(() => import('react-globe.gl').then((m) => m.default ?? m), {
@@ -79,7 +79,6 @@ export interface MapPoint {
 export interface GlobePanelProps {
   hometownData?: MapPoint[];
   workplaceData?: MapPoint[];
-  onSwitchToThailand?: (province?: string) => void;
 }
 
 // ─── Bangkok & Metro Provinces ──────────────────────────────────────────────
@@ -103,6 +102,516 @@ function transformCoords(
     return [targetLng + (lng - origLng) * scale, targetLat + (lat - origLat) * scale];
   }
   return coords.map((c: any) => transformCoords(c, scale, origLng, origLat, targetLng, targetLat));
+}
+
+// ─── 2D World Map (โหมดแผนที่แบนราบทั่วโลก + รายจังหวัดไทย) ──────────────────
+// สีและเส้นขอบใช้ชุดเดียวกับลูกโลก 3D (polygonCapColor / polygonStrokeColor ตอนซูมเข้าประเทศ)
+// เพื่อให้หน้าตาแผนที่ 2D กับ 3D เหมือนกันเป๊ะไม่ว่าจะดูมุมมองไหน
+function getThaiProvinceFill(count: number, isSelected: boolean, isHovered: boolean) {
+  if (isSelected) return '#EC4899';
+  if (isHovered) return '#E0F2FE';
+  if (count >= 5) return '#0369A1';
+  if (count >= 3) return '#0EA5E9';
+  if (count >= 1) return '#BAE6FD';
+  return '#FFFFFF';
+}
+
+function getThaiProvinceStroke(count: number, isSelected: boolean) {
+  if (isSelected) return '#FFFFFF';
+  if (count > 0) return '#0284C7';
+  return '#CBD5E1';
+}
+
+function getCountryFill(hasCluster: boolean, isSelected: boolean, isHovered: boolean) {
+  if (!hasCluster) return isHovered ? '#F1F5F9' : '#FFFFFF';
+  if (isSelected) return '#BAE6FD';
+  return isHovered ? '#EEF2FF' : '#E0E7FF';
+}
+
+function getCountryStroke(hasCluster: boolean, isSelected: boolean) {
+  if (!hasCluster) return '#CBD5E1';
+  if (isSelected) return '#0284C7';
+  return '#94A3B8';
+}
+
+// แปลงพิกัดภูมิศาสตร์ (lng, lat) เป็นตำแหน่ง x, y บนผืนผ้าใบ SVG แบบ Equirectangular
+// (เส้นแวง/ลองจิจูด -180..180 → 0..width, เส้นรุ้ง/ละติจูด 90..-90 → 0..height)
+const WORLD_MAP_VIEWBOX = { width: 960, height: 480 };
+
+function projectLngLat(lng: number, lat: number): [number, number] {
+  const x = (lng + 180) * (WORLD_MAP_VIEWBOX.width / 360);
+  const y = (90 - lat) * (WORLD_MAP_VIEWBOX.height / 180);
+  return [x, y];
+}
+
+// แปลงรูปทรง GeoJSON (Polygon / MultiPolygon) ให้เป็นคำสั่งวาด SVG path โดยฉาย
+// พิกัดแต่ละจุดด้วยฟังก์ชัน projectLngLat ด้านบน
+function geoJsonToSvgPath(geometry: any): string {
+  if (!geometry) return '';
+  const ringToPath = (ring: number[][]) =>
+    ring
+      .map(([lng, lat]: number[], i: number) => {
+        const [x, y] = projectLngLat(lng, lat);
+        return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(' ') + ' Z';
+
+  if (geometry.type === 'Polygon') {
+    return geometry.coordinates.map(ringToPath).join(' ');
+  }
+  if (geometry.type === 'MultiPolygon') {
+    return geometry.coordinates.map((poly: number[][][]) => poly.map(ringToPath).join(' ')).join(' ');
+  }
+  return '';
+}
+
+// หาขอบเขต (bounding box) ของรูปทรง GeoJSON ในหน่วยพิกัด SVG (หลังฉายด้วย projectLngLat)
+function getGeometryBBox(geometry: any): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  const visitRing = (ring: number[][]) => {
+    for (const [lng, lat] of ring) {
+      const [x, y] = projectLngLat(lng, lat);
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  };
+  if (geometry?.type === 'Polygon') {
+    geometry.coordinates.forEach(visitRing);
+  } else if (geometry?.type === 'MultiPolygon') {
+    geometry.coordinates.forEach((poly: number[][][]) => poly.forEach(visitRing));
+  } else {
+    return null;
+  }
+  if (!isFinite(minX) || !isFinite(minY)) return null;
+  return { minX, minY, maxX, maxY };
+}
+
+// หาผืนเขตแดนประเทศจาก ISO code โดยตรง (ไม่พึ่ง COUNTRY_GEO_MAP ที่มีแค่ ~15 ประเทศ)
+// ให้ครอบคลุมทุกประเทศที่มีอยู่จริงในข้อมูล GeoJSON เวลาต้องซูมเข้าบนแผนที่ 2D
+function findFeatureByCountryCode(polygons: any[], countryCode?: string) {
+  if (!countryCode) return undefined;
+  return polygons.find((f: any) => {
+    const p = f.properties || {};
+    if (p.isProvince) return false;
+    const iso2 = p.ISO_A2;
+    const iso3 = p.ISO_A3 || p.ADM0_A3;
+    return (iso2 && iso2 !== '-99' && iso2 === countryCode) || iso3 === countryCode;
+  });
+}
+
+type ViewBoxBox = { x: number; y: number; width: number; height: number };
+
+// ขยายกรอบขอบเขต (bbox) ที่จะซูมเข้า ให้มีสัดส่วนตรงกับสัดส่วนกรอบแสดงผลจริง (containerAspect)
+// พอดีเป๊ะ (เติมด้านที่แคบกว่าให้ยาวขึ้นเท่านั้น ไม่มีทางบีบอัดจนภาพเบี้ยว) เพื่อให้ตอนซูมเข้า
+// เนื้อหาเต็มกรอบพอดีไม่มีขอบว่างเหลือ (letterbox)
+function fitBBoxToAspect(
+  bbox: { minX: number; minY: number; maxX: number; maxY: number },
+  containerAspect: number,
+  pad: number
+): ViewBoxBox {
+  const bw = Math.max((bbox.maxX - bbox.minX) * pad, 24);
+  const bh = Math.max((bbox.maxY - bbox.minY) * pad, 12);
+  const cx = (bbox.minX + bbox.maxX) / 2;
+  const cy = (bbox.minY + bbox.maxY) / 2;
+  let w = bw;
+  let h = bh;
+  if (w / h > containerAspect) {
+    h = w / containerAspect;
+  } else {
+    w = h * containerAspect;
+  }
+  return { x: cx - w / 2, y: cy - h / 2, width: w, height: h };
+}
+
+// แอนิเมต viewBox ของ SVG ให้ค่อยๆ เลื่อน/ซูมจากตำแหน่งเดิมไปตำแหน่งใหม่อย่างนุ่มนวลเมื่อ
+// target เปลี่ยน (เช่น คลิกเลือกประเทศใหม่) และเปิดทางให้ตั้งค่าตำแหน่งเองได้ทันที (สำหรับ
+// การลากเลื่อน/สกอลซูมด้วยเมาส์ ซึ่งไม่ต้องการแอนิเมตหน่วงเวลา)
+function useAnimatedViewBox(target: ViewBoxBox): [ViewBoxBox, (next: ViewBoxBox) => void] {
+  const [box, setBox] = useState(target);
+  const boxRef = useRef(target);
+  const lastTargetRef = useRef(target);
+  const rafRef = useRef<number | null>(null);
+
+  const setManual = useCallback((next: ViewBoxBox) => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    boxRef.current = next;
+    lastTargetRef.current = next;
+    setBox(next);
+  }, []);
+
+  useEffect(() => {
+    const last = lastTargetRef.current;
+    const changed =
+      last.x !== target.x || last.y !== target.y || last.width !== target.width || last.height !== target.height;
+    if (!changed) return;
+    lastTargetRef.current = target;
+
+    const from = { ...boxRef.current };
+    const to = target;
+    const duration = 650;
+    const start = performance.now();
+    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      const e = easeOutCubic(t);
+      const next: ViewBoxBox = {
+        x: from.x + (to.x - from.x) * e,
+        y: from.y + (to.y - from.y) * e,
+        width: from.width + (to.width - from.width) * e,
+        height: from.height + (to.height - from.height) * e,
+      };
+      boxRef.current = next;
+      setBox(next);
+      if (t < 1) rafRef.current = requestAnimationFrame(step);
+    };
+
+    rafRef.current = requestAnimationFrame(step);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target.x, target.y, target.width, target.height]);
+
+  return [box, setManual];
+}
+
+const FULL_WORLD_BBOX = { minX: 0, minY: 0, maxX: WORLD_MAP_VIEWBOX.width, maxY: WORLD_MAP_VIEWBOX.height };
+
+// จำกัดไม่ให้ลากเลื่อนออกนอกขอบโลกไปไกลเกินจำเป็น (เผื่อระยะไว้ครึ่งหนึ่งของขนาดวิวพอร์ตปัจจุบัน)
+function clampPanToWorld(vb: ViewBoxBox): ViewBoxBox {
+  const panMargin = Math.max(vb.width, vb.height) * 0.5;
+  const loX = FULL_WORLD_BBOX.minX - panMargin;
+  const hiX = Math.max(loX, FULL_WORLD_BBOX.maxX + panMargin - vb.width);
+  const loY = FULL_WORLD_BBOX.minY - panMargin;
+  const hiY = Math.max(loY, FULL_WORLD_BBOX.maxY + panMargin - vb.height);
+  return { ...vb, x: Math.min(Math.max(vb.x, loX), hiX), y: Math.min(Math.max(vb.y, loY), hiY) };
+}
+
+function World2DMap({
+  polygons,
+  activeClusters,
+  countryLevelClusters,
+  selectedCluster,
+  selectedArea,
+  pins,
+  containerAspect,
+  onClickThaiProvince,
+  onClickCountry,
+}: {
+  polygons: any[];
+  activeClusters: GlobeCountryCluster[];
+  countryLevelClusters: GlobeCountryCluster[];
+  selectedCluster: GlobeCountryCluster | null;
+  selectedArea: GlobeCountryCluster | null;
+  pins: any[];
+  containerAspect: number;
+  onClickThaiProvince: (provinceName: string) => void;
+  onClickCountry: (cluster: GlobeCountryCluster) => void;
+}) {
+  const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
+  const aspect = containerAspect > 0 ? containerAspect : WORLD_MAP_VIEWBOX.width / WORLD_MAP_VIEWBOX.height;
+
+  // แปลงเขตแดนทุกผืน (ประเทศทั่วโลก + 77 จังหวัดไทย) เป็น path ล่วงหน้าครั้งเดียว
+  const paths = useMemo(
+    () => polygons.map((feature: any, idx: number) => ({ key: `wp-${idx}`, feature, d: geoJsonToSvgPath(feature.geometry) })),
+    [polygons]
+  );
+
+  // ─── หาขอบเขตของประเทศ/จังหวัดที่กำลังเลือกอยู่ เพื่อคำนวณการซูมเข้า ─────────
+  const zoomBBox = useMemo(() => {
+    if (selectedArea?.country_code === 'TH') {
+      const feature = polygons.find((f: any) => f.properties?.isProvince && f.properties?.name_th === selectedArea.city);
+      if (feature) return getGeometryBBox(feature.geometry);
+    }
+
+    if (selectedCluster) {
+      if (selectedCluster.country_code === 'TH') {
+        // รวมขอบเขตของทุกจังหวัดไทยเป็นกรอบเดียว (ซูมเข้าทั้งประเทศ)
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        let found = false;
+        for (const f of polygons) {
+          if (f.properties?.isProvince) {
+            const b = getGeometryBBox(f.geometry);
+            if (b) {
+              found = true;
+              minX = Math.min(minX, b.minX);
+              minY = Math.min(minY, b.minY);
+              maxX = Math.max(maxX, b.maxX);
+              maxY = Math.max(maxY, b.maxY);
+            }
+          }
+        }
+        return found ? { minX, minY, maxX, maxY } : null;
+      }
+
+      const feature =
+        findFeatureByCountryCode(polygons, selectedCluster.country_code) ||
+        polygons.find((f: any) => getClusterForFeature(f, activeClusters)?.country_code === selectedCluster.country_code);
+      if (feature) {
+        const bbox = getGeometryBBox(feature.geometry);
+        if (bbox) return bbox;
+      }
+
+      // ไม่พบเขตแดนประเทศนี้ในข้อมูล (เช่น รหัสประเทศไม่ตรงมาตรฐาน ISO) → ซูมไปที่พิกัดหมุดแทน
+      const [cx, cy] = projectLngLat(selectedCluster.lng, selectedCluster.lat);
+      const halfW = 45;
+      const halfH = 30;
+      return { minX: cx - halfW, minY: cy - halfH, maxX: cx + halfW, maxY: cy + halfH };
+    }
+
+    return null;
+  }, [selectedArea, selectedCluster, polygons, activeClusters]);
+
+  // มุมมองเริ่มต้น (ทั้งโลก) ปรับสัดส่วนให้พอดีกรอบแสดงผลเสมอ ไม่มีขอบว่าง
+  const baseWindow = useMemo(() => fitBBoxToAspect(FULL_WORLD_BBOX, aspect, 1), [aspect]);
+
+  // มุมมองเป้าหมาย: ถ้าเลือกประเทศ/จังหวัดอยู่ → ซูมเข้ากรอบนั้นให้เต็มกรอบพอดี (เว้นขอบเล็กน้อย)
+  const targetWindow = useMemo(
+    () => (zoomBBox ? fitBBoxToAspect(zoomBBox, aspect, 1.2) : baseWindow),
+    [zoomBBox, aspect, baseWindow]
+  );
+
+  const [viewBox, setViewBoxManual] = useAnimatedViewBox(targetWindow);
+
+  // อัตราส่วนการซูมปัจจุบัน เทียบกับมุมมองทั้งโลก ใช้หดหมุด/เส้นขอบให้มีขนาดคงที่บนจอเสมอ
+  const zoomRatio = baseWindow.width / viewBox.width;
+  const inverseScale = 1 / zoomRatio;
+
+  // ─── สกอลเมาส์ซูมเข้า/ออก + ลากเลื่อนแผนที่ด้วยเมาส์/นิ้ว ───────────────────
+  const svgRef = useRef<SVGSVGElement>(null);
+  const latestRef = useRef({ viewBox, aspect, baseWindowWidth: baseWindow.width });
+  const suppressClickRef = useRef(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    latestRef.current = { viewBox, aspect, baseWindowWidth: baseWindow.width };
+  });
+
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const onWheelNative = (e: WheelEvent) => {
+      e.preventDefault();
+      const { viewBox: cur, aspect: asp, baseWindowWidth } = latestRef.current;
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      const px = (e.clientX - rect.left) / rect.width;
+      const py = (e.clientY - rect.top) / rect.height;
+      const mouseSvgX = cur.x + px * cur.width;
+      const mouseSvgY = cur.y + py * cur.height;
+
+      const factor = Math.exp(-e.deltaY * 0.0015);
+      const minWidth = 8;
+      const maxWidth = baseWindowWidth;
+      const newWidth = Math.min(Math.max(cur.width / factor, minWidth), maxWidth);
+      const newHeight = newWidth / asp;
+      const scaleChange = newWidth / cur.width;
+      const newX = mouseSvgX - (mouseSvgX - cur.x) * scaleChange;
+      const newY = mouseSvgY - (mouseSvgY - cur.y) * scaleChange;
+
+      setViewBoxManual(clampPanToWorld({ x: newX, y: newY, width: newWidth, height: newHeight }));
+    };
+    el.addEventListener('wheel', onWheelNative, { passive: false });
+    return () => el.removeEventListener('wheel', onWheelNative);
+  }, [setViewBoxManual]);
+
+  // ใช้ window listener แทน setPointerCapture เพื่อไม่ให้เบราว์เซอร์ redirect click ของปุ่ม/เส้น
+  // เขตแดนที่กดอยู่ข้างในไปตกที่ <svg> เอง (ทำให้กดหมุด/เขตแดนแล้วไม่มีอะไรเกิดขึ้น)
+  const handlePointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const svgEl = e.currentTarget;
+    const startClientX = e.clientX;
+    const startClientY = e.clientY;
+    const startBox = latestRef.current.viewBox;
+    const dragState = { moved: false };
+    setIsDragging(true);
+
+    const onMove = (ev: PointerEvent) => {
+      const rect = svgEl.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      const dxPx = ev.clientX - startClientX;
+      const dyPx = ev.clientY - startClientY;
+      if (Math.abs(dxPx) > 3 || Math.abs(dyPx) > 3) dragState.moved = true;
+      const dxUnits = -(dxPx / rect.width) * startBox.width;
+      const dyUnits = -(dyPx / rect.height) * startBox.height;
+      setViewBoxManual(
+        clampPanToWorld({
+          x: startBox.x + dxUnits,
+          y: startBox.y + dyUnits,
+          width: startBox.width,
+          height: startBox.height,
+        })
+      );
+    };
+
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      setIsDragging(false);
+      if (dragState.moved) {
+        suppressClickRef.current = true;
+        setTimeout(() => {
+          suppressClickRef.current = false;
+        }, 0);
+      }
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  };
+
+  const handleGuardedClick = (fn: () => void) => () => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    fn();
+  };
+
+  return (
+    <div className="relative w-full h-full">
+      <svg
+        ref={svgRef}
+        viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
+        className={`w-full h-full touch-none select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        preserveAspectRatio="xMidYMid meet"
+        onPointerDown={handlePointerDown}
+      >
+        <rect x={-2000} y={-2000} width={4000} height={4000} fill="#EFF6FF" />
+
+        {paths.map(({ key, feature, d }) => {
+          const p = feature.properties || {};
+          const isThaiProvince = !!p.isProvince && !!p.name_th;
+
+          let count = 0;
+          let isSelected = false;
+          let label = '';
+          let fill: string;
+          let stroke: string;
+
+          if (isThaiProvince) {
+            label = p.name_th;
+            count = activeClusters.find((c) => c.country_code === 'TH' && c.city === label)?.count ?? 0;
+            isSelected = selectedArea?.country_code === 'TH' && selectedArea?.city === label;
+            fill = getThaiProvinceFill(count, isSelected, hoveredLabel === label);
+            stroke = getThaiProvinceStroke(count, isSelected);
+          } else {
+            const c = getClusterForFeature(feature, activeClusters);
+            label = c ? c.country_name : p.NAME || p.NAME_LONG || '';
+            if (c) {
+              count = countryLevelClusters.find((x) => x.country_code === c.country_code)?.count ?? c.count;
+              isSelected = !!selectedCluster && !selectedArea && selectedCluster.country_code === c.country_code;
+            }
+            fill = getCountryFill(!!c, isSelected, hoveredLabel === label);
+            stroke = getCountryStroke(!!c, isSelected);
+          }
+
+          return (
+            <path
+              key={key}
+              d={d}
+              fill={fill}
+              stroke={stroke}
+              strokeWidth={isSelected ? 1.3 : 0.8}
+              vectorEffect="non-scaling-stroke"
+              strokeLinejoin="round"
+              onMouseEnter={() => setHoveredLabel(label)}
+              onMouseLeave={() => setHoveredLabel(null)}
+              onClick={handleGuardedClick(() => {
+                if (isThaiProvince) {
+                  onClickThaiProvince(label);
+                  return;
+                }
+                const c = getClusterForFeature(feature, activeClusters);
+                if (c) {
+                  const matched = countryLevelClusters.find((x) => x.country_code === c.country_code) || c;
+                  onClickCountry(matched);
+                }
+              })}
+              className="cursor-pointer transition-colors duration-150"
+            >
+              <title>{count > 0 ? `${label}: ${count} คน` : label}</title>
+            </path>
+          );
+        })}
+
+        {/* หมุดปักตำแหน่งประเทศ/จังหวัด ย่อ/ขยายกลับให้ขนาดคงที่บนจอเสมอไม่ว่าจะซูมแค่ไหน */}
+        {pins.map((pin: any) => {
+          const [x, y] = projectLngLat(pin.lng, pin.lat);
+          const isCountryLevel = !!pin.isCountryLevel;
+          const isSelected = isCountryLevel
+            ? selectedCluster?.country_code === pin.country_code
+            : selectedArea?.city === pin.city && selectedArea?.country_code === pin.country_code;
+          const boxW = 160;
+          const boxH = 36;
+
+          return (
+            <foreignObject
+              key={`${pin.country_code}-${pin.city}`}
+              x={x - boxW / 2}
+              y={y - boxH}
+              width={boxW}
+              height={boxH}
+              style={{ overflow: 'visible', pointerEvents: 'none' }}
+            >
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  justifyContent: 'center',
+                  transform: `scale(${inverseScale})`,
+                  transformOrigin: 'bottom center',
+                }}
+              >
+                <button
+                  onClick={handleGuardedClick(() => {
+                    if (isCountryLevel) {
+                      const matched = countryLevelClusters.find((c) => c.country_code === pin.country_code) || pin;
+                      onClickCountry(matched);
+                    } else if (pin.country_code === 'TH') {
+                      onClickThaiProvince(pin.city);
+                    } else {
+                      onClickCountry(pin);
+                    }
+                  })}
+                  style={{ pointerEvents: 'auto' }}
+                  className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] sm:text-[11px] font-extrabold whitespace-nowrap border shadow-sm transition-transform hover:scale-110 cursor-pointer ${
+                    isSelected
+                      ? 'z-20 scale-110 bg-pink-600 text-white border-pink-600'
+                      : isCountryLevel
+                      ? 'z-10 bg-slate-900/90 text-white border-slate-700'
+                      : 'z-10 bg-cyan-600/90 text-white border-cyan-500'
+                  }`}
+                >
+                  <span>{pin.flag}</span>
+                  <span>{isCountryLevel ? pin.country_name : pin.city}</span>
+                  <span className="rounded-full bg-black/25 px-1.5">{pin.count}</span>
+                </button>
+              </div>
+            </foreignObject>
+          );
+        })}
+      </svg>
+    </div>
+  );
 }
 
 // ─── Regional Colors ─────────────────────────────────────────────────────────
@@ -321,12 +830,12 @@ function AlumniProfileModal({
 export function GlobePanel({
   hometownData = [],
   workplaceData = [],
-  onSwitchToThailand,
 }: GlobePanelProps) {
   const globeRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 720, height: 620 });
   const [mode, setMode] = useState<MapMode>('hometown');
+  const [mapView, setMapView] = useState<'3d' | '2d'>('3d');
   const [globeTheme, setGlobeTheme] = useState<GlobeTheme>('clean');
   const [selectedRegion, setSelectedRegion] = useState<RegionKey>('all');
   const [selectedCluster, setSelectedCluster] = useState<GlobeCountryCluster | null>(null);
@@ -673,6 +1182,51 @@ export function GlobePanel({
     return Array.from(map.values()).sort((a, b) => b.count - a.count);
   }, [activeClusters]);
 
+  // ─── คลิกจังหวัดไทย (ใช้ร่วมกันทั้งเขตแดนบนลูกโลก 3D และแผนที่ 2D) ───────────
+  const handleClickThaiProvince = useCallback(
+    (provName: string) => {
+      if (!isZoomedIn || selectedCluster?.country_code !== 'TH') {
+        const thaiCountry = countryLevelClusters.find((c) => c.country_code === 'TH') || {
+          country_code: 'TH',
+          country_name: 'ประเทศไทย',
+          city: 'ประเทศไทย',
+          lat: 14.8,
+          lng: 100.8,
+          count: 0,
+          flag: '🇹🇭',
+          alumni: [],
+          region: 'thailand' as const,
+        };
+        handleZoomCountry(thaiCountry);
+        return;
+      }
+
+      const clusterMatch = activeClusters.find((c) => c.country_code === 'TH' && c.city === provName);
+      if (clusterMatch) {
+        handleSelectArea(clusterMatch);
+      } else {
+        const coords = getProvinceCoords(provName);
+        handleSelectArea({
+          country_code: 'TH',
+          country_name: 'ประเทศไทย',
+          city: provName,
+          lat: coords.lat,
+          lng: coords.lng,
+          count: 0,
+          flag: '🇹🇭',
+          alumni: [],
+          region: 'thailand',
+        });
+      }
+    },
+    [isZoomedIn, selectedCluster, countryLevelClusters, activeClusters, handleZoomCountry, handleSelectArea]
+  );
+
+  // ─── สลับมุมมองแผนที่ 2D/3D (คงตำแหน่งประเทศ/พื้นที่ที่เลือกไว้เดิม) ──────────
+  const handleSetMapView = useCallback((view: '3d' | '2d') => {
+    setMapView(view);
+  }, []);
+
   // ─── ข้อมูลศิษย์เก่าในเขต กทม. และปริมณฑล สำหรับ Inset แยกขยาย ───────────────
   const metroClusters = useMemo(() => {
     return METRO_PROVINCES.map((pName) => {
@@ -760,12 +1314,24 @@ export function GlobePanel({
     return [...currentCountryAreas, ...otherCountries];
   }, [isZoomedIn, selectedCluster, countryLevelClusters, activeClusters, totalMetroAlumni]);
 
+  // ─── เขตแดนสำหรับแผนที่ 2D ทั่วโลก (ตัดรูปทรง 3D แยกขยายที่ใช้เฉพาะโหมดลูกโลกออก) ─
+  const flatPolygons = useMemo(
+    () => allPolygons.filter((p: any) => !p.properties?.isMetro3D),
+    [allPolygons]
+  );
+
+  // ─── หมุดสำหรับแผนที่ 2D ทั่วโลก (ตัดหมุด 3D Inset ที่ใช้เฉพาะโหมดลูกโลกออก) ──
+  const flatPins = useMemo(
+    () => displayedPins.filter((p: any) => !p.isMetro3D && !p.isMetro3DHeader),
+    [displayedPins]
+  );
+
   const uniqueCountriesWithAlumni = countryLevelClusters;
   const totalCountryCount = uniqueCountriesWithAlumni.length;
   const totalPinsCount = activeClusters.length;
   const totalAlumniInMode = activeClusters.reduce((sum, c) => sum + c.count, 0);
 
-  const isDarkCanvas = globeTheme === 'satellite' || globeTheme === 'night';
+  const isDarkCanvas = mapView === '3d' && (globeTheme === 'satellite' || globeTheme === 'night');
 
   return (
     <div className="flex flex-col gap-6">
@@ -850,29 +1416,30 @@ export function GlobePanel({
             ))}
           </div>
 
-          {/* ─── Realistic Theme Switcher (สลับมุมมองภาพแผนที่) ───── */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-900 rounded-2xl border border-slate-800 text-white shadow-xs">
-            <span className="text-[11px] font-bold text-slate-400 px-2 flex items-center gap-1">
-              <Layers className="w-3.5 h-3.5 text-cyan-400" />
-              <span>โหมดแผนที่:</span>
-            </span>
-            {([
-              { key: 'clean',     icon: Sun,   label: '🎨 ขาวคลีน (ดั้งเดิม)' },
-              { key: 'satellite', icon: Globe, label: '🛰️ ดาวเทียมสมจริง' },
-              { key: 'night',     icon: Moon,  label: '🌌 แสงไฟราตรี' },
-            ] as const).map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setGlobeTheme(key)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                  globeTheme === key
-                    ? 'bg-cyan-500 text-slate-950 font-black shadow-blue-glow'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          {/* 3D / 2D Map View Toggle */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl border border-slate-200/80 shadow-xs">
+            <button
+              onClick={() => handleSetMapView('3d')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-200 cursor-pointer ${
+                mapView === '3d'
+                  ? 'bg-white text-cyan-700 shadow-md shadow-cyan-100'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span>โลก 3D</span>
+            </button>
+            <button
+              onClick={() => handleSetMapView('2d')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-200 cursor-pointer ${
+                mapView === '2d'
+                  ? 'bg-white text-teal-700 shadow-md shadow-teal-100'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <MapIcon className="w-3.5 h-3.5" />
+              <span>แผนที่ 2D</span>
+            </button>
           </div>
         </div>
       </div>
@@ -896,7 +1463,7 @@ export function GlobePanel({
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shrink-0" />
                   <p className="text-cyan-400 text-[10px] sm:text-[11px] font-black uppercase tracking-wide truncate">
-                    {selectedArea ? `กำลังดูเขตพื้นที่: ${selectedArea.city}` : `กำลังซูม: ${selectedCluster.country_name}`}
+                    {selectedArea ? `กำลังดูเขตพื้นที่: ${selectedArea.city}` : `กำลังดู: ${selectedCluster.country_name}`}
                   </p>
                 </div>
                 <p className="text-white text-xs sm:text-sm font-extrabold truncate">
@@ -925,8 +1492,21 @@ export function GlobePanel({
             </div>
           )}
 
-          {/* Globe Canvas Render */}
+          {/* Map Canvas Render (3D Globe or 2D World Map) */}
           <div className="w-full h-full flex items-center justify-center">
+            {mapView === '2d' ? (
+              <World2DMap
+                polygons={flatPolygons}
+                activeClusters={activeClusters}
+                countryLevelClusters={countryLevelClusters}
+                selectedCluster={selectedCluster}
+                selectedArea={selectedArea}
+                pins={flatPins}
+                containerAspect={dimensions.width / dimensions.height}
+                onClickThaiProvince={handleClickThaiProvince}
+                onClickCountry={handleZoomCountry}
+              />
+            ) : (
             <ReactGlobe
               ref={globeRef}
               onGlobeReady={handleGlobeReady}
@@ -1144,41 +1724,7 @@ export function GlobePanel({
               onPolygonClick={(d: any) => {
                 const p = d.properties || {};
                 if (p.isProvince && p.name_th) {
-                  // ถ้ายังไม่ได้ซูมเข้าประเทศไทย ให้ซูมเข้าประเทศไทยก่อน!
-                  if (!isZoomedIn || selectedCluster?.country_code !== 'TH') {
-                    const thaiCountry = countryLevelClusters.find((c) => c.country_code === 'TH') || {
-                      country_code: 'TH',
-                      country_name: 'ประเทศไทย',
-                      city: 'ประเทศไทย',
-                      lat: 14.8,
-                      lng: 100.8,
-                      count: 0,
-                      flag: '🇹🇭',
-                      alumni: [],
-                      region: 'thailand' as const,
-                    };
-                    handleZoomCountry(thaiCountry);
-                    return;
-                  }
-
-                  // ถ้าซูมอยู่ในประเทศไทยแล้ว -> คลิกที่เขตจังหวัดเพื่อเลือกจังหวัดนั้น
-                  const clusterMatch = activeClusters.find((c) => c.country_code === 'TH' && c.city === p.name_th);
-                  if (clusterMatch) {
-                    handleSelectArea(clusterMatch);
-                  } else {
-                    const coords = getProvinceCoords(p.name_th);
-                    handleSelectArea({
-                      country_code: 'TH',
-                      country_name: 'ประเทศไทย',
-                      city: p.name_th,
-                      lat: coords.lat,
-                      lng: coords.lng,
-                      count: 0,
-                      flag: '🇹🇭',
-                      alumni: [],
-                      region: 'thailand',
-                    });
-                  }
+                  handleClickThaiProvince(p.name_th);
                   return;
                 }
 
@@ -1355,11 +1901,12 @@ export function GlobePanel({
 
               enablePointerInteraction={true}
             />
+            )}
           </div>
 
 
           {/* Auto-rotate indicator */}
-          {autoRotate && (
+          {mapView === '3d' && autoRotate && (
             <div className="absolute bottom-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 border border-slate-700 text-white shadow-sm backdrop-blur-sm">
               <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span className="text-xs font-semibold">กำลังหมุนโลก</span>
@@ -1367,9 +1914,13 @@ export function GlobePanel({
           )}
 
           {/* Hint */}
-          {globeReady && (
+          {(mapView === '3d' ? globeReady : true) && (
             <div className="absolute top-4 right-4 px-3 py-1.5 rounded-full bg-slate-900/80 border border-slate-700 text-white shadow-sm backdrop-blur-sm">
-              <span className="text-xs font-semibold">🗺️ แตะที่เขตแดนหรือหมุดจังหวัดเพื่อดูศิษย์เก่า</span>
+              <span className="text-xs font-semibold">
+                {mapView === '3d'
+                  ? '🗺️ แตะที่เขตแดนหรือหมุดจังหวัดเพื่อดูศิษย์เก่า'
+                  : '🗺️ แตะประเทศ/จังหวัดบนแผนที่ทั่วโลกเพื่อดูศิษย์เก่า'}
+              </span>
             </div>
           )}
         </div>
@@ -1498,18 +2049,25 @@ export function GlobePanel({
                   ))}
                 </div>
 
-                {/* Switch to 2D Map button if viewing Thailand */}
-                {selectedCluster.country_code === 'TH' && onSwitchToThailand && (
-                  <div className="mt-3.5 pt-3 border-t border-slate-100">
-                    <button
-                      onClick={() => onSwitchToThailand(selectedArea?.city)}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-cyan-50 to-indigo-50 hover:from-cyan-100 hover:to-indigo-100 text-indigo-800 text-xs font-extrabold border border-indigo-100 transition-colors cursor-pointer"
-                    >
-                      <MapIcon className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>สลับไปดูแผนที่ประเทศไทย 2D ({selectedArea?.city ? `เน้น ${selectedArea.city}` : 'ภาพรวม 77 จังหวัด'})</span>
-                    </button>
-                  </div>
-                )}
+                {/* Switch map view button */}
+                <div className="mt-3.5 pt-3 border-t border-slate-100">
+                  <button
+                    onClick={() => handleSetMapView(mapView === '3d' ? '2d' : '3d')}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-cyan-50 to-indigo-50 hover:from-cyan-100 hover:to-indigo-100 text-indigo-800 text-xs font-extrabold border border-indigo-100 transition-colors cursor-pointer"
+                  >
+                    {mapView === '3d' ? (
+                      <>
+                        <MapIcon className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>สลับไปดูแผนที่ 2D {selectedArea?.city ? `(เน้น ${selectedArea.city})` : ''}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>สลับไปดูลูกโลก 3D</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           )}
