@@ -15,6 +15,7 @@ export interface FeedComment {
 export interface FeedPollOption {
   id: number;
   text: string;
+  votes: number;
   voteCount: number;
 }
 
@@ -25,6 +26,8 @@ export interface FeedPoll {
   options: FeedPollOption[];
   hasVoted?: boolean;
   userVotedOptionId?: number;
+  votedUserIds?: number[];
+  userVotes?: { user_id: number; option_id: number }[];
 }
 
 export interface FeedPostItem {
@@ -82,7 +85,7 @@ export class FeedDbService {
           GROUP BY post_id
         ) comment_stat ON comment_stat.post_id = p.id
         WHERE p.status IN ('published', 'approved')
-        ORDER BY p.pinned DESC, p.created_at DESC
+        ORDER BY p.pinned DESC, COALESCE(p.published_at, p.created_at) DESC, p.created_at DESC
         LIMIT 50
       `);
 
@@ -108,7 +111,7 @@ export class FeedDbService {
 
       const pollIds = polls.map((pl) => pl.id);
       let pollOptions: any[] = [];
-      let userVotes: any[] = [];
+      let allPollVotes: any[] = [];
 
       if (pollIds.length > 0) {
         const { rows: opts } = await pool.query(
@@ -123,15 +126,13 @@ export class FeedDbService {
         );
         pollOptions = opts;
 
-        if (currentUserId) {
-          const { rows: uv } = await pool.query(
-            `SELECT pv.poll_id, pv.option_id
-             FROM poll_votes pv
-             WHERE pv.poll_id = ANY($1::int[]) AND pv.user_id = $2`,
-            [pollIds, currentUserId]
-          );
-          userVotes = uv;
-        }
+        const { rows: votes } = await pool.query(
+          `SELECT pv.poll_id, pv.option_id, pv.user_id
+           FROM poll_votes pv
+           WHERE pv.poll_id = ANY($1::int[])`,
+          [pollIds]
+        );
+        allPollVotes = votes;
       }
 
       return posts.map((p) => {
@@ -153,23 +154,29 @@ export class FeedDbService {
         let formattedPoll: FeedPoll | undefined;
 
         if (poll) {
+          const pollVotes = allPollVotes.filter((pv) => pv.poll_id === poll.id);
+          const votedUserIds = pollVotes.map((pv) => pv.user_id);
+          const userVotes = pollVotes.map((pv) => ({ user_id: pv.user_id, option_id: pv.option_id }));
+          const myVote = currentUserId ? pollVotes.find((pv) => pv.user_id === currentUserId) : undefined;
+
           const options = pollOptions
             .filter((opt) => opt.poll_id === poll.id)
             .map((opt) => ({
               id: opt.id,
               text: opt.option_text,
+              votes: opt.vote_count,
               voteCount: opt.vote_count,
             }));
-
-          const userVote = userVotes.find((uv) => uv.poll_id === poll.id);
 
           formattedPoll = {
             id: poll.id,
             question: poll.question,
             pointsPerVote: poll.points_per_vote || 5,
             options,
-            hasVoted: !!userVote,
-            userVotedOptionId: userVote?.option_id,
+            hasVoted: Boolean(myVote),
+            userVotedOptionId: myVote?.option_id,
+            votedUserIds,
+            userVotes,
           };
         }
 

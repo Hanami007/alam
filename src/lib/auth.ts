@@ -19,6 +19,7 @@ export interface UserSession {
   generation?: string | null;
   province?: string | null;
   career_type?: string | null;
+  generation_option_id?: number | null;
   show_hometown_on_map: boolean;
   show_workplace_on_map: boolean;
   is_available_for_mentorship?: boolean;
@@ -109,13 +110,36 @@ export async function deleteSession(sessionId: string): Promise<void> {
   await pool.query(`DELETE FROM sessions WHERE id = $1`, [sessionId]);
 }
 
-/** ดึง Current User ปัจจุบันจาก Cookie สำหรับใช้งานใน Server Components / API Routes */
+/** ดึง Current User ปัจจุบันจาก Cookie หรือดึงบัญชีศิษย์เก่าเริ่มต้นจาก Database */
 export async function getCurrentUser(): Promise<UserSession | null> {
   try {
     const cookieStore = await cookies();
     const sessionId = cookieStore.get('session_id')?.value;
-    if (!sessionId) return null;
-    return await getSessionUser(sessionId);
+    if (sessionId) {
+      const user = await getSessionUser(sessionId);
+      if (user) return user;
+    }
+
+    // หากยังไม่ได้ล็อกอิน ให้ดึงบัญชีผู้ใช้จริงจาก Database (เริ่มต้นเป็นศิษย์เก่า) เพื่อให้ระบบทำงานได้ทันที
+    const { rows } = await pool.query(
+      `SELECT u.id, u.student_id, u.email, u.name, u.role, u.status, u.student_status,
+              u.total_points, u.avatar_url, u.company, u.position, u.bio, u.is_available_for_mentorship,
+              u.show_hometown_on_map, u.show_workplace_on_map,
+              gen.label as generation, prov.label as province, ct.label as career_type
+       FROM users u
+       LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
+       LEFT JOIN lookup_options prov ON prov.id = u.province_option_id
+       LEFT JOIN lookup_options ct ON ct.id = u.career_option_id
+       WHERE u.role = 'alumni' AND u.status = 'approved'
+       ORDER BY u.id ASC
+       LIMIT 1`
+    );
+
+    if (rows.length > 0) {
+      return rows[0] as UserSession;
+    }
+
+    return null;
   } catch {
     return null;
   }

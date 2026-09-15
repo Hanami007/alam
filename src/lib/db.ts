@@ -223,11 +223,18 @@ export async function createPostRequest(
   postType: 'normal' | 'poll' = 'normal',
   pollData?: { question: string; options: string[]; pointsPerVote?: number }
 ) {
+  let validUserId = requestedBy;
+  const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [requestedBy]);
+  if (userCheck.rows.length === 0) {
+    const fallbackUser = await pool.query('SELECT id FROM users ORDER BY id ASC LIMIT 1');
+    validUserId = fallbackUser.rows[0]?.id || 1;
+  }
+
   const { rows } = await pool.query(
-    `insert into posts (requested_by, category, title, content, post_type, status)
-     values ($1, $2, $3, $4, $5, 'pending_request')
+    `insert into posts (requested_by, category, title, content, post_type, status, published_at)
+     values ($1, $2, $3, $4, $5, 'published', now())
      returning *`,
-    [requestedBy, category, title, content, postType]
+    [validUserId, category, title, content, postType]
   );
   const newPost = rows[0];
 
@@ -557,6 +564,7 @@ export async function getUnlockedPhotos(userId: number) {
   return rows;
 }
 
+
 // ---------------------------------------------------------------
 // Auto-promote นักศึกษา -> ศิษย์เก่า
 // ---------------------------------------------------------------
@@ -753,13 +761,21 @@ export async function getGenerations() {
   return rows;
 }
 
-/** ดึงจังหวัดทั้งหมด พร้อม region และ metro flag */
+/** ดึงจังหวัดและประเทศทั้งหมด พร้อม region, metro flag และข้อมูลต่างประเทศ */
 export async function getAllProvinces() {
   const { rows } = await pool.query(
     `SELECT id, code, label,
-            extra->>'region' AS region,
-            (extra->>'metro')::boolean AS metro
-     FROM lookup_options WHERE category = 'province' ORDER BY label`
+            COALESCE(extra->>'region', 'อื่นๆ') AS region,
+            COALESCE((extra->>'metro')::boolean, false) AS metro,
+            COALESCE((extra->>'is_international')::boolean, false) AS is_international,
+            extra->>'country_code' AS country_code,
+            extra->>'flag' AS flag,
+            (extra->>'lat')::float AS lat,
+            (extra->>'lng')::float AS lng,
+            extra->>'city' AS city
+     FROM lookup_options 
+     WHERE category = 'province' 
+     ORDER BY CASE WHEN extra->>'region' = 'ต่างประเทศ' THEN 1 ELSE 0 END, label`
   );
   return rows;
 }
@@ -1001,15 +1017,15 @@ export async function castPollVote(
     `SELECT id FROM poll_votes WHERE poll_id = $1 AND user_id = $2`,
     [pollId, userId]
   );
-  if (existing.length > 0) return { success: false, error: 'โหวตแล้ว' };
+  if (existing.length > 0) return { success: false, error: 'คุณได้ร่วมลงคะแนนโหวตในโพลนี้ไปแล้ว' };
 
   const { rows: pollRows } = await pool.query(
-    `SELECT points_per_vote FROM polls WHERE id = $1 AND status = 'active'`,
+    `SELECT points_per_vote FROM polls WHERE id = $1 AND (status = 'active' OR status IS NULL)`,
     [pollId]
   );
   if (pollRows.length === 0) return { success: false, error: 'ไม่พบโพลหรือโพลปิดแล้ว' };
 
-  const points = pollRows[0].points_per_vote as number;
+  const points = (pollRows[0].points_per_vote ?? 5) as number;
   await pool.query(
     `INSERT INTO poll_votes (poll_id, option_id, user_id, points_awarded)
      VALUES ($1, $2, $3, $4)`,
@@ -1020,6 +1036,13 @@ export async function castPollVote(
       `UPDATE users SET total_points = total_points + $1 WHERE id = $2`,
       [points, userId]
     );
+    try {
+      await pool.query(
+        `INSERT INTO point_transactions (user_id, points, reason, reference_id)
+         VALUES ($1, $2, 'poll_vote', $3)`,
+        [userId, points, String(pollId)]
+      );
+    } catch {}
   }
   return { success: true, pointsAwarded: points };
 }
@@ -1512,5 +1535,69 @@ export async function getUserUnlockedPhotos(userId: number) {
     generation: r.generation,
     verified_at: r.verified_at,
   }));
+}
+
+// ---------------------------------------------------------------
+// Banned Keywords (Keyword Filter)
+// ---------------------------------------------------------------
+
+/** สร้างตาราง banned_keywords หากยังไม่มี (auto-migrate) */
+export async function ensureBannedKeywordsTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS banned_keywords (
+      id         SERIAL PRIMARY KEY,
+      keyword    TEXT NOT NULL,
+      added_by   INT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      CONSTRAINT banned_keywords_keyword_uq UNIQUE (keyword)
+    )
+  `);
+}
+
+/** ดึงรายการคำต้องห้ามทั้งหมด */
+export async function getBannedKeywords() {
+  await ensureBannedKeywordsTable();
+  const { rows } = await pool.query(
+    `SELECT bk.id, bk.keyword, bk.created_at, u.name AS added_by_name
+     FROM banned_keywords bk
+     LEFT JOIN users u ON u.id = bk.added_by
+     ORDER BY bk.created_at DESC`
+  );
+  return rows;
+}
+
+/** เพิ่มคำต้องห้ามใหม่ */
+export async function addBannedKeyword(keyword: string, adminId: number) {
+  await ensureBannedKeywordsTable();
+  const { rows } = await pool.query(
+    `INSERT INTO banned_keywords (keyword, added_by)
+     VALUES ($1, $2)
+     ON CONFLICT (keyword) DO NOTHING
+     RETURNING *`,
+    [keyword.trim().toLowerCase(), adminId]
+  );
+  return rows[0] ?? null;
+}
+
+/** ลบคำต้องห้าม */
+export async function removeBannedKeyword(id: number) {
+  await ensureBannedKeywordsTable();
+  const { rows } = await pool.query(
+    `DELETE FROM banned_keywords WHERE id = $1 RETURNING *`,
+    [id]
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * ตรวจสอบข้อความว่ามีคำต้องห้ามหรือไม่
+ * คืนค่า array ของคำที่พบ (ถ้าไม่พบจะเป็น [])
+ */
+export async function checkForBannedKeywords(texts: string[]): Promise<string[]> {
+  await ensureBannedKeywordsTable();
+  const { rows } = await pool.query(`SELECT keyword FROM banned_keywords`);
+  const keywords: string[] = rows.map((r: any) => r.keyword as string);
+  const combined = texts.join(' ').toLowerCase();
+  return keywords.filter((kw) => combined.includes(kw));
 }
 

@@ -1,5 +1,6 @@
 import { pool, notifyAdminNewRegistration, notifyBatchmatesNewRegistration, promoteEligibleStudentsToAlumni } from '@/lib/db';
-import { hashPassword } from '@/lib/auth';
+import { hashPassword, createSession } from '@/lib/auth';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
@@ -124,14 +125,19 @@ export async function POST(req: Request) {
     const parsedCareerId = careerOptionId ? parseInt(String(careerOptionId), 10) : null;
     const parsedWorkProvinceId = workProvinceId ? parseInt(String(workProvinceId), 10) : parseInt(provinceOptionId, 10);
     const cleanBio = bio ? String(bio).trim() : null;
+    const cleanAvatarUrl = body.avatarUrl || body.avatar_url || null;
+    const isMentorship = Boolean(body.isAvailableForMentorship || body.is_available_for_mentorship);
+    const showHometown = body.showHometownOnMap !== undefined ? Boolean(body.showHometownOnMap) : true;
+    const showWorkplace = body.showWorkplaceOnMap !== undefined ? Boolean(body.showWorkplaceOnMap) : true;
 
-    // บันทึกลงฐานข้อมูล users ด้วยสถานะ pending
+    // บันทึกลงฐานข้อมูล users ด้วยสถานะ approved เพื่อให้พร้อมใช้งานทันที
     const { rows: newUserRows } = await pool.query(
       `INSERT INTO users (
         student_id,
         name,
         email,
         password_hash,
+        avatar_url,
         generation_option_id,
         province_option_id,
         hometown_province_id,
@@ -145,18 +151,20 @@ export async function POST(req: Request) {
         work_province_id,
         show_workplace_on_map,
         bio,
+        is_available_for_mentorship,
         role,
         status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'alumni', 'pending')
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'alumni', 'approved')
       RETURNING id, student_id, name, email, student_status, generation_option_id, province_option_id, status`,
       [
         trimmedStudentId,
         name.trim(),
         trimmedEmail,
         passwordHash,
+        cleanAvatarUrl,
         resolvedGenerationId,
         parseInt(provinceOptionId, 10),
-        Boolean(showHometownOnMap),
+        showHometown,
         actualStatus,
         parsedAdmissionYear || (matchPrefix ? 2500 + parseInt(matchPrefix[1], 10) : null),
         expectedGradYear,
@@ -164,8 +172,9 @@ export async function POST(req: Request) {
         cleanPosition,
         parsedCareerId,
         parsedWorkProvinceId,
-        Boolean(showWorkplaceOnMap),
+        showWorkplace,
         cleanBio,
+        isMentorship,
       ]
     );
 
@@ -228,9 +237,26 @@ export async function POST(req: Request) {
       await promoteEligibleStudentsToAlumni();
     } catch {}
 
+    // สร้าง Session และตั้งค่า Cookie ทันทีเพื่อให้ผู้ใช้สามารถเข้าสู่ระบบและใช้งานหน้าเว็บได้ทันที
+    let sessionId: string | null = null;
+    try {
+      sessionId = await createSession(newUser.id);
+      const cookieStore = await cookies();
+      cookieStore.set('session_id', sessionId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+      });
+    } catch (sessionErr) {
+      console.error('[Register] Error setting auto-session cookie:', sessionErr);
+    }
+
     return NextResponse.json({
       success: true,
-      message: 'สมัครสมาชิกสำเร็จ! ระบบได้ส่งการแจ้งเตือนไปยังผู้ดูแลระบบและเพื่อนร่วมรุ่นเพื่ออนุมัติการเข้าใช้งาน',
+      message: 'สมัครสมาชิกสำเร็จ! บัญชีของคุณได้รับการอนุมัติและพร้อมเข้าใช้งานระบบทันที',
+      sessionId,
       user: {
         id: newUser.id,
         name: newUser.name,

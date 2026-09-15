@@ -68,6 +68,12 @@ export interface MapPoint {
   province_name: string;
   region: string;
   metro: boolean;
+  is_international?: boolean;
+  country_code?: string;
+  flag?: string;
+  lat?: number;
+  lng?: number;
+  city?: string;
 }
 
 export interface GlobePanelProps {
@@ -330,7 +336,7 @@ export function GlobePanel({
   const [autoRotate, setAutoRotate] = useState(true);
   const [globeReady, setGlobeReady] = useState(false);
   const [allPolygons, setAllPolygons] = useState<any[]>([]);
-  const [hoveredMetroProvince, setHoveredMetroProvince] = useState<string | null>(null);
+
 
   // ─── Fetch GeoJSON: World Countries + Thailand 77 Provinces ─────────────────
   useEffect(() => {
@@ -401,18 +407,41 @@ export function GlobePanel({
     return () => ro.disconnect();
   }, []);
 
-  // ─── Dynamically Build Clusters from Thailand DB + International Mock ───────
+  // ─── Dynamically Build Clusters from Thailand DB + International DB ─────────
   const activeClusters = useMemo(() => {
-    const intlClusters = GLOBE_CLUSTERS.filter((c) => c.country_code !== 'TH');
-    const thaiSource = mode === 'hometown' ? hometownData : workplaceData;
+    const rawIntlClusters = GLOBE_CLUSTERS.filter((c) => c.country_code !== 'TH');
+    const source = mode === 'hometown' ? hometownData : workplaceData;
 
-    if (!thaiSource || thaiSource.length === 0) {
+    if (!source || source.length === 0) {
       return GLOBE_CLUSTERS;
+    }
+
+    const thaiPoints: MapPoint[] = [];
+    const intlPoints: MapPoint[] = [];
+
+    for (const p of source) {
+      const isIntl =
+        p.is_international ||
+        p.region === 'ต่างประเทศ' ||
+        (p.country_code && p.country_code !== 'TH') ||
+        p.province_name?.includes('ต่างประเทศ') ||
+        p.province_name?.includes('Japan') ||
+        p.province_name?.includes('Singapore') ||
+        p.province_name?.includes('USA') ||
+        p.province_name?.includes('Australia') ||
+        p.province_name?.includes('Germany') ||
+        p.province_name?.includes('UK');
+
+      if (isIntl) {
+        intlPoints.push(p);
+      } else {
+        thaiPoints.push(p);
+      }
     }
 
     // Group Thai database alumni by province
     const provMap = new Map<string, MapPoint[]>();
-    for (const p of thaiSource) {
+    for (const p of thaiPoints) {
       const pName = p.province_name || (p as any).provinceName;
       if (!pName) continue;
       const list = provMap.get(pName) ?? [];
@@ -450,6 +479,60 @@ export function GlobePanel({
         };
       }
     );
+
+    // Deep clone intl clusters so we can augment them with real registered alumni
+    const intlClusters: GlobeCountryCluster[] = rawIntlClusters.map((c) => ({
+      ...c,
+      alumni: [...c.alumni],
+    }));
+
+    for (const p of intlPoints) {
+      let cluster = intlClusters.find(
+        (c) =>
+          (p.country_code && c.country_code === p.country_code) ||
+          (p.province_name && (p.province_name.includes(c.country_name) || c.country_name.includes(p.province_name)))
+      );
+
+      const pLat = p.lat || cluster?.lat || 35.6762;
+      const pLng = p.lng || cluster?.lng || 139.6503;
+      const pCountryName = cluster?.country_name || p.province_name || 'ต่างประเทศ';
+      const pCity = p.city || cluster?.city || pCountryName;
+
+      const alumnusObj: GlobeAlumni = {
+        id: p.id,
+        name: p.name,
+        avatar_url: p.avatar_url,
+        position: p.position || 'ศิษย์เก่า CSMJU',
+        company: p.company || 'องค์กรต่างประเทศ',
+        generation: p.generation,
+        career_type: p.career_type,
+        country_code: p.country_code || cluster?.country_code || 'INTL',
+        country_name: pCountryName,
+        city: pCity,
+        lat: pLat,
+        lng: pLng,
+        student_status: (p.student_status === 'studying' ? 'student' : 'alumni') as any,
+      };
+
+      if (cluster) {
+        // Prepend so real registered alumnus shows at top
+        cluster.alumni = [alumnusObj, ...cluster.alumni];
+        cluster.count += 1;
+      } else {
+        const newCluster: GlobeCountryCluster = {
+          country_code: p.country_code || 'INTL',
+          country_name: pCountryName,
+          city: pCity,
+          lat: pLat,
+          lng: pLng,
+          count: 1,
+          flag: p.flag || '🌐',
+          alumni: [alumnusObj],
+          region: 'asia',
+        };
+        intlClusters.push(newCluster);
+      }
+    }
 
     thaiClusters.sort((a, b) => b.count - a.count);
     return [...thaiClusters, ...intlClusters];
@@ -879,15 +962,11 @@ export function GlobePanel({
                 // ถ้าเป็นจังหวัดของไทย (ทั้งบนแผ่นดินใหญ่และรูปทรง 3D แยกขยาย)
                 if (isThaiProv) {
                   const isAreaSel = selectedArea?.city === provName;
-                  const isHovered = hoveredMetroProvince === provName;
                   const clusterMatch = activeClusters.find((c) => c.country_code === 'TH' && c.city === provName);
                   const count = clusterMatch?.count ?? 0;
 
                   if (isAreaSel) {
                     return '#ec4899'; // สีชมพูเน้นชัดเจนเมื่อเลือก
-                  }
-                  if (isHovered && isMetro3D) {
-                    return '#06b6d4'; // สี cyan เมื่อชี้
                   }
                   if (count >= 5) {
                     return isDarkCanvas ? 'rgba(3, 105, 161, 0.85)' : '#0369a1'; // ฟ้าเข้ม (หนาแน่นมาก)
@@ -1278,119 +1357,6 @@ export function GlobePanel({
             />
           </div>
 
-          {/* ─── Floating Bangkok & Metro Callout Inset (แยกแผนที่ปริมณฑลออกมาในรูป 3 มิติ) ─── */}
-          {isZoomedIn && selectedCluster?.country_code === 'TH' && (
-            <div className="absolute bottom-4 left-4 z-20 w-[300px] sm:w-[340px] rounded-2xl bg-slate-900/95 text-white p-3.5 border border-sky-400/50 shadow-2xl backdrop-blur-md animate-fade-in select-none">
-              {/* Header */}
-              <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-white/10">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="text-base">🏙️</span>
-                  <div>
-                    <span className="text-xs font-black text-white block leading-tight">กทม. และปริมณฑล (3D ขยาย)</span>
-                    <span className="text-[10px] text-sky-300 font-medium">แยกรูปทรง 3 มิติบนลูกโลก • แตะหมุด/ปุ่ม</span>
-                  </div>
-                </div>
-                <span className="shrink-0 px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-extrabold border border-sky-400/40 shadow-xs">
-                  รวม {totalMetroAlumni} คน
-                </span>
-              </div>
-
-              {/* SVG Map of Bangkok & Perimeter */}
-              <div className="relative w-full h-[145px] bg-slate-950/70 rounded-xl border border-sky-500/25 p-2 mb-2.5 flex items-center justify-center overflow-hidden">
-                <svg
-                  viewBox="140.2 364.5 84.4 66.4"
-                  className="w-full h-full filter drop-shadow-sm transition-all duration-300"
-                >
-                  <defs>
-                    <filter id="metro-glow-selected" x="-30%" y="-30%" width="160%" height="160%">
-                      <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#38bdf8" floodOpacity="0.9" />
-                    </filter>
-                  </defs>
-                  {METRO_PROVINCES.map((provName) => {
-                    const cluster = metroClusters.find((c) => c.city === provName);
-                    const count = cluster?.count ?? 0;
-                    const isSelected = selectedArea?.city === provName;
-                    const isHovered = hoveredMetroProvince === provName;
-
-                    // Fill color based on density gradient
-                    let fill = '#0f172a';
-                    if (count >= 10) fill = '#0284c7';
-                    else if (count >= 5) fill = '#0ea5e9';
-                    else if (count >= 1) fill = '#38bdf8';
-                    else fill = '#1e293b';
-
-                    if (isSelected) fill = '#ec4899';
-                    else if (isHovered) fill = '#06b6d4';
-
-                    return (
-                      <path
-                        key={`metro-svg-${provName}`}
-                        d={THAILAND_PROVINCE_PATHS[provName]}
-                        fill={fill}
-                        stroke={isSelected ? '#ffffff' : isHovered ? '#ffffff' : '#38bdf8'}
-                        strokeWidth={isSelected ? 1.4 : isHovered ? 1.0 : 0.6}
-                        strokeLinejoin="round"
-                        filter={isSelected ? 'url(#metro-glow-selected)' : undefined}
-                        onMouseEnter={() => setHoveredMetroProvince(provName)}
-                        onMouseLeave={() => setHoveredMetroProvince(null)}
-                        onClick={() => {
-                          if (cluster) handleSelectArea(cluster);
-                        }}
-                        className="cursor-pointer transition-all duration-150 hover:opacity-95"
-                      >
-                        <title>{`${provName}: ${count} คน`}</title>
-                      </path>
-                    );
-                  })}
-                </svg>
-
-                {/* Hover Tooltip overlay on mini map */}
-                {hoveredMetroProvince && (
-                  <div className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded-md bg-slate-900/90 text-white border border-sky-400 text-[10px] font-black pointer-events-none animate-fade-in shadow-md">
-                    📍 {hoveredMetroProvince} ({metroClusters.find((c) => c.city === hoveredMetroProvince)?.count ?? 0} คน)
-                  </div>
-                )}
-              </div>
-
-              {/* Quick Badge Chips */}
-              <div className="grid grid-cols-3 gap-1">
-                {metroClusters.map((cluster) => {
-                  const isSelected = selectedArea?.city === cluster.city;
-                  const isHovered = hoveredMetroProvince === cluster.city;
-                  return (
-                    <button
-                      key={cluster.city}
-                      onMouseEnter={() => setHoveredMetroProvince(cluster.city)}
-                      onMouseLeave={() => setHoveredMetroProvince(null)}
-                      onClick={() => handleSelectArea(cluster)}
-                      className={`flex items-center justify-between gap-1 px-2 py-1 rounded-lg text-left text-[11px] font-bold transition-all cursor-pointer ${
-                        isSelected
-                          ? 'bg-pink-600 text-white font-black shadow-md shadow-pink-600/30 ring-1 ring-white'
-                          : isHovered
-                          ? 'bg-sky-500/30 text-sky-200 border border-sky-400/50'
-                          : cluster.count > 0
-                          ? 'bg-white/10 hover:bg-white/20 text-white border border-white/10'
-                          : 'bg-white/5 hover:bg-white/10 text-slate-400 border border-white/5'
-                      }`}
-                    >
-                      <span className="truncate text-[10px]">{cluster.city}</span>
-                      <span
-                        className={`shrink-0 px-1 py-0.1 rounded text-[9px] font-extrabold ${
-                          isSelected
-                            ? 'bg-slate-950 text-pink-300'
-                            : cluster.count > 0
-                            ? 'bg-sky-500/30 text-sky-200'
-                            : 'bg-slate-800 text-slate-500'
-                        }`}
-                      >
-                        {cluster.count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
           {/* Auto-rotate indicator */}
           {autoRotate && (

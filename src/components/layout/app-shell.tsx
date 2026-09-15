@@ -16,6 +16,7 @@ import {
   User,
   X,
   LogOut,
+  LogIn,
   Shield,
   Award,
   CheckCheck,
@@ -78,12 +79,17 @@ const MAIN_NAV = [
   { href: '/search', label: 'หนังสือรุ่น', icon: BookOpen },
 ];
 
-const ACCOUNT_NAV = [
-  { href: '/profile', label: 'โปรไฟล์', icon: User },
-  { href: '/admin', label: 'จัดการระบบ', icon: Settings },
-];
+interface NavItem {
+  href: string;
+  label: string;
+  icon: any;
+  adminOnly?: boolean;
+}
 
-const CURRENT_USER = { name: 'สมชาย ใจดี', generation: 'รุ่น 43', points: 16, level: 2, is_available_for_mentorship: true };
+const ACCOUNT_NAV: NavItem[] = [
+  { href: '/profile', label: 'โปรไฟล์', icon: User },
+  { href: '/admin', label: 'จัดการระบบ', icon: Settings, adminOnly: true },
+];
 
 function NavSection({
   title,
@@ -92,7 +98,7 @@ function NavSection({
   collapsed,
 }: {
   title: string;
-  items: typeof MAIN_NAV;
+  items: NavItem[];
   pathname: string | null;
   collapsed: boolean;
 }) {
@@ -145,7 +151,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(CURRENT_USER);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [notifications, setNotifications] = useState<AppNotification[]>(INITIAL_NOTIFICATIONS);
 
   const notifPopoverRef = useRef<HTMLDivElement>(null);
@@ -154,27 +161,42 @@ export function AppShell({ children }: { children: ReactNode }) {
   const avatarRef = useRef<HTMLDivElement>(null);
 
   const unreadNotifCount = notifications.filter((n) => n.unread).length;
+  const isAdmin = currentUser?.role === 'admin';
+  const navAccountItems = ACCOUNT_NAV.filter((item) => !item.adminOnly || isAdmin);
 
   const fetchUserProfile = useCallback(() => {
     fetch('/api/user/profile')
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) {
+          setCurrentUser(null);
+          return null;
+        }
+        return res.json();
+      })
       .then((u) => {
         if (u && !u.error) {
-          const points = u.totalPoints ?? u.total_points ?? 16;
+          const points = u.totalPoints ?? u.total_points ?? 0;
           const level = Math.floor(points / 20) + 1;
           setCurrentUser({
             id: u.id,
-            name: u.name || 'สมชาย ใจดี',
-            generation: u.generation || 'รุ่น 43',
+            name: u.name,
+            generation: u.generation || '',
             points: points,
             level: level,
             avatar_url: u.avatarUrl || u.avatar_url,
             role: u.role || 'alumni',
             is_available_for_mentorship: Boolean(u.isAvailableForMentorship ?? u.is_available_for_mentorship),
           });
+        } else {
+          setCurrentUser(null);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        setCurrentUser(null);
+      })
+      .finally(() => {
+        setAuthLoading(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -224,11 +246,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
     // Reward points for gratitude
     notifyPointsUpdated(1);
-    fetch('/api/user/profile', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pointsAdded: 1, userId: currentUser.id }),
-    }).catch(() => {});
+    if (currentUser?.id) {
+      fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pointsAdded: 1, userId: currentUser.id }),
+      }).catch(() => {});
+    }
 
     // Add confirmation notification
     notifyNewNotification({
@@ -319,12 +343,22 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
 
           {/* User points badge in mobile header */}
-          <Link
-            href="/profile"
-            className="flex items-center gap-1.5 rounded-full bg-primary-light/80 border border-primary/20 px-2.5 py-1 text-xs font-bold text-primary active:scale-95"
-          >
-            <span>✨ {currentUser.points}p</span>
-          </Link>
+          {currentUser ? (
+            <Link
+              href="/profile"
+              className="flex items-center gap-1.5 rounded-full bg-primary-light/80 border border-primary/20 px-2.5 py-1 text-xs font-bold text-primary active:scale-95"
+            >
+              <span>✨ {currentUser.points ?? 0}p</span>
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-bold text-white active:scale-95 shadow-xs"
+            >
+              <LogIn className="h-3.5 w-3.5" />
+              <span>เข้าสู่ระบบ</span>
+            </Link>
+          )}
         </div>
       </header>
 
@@ -505,266 +539,282 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Sidebar Nav Sections */}
         <nav className="flex flex-1 flex-col gap-5 overflow-y-auto pr-0.5">
           <NavSection title="เมนูหลัก" items={MAIN_NAV} pathname={pathname} collapsed={collapsed} />
-          <NavSection title="บัญชีของฉัน" items={ACCOUNT_NAV} pathname={pathname} collapsed={collapsed} />
+          <NavSection title="บัญชีของฉัน" items={navAccountItems} pathname={pathname} collapsed={collapsed} />
         </nav>
 
         {/* User Card with Inline Accordion Expansion */}
         <div className="relative mt-auto pt-3" ref={avatarRef}>
-          {/* Collapsed view floating popup */}
-          {avatarOpen && collapsed && (
-            <div className="animate-popover-down fixed left-[84px] bottom-4 z-50 overflow-hidden rounded-2xl border border-border bg-card shadow-hero w-64">
-              <div className="gradient-primary p-4 text-white">
-                <div className="flex items-center gap-3">
-                  {currentUser.avatar_url ? (
-                    <img
-                      src={currentUser.avatar_url}
-                      alt={currentUser.name}
-                      className="h-10 w-10 shrink-0 aspect-square rounded-full object-cover ring-2 ring-white/40"
-                    />
-                  ) : (
-                    <div className="flex h-10 w-10 shrink-0 aspect-square items-center justify-center rounded-full bg-white/20 font-bold text-white text-xs backdrop-blur-xs">
-                      {currentUser.name?.substring(0, 2) || 'CS'}
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold truncate">{currentUser.name}</p>
-                    <p className="text-xs text-white/80">{currentUser.generation}</p>
-                    {currentUser.is_available_for_mentorship && (
-                      <span className="inline-block mt-1 rounded-md bg-emerald-400/30 px-2 py-0.5 text-[10px] sm:text-xs font-extrabold text-emerald-100 border border-emerald-300/40">
-                        💬 ยินดีให้คำแนะนำ
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="mt-3 flex items-center justify-between rounded-xl bg-white/15 px-3 py-1.5 text-xs backdrop-blur-xs">
-                  <span className="font-medium">แต้มสะสม</span>
-                  <span className="font-bold">{currentUser.points} แต้ม (Lv.{currentUser.level})</span>
-                </div>
-              </div>
-
-              <div className="p-1.5 divide-y divide-border/50 text-xs">
-                <div className="py-1 space-y-1">
-                  <div className="flex items-center justify-between rounded-xl px-3 py-2 bg-emerald-50 border border-emerald-200/80 text-emerald-950">
-                    <span className="flex items-center gap-2 text-xs font-bold">
-                      <MessageCircle className="h-4 w-4 text-emerald-600" />
-                      ยินดีให้คำแนะนำ
-                    </span>
-                    <button
-                      type="button"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        const next = !currentUser.is_available_for_mentorship;
-                        setCurrentUser((prev: any) => ({ ...prev, is_available_for_mentorship: next }));
-                        await fetch('/api/user/profile', {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ isAvailableForMentorship: next, userId: currentUser.id }),
-                        }).catch(() => {});
-                      }}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        currentUser.is_available_for_mentorship ? 'bg-emerald-500' : 'bg-slate-300'
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                          currentUser.is_available_for_mentorship ? 'translate-x-4' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                  </div>
-
-                  <Link
-                    href="/profile"
-                    onClick={() => setAvatarOpen(false)}
-                    className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
-                  >
-                    <User className="h-4 w-4 text-primary" />
-                    โปรไฟล์ของฉัน
-                  </Link>
-                  <Link
-                    href="/settings"
-                    onClick={() => setAvatarOpen(false)}
-                    className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
-                  >
-                    <Settings className="h-4 w-4 text-slate-500" />
-                    การตั้งค่าความเป็นส่วนตัว
-                  </Link>
-                  <Link
-                    href="/hall-of-fame"
-                    onClick={() => setAvatarOpen(false)}
-                    className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
-                  >
-                    <Award className="h-4 w-4 text-amber-500" />
-                    แต้ม & รางวัลศิษย์เก่า
-                  </Link>
-                  {currentUser.role === 'admin' && (
-                    <Link
-                      href="/admin"
-                      onClick={() => setAvatarOpen(false)}
-                      className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
-                    >
-                      <Shield className="h-4 w-4 text-indigo-500" />
-                      จัดการระบบ Admin
-                    </Link>
-                  )}
-                </div>
-
-                <div className="pt-1">
-                  <button
-                    onClick={() => {
-                      setAvatarOpen(false);
-                      handleLogout();
-                    }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-rose-600 transition-colors hover:bg-rose-50 font-medium cursor-pointer"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    ออกจากระบบ
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Integrated User Card with Smooth Slide-Up Inline Expansion */}
-          <div className={`gradient-primary overflow-hidden rounded-2xl text-white shadow-blue-glow transition-all duration-300 ${collapsed ? 'p-2' : 'p-3'}`}>
-            <button
-              onClick={() => {
-                setAvatarOpen((v) => !v);
-                setNotifOpen(false);
-              }}
-              className="w-full text-left flex items-center gap-2.5 cursor-pointer justify-center"
-              title={collapsed ? `${currentUser.name} (${currentUser.points} แต้ม)` : undefined}
-            >
-              {collapsed ? (
-                <div className="flex flex-col items-center gap-1 mx-auto shrink-0">
-                  {currentUser.avatar_url ? (
-                    <img
-                      src={currentUser.avatar_url}
-                      alt={currentUser.name}
-                      className="h-9 w-9 shrink-0 aspect-square rounded-full object-cover ring-1 ring-white/40"
-                    />
-                  ) : (
-                    <div className="flex h-9 w-9 shrink-0 aspect-square items-center justify-center rounded-full bg-white/25 text-xs font-bold shadow-xs">
-                      {currentUser.name?.substring(0, 2) || 'CS'}
-                    </div>
-                  )}
-                  <p className="text-[10px] font-extrabold shrink-0 text-center leading-none mt-0.5">{currentUser.points}p</p>
-                </div>
-              ) : (
-                <>
-                  <div className="relative shrink-0">
-                    {currentUser.avatar_url ? (
-                      <img
-                        src={currentUser.avatar_url}
-                        alt={currentUser.name}
-                        className="h-9 w-9 shrink-0 aspect-square rounded-full object-cover ring-2 ring-white/40"
-                      />
-                    ) : (
-                      <div className="flex h-9 w-9 shrink-0 aspect-square items-center justify-center rounded-full bg-white/20 text-xs font-bold shadow-xs ring-2 ring-white/40 backdrop-blur-xs">
-                        {currentUser.name?.substring(0, 2) || 'CS'}
+          {authLoading ? (
+            <div className={`rounded-2xl bg-slate-100/70 border border-slate-200 animate-pulse ${collapsed ? 'h-12 w-12 mx-auto' : 'h-14 w-full'}`} />
+          ) : currentUser ? (
+            <>
+              {/* Collapsed view floating popup */}
+              {avatarOpen && collapsed && (
+                <div className="animate-popover-down fixed left-[84px] bottom-4 z-50 overflow-hidden rounded-2xl border border-border bg-card shadow-hero w-64">
+                  <div className="gradient-primary p-4 text-white">
+                    <div className="flex items-center gap-3">
+                      {currentUser.avatar_url ? (
+                        <img
+                          src={currentUser.avatar_url}
+                          alt={currentUser.name}
+                          className="h-10 w-10 shrink-0 aspect-square rounded-full object-cover ring-2 ring-white/40"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 shrink-0 aspect-square items-center justify-center rounded-full bg-white/20 font-bold text-white text-xs backdrop-blur-xs">
+                          {currentUser.name?.substring(0, 2) || 'CS'}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold truncate">{currentUser.name}</p>
+                        <p className="text-xs text-white/80">{currentUser.generation}</p>
+                        {currentUser.is_available_for_mentorship && (
+                          <span className="inline-block mt-1 rounded-md bg-emerald-400/30 px-2 py-0.5 text-[10px] sm:text-xs font-extrabold text-emerald-100 border border-emerald-300/40">
+                            💬 ยินดีให้คำแนะนำ
+                          </span>
+                        )}
                       </div>
-                    )}
-                    <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs sm:text-sm font-bold truncate">{currentUser.name}</p>
-                      <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] sm:text-xs font-bold shrink-0">
-                        Lv.{currentUser.level}
-                      </span>
                     </div>
-                    <p className="text-xs text-white/80 truncate">{currentUser.generation} • {currentUser.points} แต้ม</p>
-                    {currentUser.is_available_for_mentorship && (
-                      <span className="inline-block mt-0.5 rounded-md bg-emerald-400/30 px-1.5 py-0.5 text-[10px] sm:text-xs font-extrabold text-emerald-100 border border-emerald-300/40">
-                        💬 ยินดีให้คำแนะนำ
-                      </span>
-                    )}
+                    <div className="mt-3 flex items-center justify-between rounded-xl bg-white/15 px-3 py-1.5 text-xs backdrop-blur-xs">
+                      <span className="font-medium">แต้มสะสม</span>
+                      <span className="font-bold">{currentUser.points} แต้ม (Lv.{currentUser.level})</span>
+                    </div>
                   </div>
-                  <ChevronRight className={`h-4 w-4 text-white/80 shrink-0 transition-transform duration-300 ${avatarOpen ? '-rotate-90' : ''}`} />
-                </>
-              )}
-            </button>
 
-            {/* Inline Slide-Up Options inside the SAME Card */}
-            {avatarOpen && !collapsed && (
-              <div className="mt-3 pt-3 border-t border-white/20 text-xs space-y-1.5 animate-popover-down">
-                {/* Quick Toggle for Mentorship */}
-                <div className="flex items-center justify-between rounded-xl px-2.5 py-2 bg-white/15 backdrop-blur-xs text-white my-1">
-                  <span className="flex items-center gap-2 text-xs font-bold">
-                    <MessageCircle className="h-4 w-4 text-emerald-300" />
-                    ยินดีให้คำแนะนำรุ่นน้อง
-                  </span>
-                  <button
-                    type="button"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      const next = !currentUser.is_available_for_mentorship;
-                      setCurrentUser((prev: any) => ({ ...prev, is_available_for_mentorship: next }));
-                      await fetch('/api/user/profile', {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ isAvailableForMentorship: next, userId: currentUser.id }),
-                      }).catch(() => {});
-                    }}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      currentUser.is_available_for_mentorship ? 'bg-emerald-400' : 'bg-white/30'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                        currentUser.is_available_for_mentorship ? 'translate-x-4' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
+                  <div className="p-1.5 divide-y divide-border/50 text-xs">
+                    <div className="py-1 space-y-1">
+                      <div className="flex items-center justify-between rounded-xl px-3 py-2 bg-emerald-50 border border-emerald-200/80 text-emerald-950">
+                        <span className="flex items-center gap-2 text-xs font-bold">
+                          <MessageCircle className="h-4 w-4 text-emerald-600" />
+                          ยินดีให้คำแนะนำ
+                        </span>
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const next = !currentUser.is_available_for_mentorship;
+                            setCurrentUser((prev: any) => ({ ...prev, is_available_for_mentorship: next }));
+                            await fetch('/api/user/profile', {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ isAvailableForMentorship: next, userId: currentUser.id }),
+                            }).catch(() => {});
+                          }}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            currentUser.is_available_for_mentorship ? 'bg-emerald-500' : 'bg-slate-300'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                              currentUser.is_available_for_mentorship ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      <Link
+                        href="/profile"
+                        onClick={() => setAvatarOpen(false)}
+                        className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
+                      >
+                        <User className="h-4 w-4 text-primary" />
+                        โปรไฟล์ของฉัน
+                      </Link>
+                      <Link
+                        href="/settings"
+                        onClick={() => setAvatarOpen(false)}
+                        className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
+                      >
+                        <Settings className="h-4 w-4 text-slate-500" />
+                        การตั้งค่าความเป็นส่วนตัว
+                      </Link>
+                      <Link
+                        href="/hall-of-fame"
+                        onClick={() => setAvatarOpen(false)}
+                        className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
+                      >
+                        <Award className="h-4 w-4 text-amber-500" />
+                        แต้ม & รางวัลศิษย์เก่า
+                      </Link>
+                      {isAdmin && (
+                        <Link
+                          href="/admin"
+                          onClick={() => setAvatarOpen(false)}
+                          className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
+                        >
+                          <Shield className="h-4 w-4 text-indigo-500" />
+                          จัดการระบบ Admin
+                        </Link>
+                      )}
+                    </div>
+
+                    <div className="pt-1">
+                      <button
+                        onClick={() => {
+                          setAvatarOpen(false);
+                          handleLogout();
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-rose-600 transition-colors hover:bg-rose-50 font-medium cursor-pointer"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        ออกจากระบบ
+                      </button>
+                    </div>
+                  </div>
                 </div>
+              )}
 
-                <Link
-                  href="/profile"
-                  onClick={() => setAvatarOpen(false)}
-                  className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-white hover:bg-white/20 transition-colors font-medium"
-                >
-                  <User className="h-4 w-4 text-white" />
-                  โปรไฟล์ของฉัน
-                </Link>
-                <Link
-                  href="/settings"
-                  onClick={() => setAvatarOpen(false)}
-                  className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-white hover:bg-white/20 transition-colors font-medium"
-                >
-                  <Settings className="h-4 w-4 text-white/80" />
-                  การตั้งค่าความเป็นส่วนตัว
-                </Link>
-                <Link
-                  href="/hall-of-fame"
-                  onClick={() => setAvatarOpen(false)}
-                  className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-white hover:bg-white/20 transition-colors font-medium"
-                >
-                  <Award className="h-4 w-4 text-amber-300" />
-                  แต้ม & รางวัลศิษย์เก่า
-                </Link>
-                {currentUser.role === 'admin' && (
-                  <Link
-                    href="/admin"
-                    onClick={() => setAvatarOpen(false)}
-                    className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-white hover:bg-white/20 transition-colors font-medium"
-                  >
-                    <Shield className="h-4 w-4 text-indigo-200" />
-                    จัดการระบบ Admin
-                  </Link>
-                )}
+              {/* Integrated User Card with Smooth Slide-Up Inline Expansion */}
+              <div className={`gradient-primary overflow-hidden rounded-2xl text-white shadow-blue-glow transition-all duration-300 ${collapsed ? 'p-2' : 'p-3'}`}>
                 <button
                   onClick={() => {
-                    setAvatarOpen(false);
-                    handleLogout();
+                    setAvatarOpen((v) => !v);
+                    setNotifOpen(false);
                   }}
-                  className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-rose-200 hover:bg-rose-500/30 transition-colors font-medium cursor-pointer"
+                  className="w-full text-left flex items-center gap-2.5 cursor-pointer justify-center"
+                  title={collapsed ? `${currentUser.name} (${currentUser.points} แต้ม)` : undefined}
                 >
-                  <LogOut className="h-4 w-4" />
-                  ออกจากระบบ
+                  {collapsed ? (
+                    <div className="flex flex-col items-center gap-1 mx-auto shrink-0">
+                      {currentUser.avatar_url ? (
+                        <img
+                          src={currentUser.avatar_url}
+                          alt={currentUser.name}
+                          className="h-9 w-9 shrink-0 aspect-square rounded-full object-cover ring-1 ring-white/40"
+                        />
+                      ) : (
+                        <div className="flex h-9 w-9 shrink-0 aspect-square items-center justify-center rounded-full bg-white/25 text-xs font-bold shadow-xs">
+                          {currentUser.name?.substring(0, 2) || 'CS'}
+                        </div>
+                      )}
+                      <p className="text-[10px] font-extrabold shrink-0 text-center leading-none mt-0.5">{currentUser.points}p</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="relative shrink-0">
+                        {currentUser.avatar_url ? (
+                          <img
+                            src={currentUser.avatar_url}
+                            alt={currentUser.name}
+                            className="h-9 w-9 shrink-0 aspect-square rounded-full object-cover ring-2 ring-white/40"
+                          />
+                        ) : (
+                          <div className="flex h-9 w-9 shrink-0 aspect-square items-center justify-center rounded-full bg-white/20 text-xs font-bold shadow-xs ring-2 ring-white/40 backdrop-blur-xs">
+                            {currentUser.name?.substring(0, 2) || 'CS'}
+                          </div>
+                        )}
+                        <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs sm:text-sm font-bold truncate">{currentUser.name}</p>
+                          <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] sm:text-xs font-bold shrink-0">
+                            Lv.{currentUser.level}
+                          </span>
+                        </div>
+                        <p className="text-xs text-white/80 truncate">{currentUser.generation} • {currentUser.points} แต้ม</p>
+                        {currentUser.is_available_for_mentorship && (
+                          <span className="inline-block mt-0.5 rounded-md bg-emerald-400/30 px-1.5 py-0.5 text-[10px] sm:text-xs font-extrabold text-emerald-100 border border-emerald-300/40">
+                            💬 ยินดีให้คำแนะนำ
+                          </span>
+                        )}
+                      </div>
+                      <ChevronRight className={`h-4 w-4 text-white/80 shrink-0 transition-transform duration-300 ${avatarOpen ? '-rotate-90' : ''}`} />
+                    </>
+                  )}
                 </button>
+
+                {/* Inline Slide-Up Options inside the SAME Card */}
+                {avatarOpen && !collapsed && (
+                  <div className="mt-3 pt-3 border-t border-white/20 text-xs space-y-1.5 animate-popover-down">
+                    {/* Quick Toggle for Mentorship */}
+                    <div className="flex items-center justify-between rounded-xl px-2.5 py-2 bg-white/15 backdrop-blur-xs text-white my-1">
+                      <span className="flex items-center gap-2 text-xs font-bold">
+                        <MessageCircle className="h-4 w-4 text-emerald-300" />
+                        ยินดีให้คำแนะนำรุ่นน้อง
+                      </span>
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const next = !currentUser.is_available_for_mentorship;
+                          setCurrentUser((prev: any) => ({ ...prev, is_available_for_mentorship: next }));
+                          await fetch('/api/user/profile', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ isAvailableForMentorship: next, userId: currentUser.id }),
+                          }).catch(() => {});
+                        }}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          currentUser.is_available_for_mentorship ? 'bg-emerald-400' : 'bg-white/30'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                            currentUser.is_available_for_mentorship ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    <Link
+                      href="/profile"
+                      onClick={() => setAvatarOpen(false)}
+                      className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-white hover:bg-white/20 transition-colors font-medium"
+                    >
+                      <User className="h-4 w-4 text-white" />
+                      โปรไฟล์ของฉัน
+                    </Link>
+                    <Link
+                      href="/settings"
+                      onClick={() => setAvatarOpen(false)}
+                      className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-white hover:bg-white/20 transition-colors font-medium"
+                    >
+                      <Settings className="h-4 w-4 text-white/80" />
+                      การตั้งค่าความเป็นส่วนตัว
+                    </Link>
+                    <Link
+                      href="/hall-of-fame"
+                      onClick={() => setAvatarOpen(false)}
+                      className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-white hover:bg-white/20 transition-colors font-medium"
+                    >
+                      <Award className="h-4 w-4 text-amber-300" />
+                      แต้ม & รางวัลศิษย์เก่า
+                    </Link>
+                    {isAdmin && (
+                      <Link
+                        href="/admin"
+                        onClick={() => setAvatarOpen(false)}
+                        className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-white hover:bg-white/20 transition-colors font-medium"
+                      >
+                        <Shield className="h-4 w-4 text-indigo-200" />
+                        จัดการระบบ Admin
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => {
+                        setAvatarOpen(false);
+                        handleLogout();
+                      }}
+                      className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-rose-200 hover:bg-rose-500/30 transition-colors font-medium cursor-pointer"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      ออกจากระบบ
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          ) : (
+            <Link
+              href="/login"
+              className={`flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-3 font-semibold text-xs justify-center hover:opacity-95 transition-all shadow-blue-glow ${
+                collapsed ? 'px-2' : 'px-4'
+              }`}
+            >
+              <LogIn className="h-4 w-4 shrink-0" />
+              {!collapsed && <span>เข้าสู่ระบบ</span>}
+            </Link>
+          )}
         </div>
 
         {/* Floating Side-Badge Toggle Button (Desktop only) */}

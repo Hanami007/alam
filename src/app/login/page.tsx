@@ -180,15 +180,15 @@ function LoginForm() {
 
           <button
             type="button"
-            onClick={() => handleQuickFill('60010001')}
+            onClick={() => handleQuickFill('6604101313')}
             className="flex items-center gap-2 rounded-xl bg-white p-2 text-left border border-slate-200/80 hover:border-indigo-300 hover:bg-indigo-50/50 transition-all cursor-pointer"
           >
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 text-xs font-bold shrink-0">
               <Users className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">สมชาย ใจดี (ศิษย์เก่า)</p>
-              <p className="text-xs text-slate-500 truncate">รหัส 60010001</p>
+              <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">จักรพรรดิ์ (ศิษย์เก่า รุ่น 29)</p>
+              <p className="text-xs text-slate-500 truncate">รหัส 6604101313</p>
             </div>
           </button>
         </div>

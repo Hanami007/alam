@@ -29,16 +29,13 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // ถ้าเข้า root / ให้พาไป /feed (ถ้ามี session) หรือ /login (ถ้าไม่มี)
+  // ถ้าเข้า root / ให้พาไป /feed
   if (pathname === '/') {
-    if (sessionId) {
-      return NextResponse.redirect(new URL('/feed', req.url));
-    }
-    return NextResponse.redirect(new URL('/login', req.url));
+    return NextResponse.redirect(new URL('/feed', req.url));
   }
 
-  // เส้นทางที่ต้องการล็อกอิน
-  if (!sessionId) {
+  // เส้นทางที่ต้องการสิทธิ์ผู้ดูแลระบบ (Admin)
+  if (pathname.startsWith('/admin') && !sessionId) {
     const loginUrl = new URL('/login', req.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);

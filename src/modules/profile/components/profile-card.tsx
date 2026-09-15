@@ -27,6 +27,7 @@ interface ProfileCardProps {
   taggedPhotos: Photo[];
   unlockedPhotos: Photo[];
   activityLog: ActivityItem[];
+  isOwner?: boolean;
 }
 
 const POINTS_PER_LEVEL = 20;
@@ -225,11 +226,17 @@ export function ProfileCard({ user, taggedPhotos = [], unlockedPhotos = [], acti
               <div>
                 <div className="flex items-center gap-3.5 pb-3.5 border-b border-slate-100">
                   <div className="relative shrink-0">
-                    <img
-                      src={user.avatar_url}
-                      alt={user.name}
-                      className="h-12 w-12 rounded-2xl object-cover border border-slate-200 shadow-xs"
-                    />
+                    {user.avatar_url ? (
+                      <img
+                        src={user.avatar_url}
+                        alt={user.name}
+                        className="h-12 w-12 rounded-2xl object-cover border border-slate-200 shadow-xs"
+                      />
+                    ) : (
+                      <div className="h-12 w-12 rounded-2xl border border-slate-200 shadow-xs bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold text-lg select-none">
+                        {user.name?.charAt(0)?.toUpperCase() ?? '?'}
+                      </div>
+                    )}
                     <span className="badge-points absolute -bottom-1.5 left-1/2 -translate-x-1/2 text-[10px] sm:text-xs px-2 py-0.5 whitespace-nowrap shadow-2xs font-extrabold">
                       Lv.{level}
                     </span>

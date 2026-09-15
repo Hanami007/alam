@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { LocationPicker } from '@/components/ui/location-picker';
 import {
   GraduationCap,
   Lock,
@@ -33,7 +34,20 @@ import {
   ChevronRight,
   Info,
   Check,
+  Camera,
+  Upload,
+  HeartHandshake,
+  Image as ImageIcon,
 } from 'lucide-react';
+
+const PRESET_AVATARS = [
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop&q=80',
+];
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -63,14 +77,19 @@ export default function RegisterPage() {
   const [workProvinceId, setWorkProvinceId] = useState<string>('');
   const [bio, setBio] = useState('');
 
+  // Profile & Mentorship (ข้อมูลจำเป็นสำหรับแสดงในหน้าเว็บ)
+  const [avatarUrl, setAvatarUrl] = useState<string>(
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'
+  );
+  const [customAvatarInput, setCustomAvatarInput] = useState<string>('');
+  const [isAvailableForMentorship, setIsAvailableForMentorship] = useState<boolean>(true);
+
   // Consents & Agreements (ข้อกำหนดและความยินยอม)
   const [consentPdpa, setConsentPdpa] = useState(false); // Required
   const [consentTerms, setConsentTerms] = useState(false); // Required
   const [consentVerification, setConsentVerification] = useState(false); // Required
-  const [consentYearbook, setConsentYearbook] = useState(true); // Recommended
-  const [showHometownOnMap, setShowHometownOnMap] = useState<boolean>(true); // Optional
-  const [showWorkplaceOnMap, setShowWorkplaceOnMap] = useState<boolean>(true); // Optional
-  const [consentCommunications, setConsentCommunications] = useState(true); // Optional
+  // รวม 4 ตัวเลือกเดิม (Yearbook, Hometown Map, Workplace Map, Communications) เป็น 1 ตัวเลือก
+  const [consentPublicNetwork, setConsentPublicNetwork] = useState(true);
 
   // Policy Details Modal State
   const [activeModal, setActiveModal] = useState<'pdpa' | 'terms' | 'verification' | null>(null);
@@ -162,20 +181,30 @@ export default function RegisterPage() {
     consentPdpa &&
     consentTerms &&
     consentVerification &&
-    consentYearbook &&
-    showHometownOnMap &&
-    showWorkplaceOnMap &&
-    consentCommunications;
+    consentPublicNetwork;
 
   function handleToggleAllConsents() {
     const nextState = !areAllConsentsSelected;
     setConsentPdpa(nextState);
     setConsentTerms(nextState);
     setConsentVerification(nextState);
-    setConsentYearbook(nextState);
-    setShowHometownOnMap(nextState);
-    setShowWorkplaceOnMap(nextState);
-    setConsentCommunications(nextState);
+    setConsentPublicNetwork(nextState);
+  }
+
+  function handleAvatarFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setError('ขนาดรูปภาพต้องไม่เกิน 2MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setAvatarUrl(event.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
   }
 
   // Check required consents
@@ -253,14 +282,16 @@ export default function RegisterPage() {
           careerOptionId: careerOptionId ? Number(careerOptionId) : null,
           workProvinceId: workProvinceId ? Number(workProvinceId) : Number(provinceOptionId),
           bio: bio.trim(),
-          // Consents
+          avatarUrl: avatarUrl.trim(),
+          isAvailableForMentorship,
+          // Consents (4 ตัวเลือกเดิมรวมเป็น 1 ตัวเลือก ส่งครบถ้วนเข้าสู่ระบบ)
           consentPdpa,
           consentTerms,
           consentVerification,
-          consentYearbook,
-          showHometownOnMap,
-          showWorkplaceOnMap,
-          consentCommunications,
+          consentYearbook: consentPublicNetwork,
+          showHometownOnMap: consentPublicNetwork,
+          showWorkplaceOnMap: consentPublicNetwork,
+          consentCommunications: consentPublicNetwork,
         }),
       });
 
@@ -313,32 +344,38 @@ export default function RegisterPage() {
 
             <div className="space-y-2">
               <h2 className="text-2xl sm:text-3xl font-black text-white">
-                ลงทะเบียนสำเร็จเรียบร้อย!
+                ลงทะเบียนสำเร็จและพร้อมใช้งานทันที!
               </h2>
               <p className="text-sm text-slate-300 max-w-lg mx-auto leading-relaxed">
-                ระบบได้ส่งการแจ้งเตือนไปยัง <span className="font-bold text-emerald-400">ผู้ดูแลระบบ</span> และ <span className="font-bold text-indigo-400">เพื่อนร่วมรุ่น</span> เพื่อตรวจสอบและยืนยันตัวตนของคุณแล้ว
+                บัญชีของคุณได้รับการบันทึกลงสู่ฐานข้อมูล และตั้งค่าสถานะ <span className="font-bold text-emerald-400">อนุมัติแล้ว (Approved)</span> พร้อมเข้าใช้งานระบบเครือข่าย CS MJU CONNECT ได้ทันที
               </p>
             </div>
 
             <div className="rounded-2xl bg-indigo-950/50 border border-indigo-500/30 p-5 text-left space-y-3 text-xs text-slate-300">
               <p className="font-bold flex items-center gap-2 text-indigo-300 text-sm">
                 <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                ขั้นตอนต่อไปคืออะไร?
+                สถานะการลงทะเบียนในระบบ
               </p>
               <ul className="space-y-2 text-slate-300 list-disc list-inside">
-                <li>เมื่อผู้ดูแลระบบหรือเพื่อนร่วมรุ่นกดยืนยันตัวตน สถานะบัญชีจะเปลี่ยนเป็น <span className="text-emerald-400 font-bold">อนุมัติแล้ว (Approved)</span> ทันที</li>
-                <li>คุณจะสามารถเข้าสู่ระบบด้วยรหัสนักศึกษา/อีเมล และรหัสผ่านที่ได้ตั้งไว้</li>
-                <li>ข้อมูลและหนังสือยินยอมของคุณได้รับการบันทึกตามมาตรฐาน PDPA เรียบร้อยแล้ว</li>
+                <li>ข้อมูลโปรไฟล์ รูปภาพประจำตัว และการตั้งค่าความเป็นส่วนตัวได้รับการบันทึกลง Database เรียบร้อย</li>
+                <li>คุณได้เข้าสู่ระบบโดยอัตโนมัติแล้ว สามารถเริ่มใช้งานกระดานข่าวสาร ทำเนียบรุ่น หรือแผนที่เครือข่ายได้ทันที</li>
+                <li>ระบบได้ส่งการแจ้งเตือนไปยังผู้ดูแลระบบและเพื่อนร่วมรุ่นเพื่อต้อนรับคุณสู่เครือข่าย</li>
               </ul>
             </div>
 
-            <div className="pt-2">
+            <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Link
-                href="/login"
+                href="/feed"
                 className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-indigo-600 p-4 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
               >
-                <span>ไปที่หน้าเข้าสู่ระบบ (Login)</span>
+                <span>เริ่มใช้งานระบบ (Go to Feed)</span>
                 <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/profile"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 p-4 text-sm font-bold text-slate-200 active:scale-[0.98] transition-all cursor-pointer"
+              >
+                <span>ดูโปรไฟล์ของฉัน</span>
               </Link>
             </div>
           </div>
@@ -464,21 +501,20 @@ export default function RegisterPage() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                        <MapPin className="h-3.5 w-3.5 text-indigo-400" /> จังหวัดภูมิลำเนา <span className="text-rose-400">*</span>
+                      <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <MapPin className="h-3.5 w-3.5 text-indigo-400" /> จังหวัด / ประเทศภูมิลำเนา <span className="text-rose-400">*</span>
+                        </span>
+                        <span className="text-[10px] text-indigo-300">รองรับทั้งในไทยและต่างประเทศ</span>
                       </label>
-                      <select
+                      <LocationPicker
                         value={provinceOptionId}
-                        onChange={(e) => setProvinceOptionId(e.target.value)}
+                        onChange={(val) => setProvinceOptionId(val)}
+                        options={provinces}
                         disabled={loadingOptions}
-                        className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white focus:border-indigo-500 focus:bg-slate-950 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all"
-                      >
-                        {provinces.map((prov) => (
-                          <option key={prov.id} value={prov.id} className="bg-slate-900 text-white">
-                            {prov.label} ({prov.region || 'ทั่วไทย'})
-                          </option>
-                        ))}
-                      </select>
+                        accentColor="indigo"
+                        placeholder="เลือกจังหวัด หรือ ประเทศภูมิลำเนา"
+                      />
                     </div>
                   </div>
 
@@ -521,6 +557,124 @@ export default function RegisterPage() {
                       />
                     </div>
                   </div>
+
+                  {/* Avatar Picker & Profile Display */}
+                  <div className="rounded-2xl border border-indigo-500/20 bg-slate-950/50 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                        <Camera className="h-4 w-4 text-indigo-400" />
+                        <span>รูปภาพโปรไฟล์ (Avatar)</span>
+                      </label>
+                      <span className="text-[11px] text-slate-400">แสดงบนทำเนียบรุ่น, ฟีด และหน้าโปรไฟล์</span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center gap-4">
+                      {/* Avatar Preview */}
+                      <div className="relative shrink-0">
+                        <img
+                          src={avatarUrl || PRESET_AVATARS[0]}
+                          alt="Avatar Preview"
+                          className="h-16 w-16 sm:h-18 sm:w-18 rounded-2xl object-cover border-2 border-indigo-500/60 shadow-md shadow-indigo-500/20 bg-slate-800"
+                        />
+                        <div className="absolute -bottom-1 -right-1 bg-indigo-600 text-white rounded-full p-1 shadow">
+                          <Sparkles className="h-3 w-3" />
+                        </div>
+                      </div>
+
+                      {/* Presets & Custom Upload */}
+                      <div className="flex-1 w-full space-y-2.5">
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                          <span className="text-[11px] text-slate-400 shrink-0">เลือกรูปแนะนำ:</span>
+                          <div className="flex items-center gap-1.5">
+                            {PRESET_AVATARS.map((url, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => setAvatarUrl(url)}
+                                className={`relative rounded-xl overflow-hidden h-9 w-9 border-2 transition-all cursor-pointer shrink-0 ${
+                                  avatarUrl === url
+                                    ? 'border-indigo-400 ring-2 ring-indigo-400/40 scale-105'
+                                    : 'border-white/15 opacity-70 hover:opacity-100 hover:border-white/40'
+                                }`}
+                              >
+                                <img src={url} alt={`Preset ${idx + 1}`} className="h-full w-full object-cover" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs text-slate-200 cursor-pointer transition-all">
+                            <Upload className="h-3.5 w-3.5 text-indigo-400" />
+                            <span>อัปโหลดจากเครื่อง</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleAvatarFileUpload}
+                              className="hidden"
+                            />
+                          </label>
+
+                          <div className="flex-1 min-w-[200px]">
+                            <input
+                              type="url"
+                              value={avatarUrl.startsWith('data:') ? '' : avatarUrl}
+                              onChange={(e) => setAvatarUrl(e.target.value)}
+                              placeholder="หรือวาง URL รูปภาพ..."
+                              className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none transition-all"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mentorship Availability Option */}
+                  <div
+                    onClick={() => setIsAvailableForMentorship(!isAvailableForMentorship)}
+                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex items-center justify-between gap-3 ${
+                      isAvailableForMentorship
+                        ? 'bg-purple-500/10 border-purple-500/30'
+                        : 'bg-slate-950/40 border-white/10 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2.5 rounded-xl ${isAvailableForMentorship ? 'bg-purple-500/20 text-purple-300' : 'bg-white/5 text-slate-400'}`}>
+                        <HeartHandshake className="h-5 w-5" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-white">ยินดีให้คำแนะนำรุ่นน้อง (Open for Mentorship)</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 font-semibold">
+                            แนะนำ
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400">
+                          เปิดให้รุ่นน้องในสาขาติดต่อขอคำปรึกษาด้านการเรียนหรือการทำงาน พร้อมแสดงเหรียญตรา Mentor บนโปรไฟล์
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className={`h-6 w-11 rounded-full p-0.5 transition-colors shrink-0 ${isAvailableForMentorship ? 'bg-purple-500' : 'bg-slate-700'}`}>
+                      <div className={`h-5 w-5 rounded-full bg-white transition-transform ${isAvailableForMentorship ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </div>
+                  </div>
+
+                  {/* Student Bio (เมื่อเป็นนักศึกษาปัจจุบัน) */}
+                  {studentStatus === 'studying' && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                        <Quote className="h-3.5 w-3.5 text-indigo-400" /> แนะนำตัวสั้นๆ / สิ่งที่สนใจ (Bio)
+                      </label>
+                      <input
+                        type="text"
+                        value={bio}
+                        onChange={(e) => setBio(e.target.value)}
+                        placeholder="เช่น สนใจศึกษาด้าน Web Development, Cloud & AI ยินดีทำความรู้จักเพื่อนๆ พี่ๆ ครับ"
+                        className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-indigo-500 focus:bg-slate-950 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* 3. Alumni Specific Details (แสดงเมื่อเป็นศิษย์เก่า) */}
@@ -590,20 +744,20 @@ export default function RegisterPage() {
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                          <MapPin className="h-3.5 w-3.5 text-amber-400" /> จังหวัดที่ตั้งสถานที่ทำงาน
+                        <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <MapPin className="h-3.5 w-3.5 text-amber-400" /> ที่ตั้งสถานที่ทำงาน (จังหวัด / ต่างประเทศ) <span className="text-rose-400">*</span>
+                          </span>
+                          <span className="text-[10px] text-amber-300">แสดงหมุดบนแผนที่ศิษย์เก่า</span>
                         </label>
-                        <select
+                        <LocationPicker
                           value={workProvinceId}
-                          onChange={(e) => setWorkProvinceId(e.target.value)}
-                          className="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-2.5 text-sm text-white focus:border-amber-400 focus:outline-none focus:ring-4 focus:ring-amber-500/20 transition-all"
-                        >
-                          {provinces.map((prov) => (
-                            <option key={prov.id} value={prov.id} className="bg-slate-900 text-white">
-                              {prov.label} ({prov.region || 'ทั่วไทย'})
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(val) => setWorkProvinceId(val)}
+                          options={provinces}
+                          disabled={loadingOptions}
+                          accentColor="amber"
+                          placeholder="เลือกจังหวัดในไทย หรือ ประเทศที่ทำงาน"
+                        />
                       </div>
                     </div>
 
@@ -791,17 +945,17 @@ export default function RegisterPage() {
                       </div>
                     </div>
 
-                    {/* Item 4: Yearbook Visibility (Recommended) */}
+                    {/* Item 4: รวม 4 ตัวเลือกเป็น 1 ตัวเลือก (ทำเนียบรุ่น, แผนที่ภูมิลำเนา, แผนที่ที่ทำงาน, และการรับข่าวสาร) */}
                     <div
-                      onClick={() => setConsentYearbook(!consentYearbook)}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex items-start gap-3.5 ${
-                        consentYearbook
-                          ? 'bg-indigo-500/10 border-indigo-500/40 shadow-inner'
+                      onClick={() => setConsentPublicNetwork(!consentPublicNetwork)}
+                      className={`p-4 rounded-2xl border transition-all cursor-pointer select-none flex items-start gap-3.5 ${
+                        consentPublicNetwork
+                          ? 'bg-indigo-500/10 border-indigo-500/40 shadow-inner ring-1 ring-indigo-500/20'
                           : 'bg-slate-950/40 border-white/10 hover:border-white/20'
                       }`}
                     >
                       <div className="pt-0.5 shrink-0">
-                        {consentYearbook ? (
+                        {consentPublicNetwork ? (
                           <div className="h-5 w-5 rounded-lg bg-indigo-500 text-white flex items-center justify-center font-bold">
                             <Check className="h-3.5 w-3.5 stroke-[3]" />
                           </div>
@@ -810,122 +964,32 @@ export default function RegisterPage() {
                         )}
                       </div>
 
-                      <div className="flex-1 space-y-1">
+                      <div className="flex-1 space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-xs font-bold text-white">
-                            การเผยแพร่ข้อมูลในทำเนียบรุ่น (Yearbook & Alumni Directory)
+                            การเผยแพร่ข้อมูลและแสดงผลในระบบเครือข่ายศิษย์เก่า (ทำเนียบรุ่น, หมุดแผนที่ และรับข่าวสาร)
                           </span>
                           <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                            แนะนำ
+                            แนะนำ (รวมทุกตัวเลือก)
                           </span>
                         </div>
-                        <p className="text-xs text-slate-400 leading-relaxed">
-                          ยินยอมให้แสดงชื่อ-สกุล, รุ่น, ภาพโปรไฟล์ และข้อมูลวิชาชีพในสมุดทำเนียบรุ่น เพื่อให้เพื่อนร่วมรุ่นและศิษย์เก่าในเครือข่ายสามารถค้นหาและติดต่อสื่อสารได้
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          ยินยอมให้นำข้อมูลโปรไฟล์ (ชื่อ-สกุล, รุ่น, ภาพโปรไฟล์, ข้อมูลวิชาชีพ) แสดงในสมุดทำเนียบรุ่น (Yearbook), ปักหมุดพิกัดจังหวัดภูมิลำเนาและที่ทำงานบนแผนที่เครือข่ายศิษย์เก่า (Alumni Map) และรับข่าวสารประชาสัมพันธ์กิจกรรมของสาขาวิชา
                         </p>
-                      </div>
-                    </div>
-
-                    {/* Item 5: Alumni Map Hometown (Optional) */}
-                    <div
-                      onClick={() => setShowHometownOnMap(!showHometownOnMap)}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex items-start gap-3.5 ${
-                        showHometownOnMap
-                          ? 'bg-indigo-500/10 border-indigo-500/40 shadow-inner'
-                          : 'bg-slate-950/40 border-white/10 hover:border-white/20'
-                      }`}
-                    >
-                      <div className="pt-0.5 shrink-0">
-                        {showHometownOnMap ? (
-                          <div className="h-5 w-5 rounded-lg bg-indigo-500 text-white flex items-center justify-center font-bold">
-                            <Check className="h-3.5 w-3.5 stroke-[3]" />
-                          </div>
-                        ) : (
-                          <div className="h-5 w-5 rounded-lg border-2 border-slate-500 hover:border-slate-400 transition-colors" />
-                        )}
-                      </div>
-
-                      <div className="flex-1 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-bold text-white">
-                            การแสดงหมุดภูมิลำเนาบนแผนที่เครือข่าย (Hometown Map)
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-300 bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg">
+                            📖 ทำเนียบรุ่น (Yearbook)
                           </span>
-                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-slate-500/20 text-slate-300 border border-slate-500/30">
-                            ทางเลือก
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-300 bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg">
+                            📍 แผนที่ภูมิลำเนา (Hometown Map)
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-300 bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg">
+                            💼 แผนที่ที่ทำงาน (Workplace Map)
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-300 bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg">
+                            📢 ข่าวสารและกิจกรรม (News & Events)
                           </span>
                         </div>
-                        <p className="text-xs text-slate-400 leading-relaxed">
-                          ยินยอมให้แสดงจำนวนและตำแหน่งจุดพิกัดจังหวัดภูมิลำเนาบนแผนที่เครือข่ายศิษย์เก่า (Alumni Map) เพื่อประโยชน์ในการสร้างเครือข่ายตามภูมิภาค
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Item 6: Alumni Map Workplace (Optional - Only for Alumni) */}
-                    {studentStatus === 'alumni' && (
-                      <div
-                        onClick={() => setShowWorkplaceOnMap(!showWorkplaceOnMap)}
-                        className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex items-start gap-3.5 ${
-                          showWorkplaceOnMap
-                            ? 'bg-amber-500/10 border-amber-500/40 shadow-inner'
-                            : 'bg-slate-950/40 border-white/10 hover:border-white/20'
-                        }`}
-                      >
-                        <div className="pt-0.5 shrink-0">
-                          {showWorkplaceOnMap ? (
-                            <div className="h-5 w-5 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-bold">
-                              <Check className="h-3.5 w-3.5 stroke-[3]" />
-                            </div>
-                          ) : (
-                            <div className="h-5 w-5 rounded-lg border-2 border-slate-500 hover:border-slate-400 transition-colors" />
-                          )}
-                        </div>
-
-                        <div className="flex-1 space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-xs font-bold text-white">
-                              การแสดงหมุดสถานที่ทำงานบนแผนที่ศิษย์เก่า (Workplace Map)
-                            </span>
-                            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                              ทางเลือก (ศิษย์เก่า)
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-400 leading-relaxed">
-                            ยินยอมให้แสดงหมุดจังหวัดที่ตั้งของที่ทำงานและองค์กรบนแผนที่สถานที่ทำงานศิษย์เก่า เพื่อสนับสนุนการทำงานร่วมกันและสร้างเครือข่ายวิชาชีพ
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Item 7: Newsletter & Activities (Optional) */}
-                    <div
-                      onClick={() => setConsentCommunications(!consentCommunications)}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex items-start gap-3.5 ${
-                        consentCommunications
-                          ? 'bg-indigo-500/10 border-indigo-500/40 shadow-inner'
-                          : 'bg-slate-950/40 border-white/10 hover:border-white/20'
-                      }`}
-                    >
-                      <div className="pt-0.5 shrink-0">
-                        {consentCommunications ? (
-                          <div className="h-5 w-5 rounded-lg bg-indigo-500 text-white flex items-center justify-center font-bold">
-                            <Check className="h-3.5 w-3.5 stroke-[3]" />
-                          </div>
-                        ) : (
-                          <div className="h-5 w-5 rounded-lg border-2 border-slate-500 hover:border-slate-400 transition-colors" />
-                        )}
-                      </div>
-
-                      <div className="flex-1 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-bold text-white">
-                            การรับข่าวสาร ประชาสัมพันธ์ และกิจกรรมทางวิชาการ (Communications & Events)
-                          </span>
-                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-slate-500/20 text-slate-300 border border-slate-500/30">
-                            ทางเลือก
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-400 leading-relaxed">
-                          ยินยอมรับข้อมูลข่าวสารทางอีเมลหรือการแจ้งเตือนในระบบ เกี่ยวกับงานคืนสู่เหย้า งานสัมมนาวิชาการ ประกาศรับสมัครงาน และกิจกรรมของสาขาวิชา
-                        </p>
                       </div>
                     </div>
                   </div>

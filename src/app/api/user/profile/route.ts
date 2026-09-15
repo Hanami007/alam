@@ -3,18 +3,27 @@ import { userDbService } from '@/services/db/user.service';
 import { alumniAggregator } from '@/services/aggregator/alumni.aggregator';
 import { NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const user = await getCurrentUser();
-    const userId = user?.id || 2;
+    const { searchParams } = new URL(req.url);
+    const requestedId = searchParams.get('id');
 
-    const profile = await userDbService.getUserProfile(userId);
-    const unified = await alumniAggregator.getUnifiedProfileById(userId);
+    const targetUserId = requestedId ? parseInt(requestedId, 10) : user?.id;
+    if (!targetUserId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const profile = await userDbService.getUserProfile(targetUserId);
+    const unified = await alumniAggregator.getUnifiedProfileById(targetUserId);
+    const isOwner = user ? user.id === targetUserId : false;
 
     return NextResponse.json({
       ...unified,
       ...profile,
-      id: userId,
+      id: targetUserId,
+      role: profile?.role || (isOwner ? user?.role : 'alumni'),
+      isOwner,
     });
   } catch (err: any) {
     console.error('[API /api/user/profile] Error:', err);
@@ -25,8 +34,11 @@ export async function GET() {
 export async function PUT(req: Request) {
   try {
     const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const body = await req.json();
-    const userId = user?.id || body.userId || 2;
+    const userId = user.id;
 
     await userDbService.updateProfile(userId, body);
 

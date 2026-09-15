@@ -13,6 +13,12 @@ export interface MapPoint {
   province_name: string;
   region: string;
   metro: boolean;
+  is_international?: boolean;
+  country_code?: string;
+  flag?: string;
+  lat?: number;
+  lng?: number;
+  city?: string;
 }
 
 const DEFAULT_HOMETOWN_POINTS: MapPoint[] = [
@@ -655,8 +661,15 @@ export class MapDbService {
           ct.label as career_type,
           prov.id as province_id,
           prov.label as province_name,
+          prov.code as province_code,
           COALESCE(prov.extra->>'region', 'อื่นๆ') as region,
-          COALESCE((prov.extra->>'metro')::boolean, false) as metro
+          COALESCE((prov.extra->>'metro')::boolean, false) as metro,
+          COALESCE((prov.extra->>'is_international')::boolean, false) as is_international,
+          prov.extra->>'country_code' as country_code,
+          prov.extra->>'flag' as flag,
+          (prov.extra->>'lat')::float as lat,
+          (prov.extra->>'lng')::float as lng,
+          prov.extra->>'city' as city
         FROM users u
         JOIN lookup_options prov ON prov.id = COALESCE(u.hometown_province_id, u.province_option_id)
         LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
@@ -689,8 +702,15 @@ export class MapDbService {
           ct.label as career_type,
           prov.id as province_id,
           prov.label as province_name,
+          prov.code as province_code,
           COALESCE(prov.extra->>'region', 'อื่นๆ') as region,
-          COALESCE((prov.extra->>'metro')::boolean, false) as metro
+          COALESCE((prov.extra->>'metro')::boolean, false) as metro,
+          COALESCE((prov.extra->>'is_international')::boolean, false) as is_international,
+          prov.extra->>'country_code' as country_code,
+          prov.extra->>'flag' as flag,
+          (prov.extra->>'lat')::float as lat,
+          (prov.extra->>'lng')::float as lng,
+          prov.extra->>'city' as city
         FROM users u
         JOIN lookup_options prov ON prov.id = COALESCE(u.work_province_id, u.province_option_id)
         LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id

@@ -148,7 +148,7 @@ export class AdminDbService {
   }
 
   /**
-   * ดึงคิวคำขอโพสต์ที่รออนุมัติ พร้อมรายละเอียดโพล (ถ้ามี)
+   * ดึงโพสต์ที่เผยแพร่แล้วเพื่อให้แอดมินจัดการ (ลบ) — เรียงล่าสุดก่อน
    */
   async getPendingPostRequests(): Promise<PendingPostRequest[]> {
     try {
@@ -161,8 +161,9 @@ export class AdminDbService {
           COALESCE(u.role, 'alumni') as author_role
         FROM posts p
         LEFT JOIN users u ON u.id = p.requested_by
-        WHERE p.status IN ('pending', 'pending_request')
+        WHERE p.status = 'published'
         ORDER BY p.created_at DESC
+        LIMIT 100
       `);
 
       const postIds = posts.map((p) => p.id);

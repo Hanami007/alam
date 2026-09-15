@@ -178,5 +178,16 @@ export const api = {
       fetchJson<any>(`/api/admin/yearbook?id=${encodeURIComponent(String(id))}`, {
         method: 'DELETE',
       }),
+    // Keyword Filter Management
+    getKeywords: () => fetchJson<{ keywords: any[] }>('/api/admin/keywords'),
+    addKeyword: (keyword: string) =>
+      fetchJson<any>('/api/admin/keywords', {
+        method: 'POST',
+        body: JSON.stringify({ keyword }),
+      }),
+    removeKeyword: (id: number) =>
+      fetchJson<any>(`/api/admin/keywords?id=${id}`, {
+        method: 'DELETE',
+      }),
   },
 };

@@ -31,7 +31,7 @@ export default function FeedPage() {
           setCurrentUser(meRes.value.user);
         } else {
           // Default fallback user for client simulation if not logged in
-          setCurrentUser({ id: 2, name: 'สมชาย ใจดี', role: 'alumni' });
+          setCurrentUser({ id: 0, name: 'ผู้เยี่ยมชม', role: 'alumni' });
         }
 
         if (feedRes.status === 'fulfilled' && Array.isArray(feedRes.value)) {
@@ -84,9 +84,9 @@ export default function FeedPage() {
           stats={stats}
           latestPhotos={latestPhotos}
           featuredAlumni={featuredAlumni}
-          currentUserId={currentUser?.id || 2}
-          currentUserRole={currentUser?.role || 'alumni'}
-          currentUserName={currentUser?.name || 'สมชาย ใจดี'}
+          currentUserId={currentUser?.id || 1}
+          currentUserRole={currentUser?.role || 'admin'}
+          currentUserName={currentUser?.name || 'ผู้ดูแลระบบ'}
           currentUserMentorship={Boolean(currentUser?.is_available_for_mentorship ?? currentUser?.isAvailableForMentorship)}
         />
       )}

@@ -13,7 +13,7 @@ export default function SettingsPage() {
     async function loadSettings() {
       try {
         setLoading(true);
-        const meRes = await api.auth.me();
+        const meRes = await api.auth.me().catch(() => null);
         if (meRes?.user) {
           setUser(meRes.user);
         } else {

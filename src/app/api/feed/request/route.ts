@@ -1,5 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
-import { createPostRequest } from '@/lib/db';
+import { createPostRequest, checkForBannedKeywords } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
@@ -8,7 +8,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { requestedBy, title, content, category, postType, poll } = body;
 
-    const requesterId = Number(requestedBy) || user?.id || 1;
+    const requesterId = user?.id || (requestedBy ? Number(requestedBy) : 1);
 
     if (!title || !title.trim()) {
       return NextResponse.json(
@@ -54,6 +54,27 @@ export async function POST(req: Request) {
       }
     }
 
+    // ──── ตรวจสอบคำต้องห้าม ────
+    const textsToCheck = [
+      title,
+      content ?? '',
+      pollData?.question ?? '',
+      ...(pollData?.options ?? []),
+    ].filter(Boolean);
+
+    const foundKeywords = await checkForBannedKeywords(textsToCheck);
+    if (foundKeywords.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `โพสต์ของคุณมีคำที่ไม่เหมาะสม: "${foundKeywords.join('", "')}" กรุณาแก้ไขก่อนส่งอีกครั้ง`,
+          bannedWords: foundKeywords,
+        },
+        { status: 400 }
+      );
+    }
+    // ───────────────────────────
+
     const post = await createPostRequest(
       requesterId,
       title.trim(),
@@ -65,7 +86,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: type === 'poll' ? 'ส่งคำขอสร้างโพลสำเร็จ ✨' : 'ส่งคำขอสร้างโพสต์สำเร็จ ✨',
+      message: type === 'poll' ? 'สร้างโพลสำเร็จ ✨' : 'สร้างโพสต์สำเร็จ ✨',
       post,
     });
   } catch (err: any) {

@@ -1,13 +1,17 @@
 import { castPollVote } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   try {
-    const { pollId, optionId, userId } = await req.json();
+    const body = await req.json();
+    const { pollId, optionId } = body;
+    const sessionUser = await getCurrentUser();
+    const effectiveUserId = sessionUser?.id || (body.userId ? Number(body.userId) : null);
 
-    if (!pollId || !optionId || !userId) {
+    if (!pollId || !optionId || !effectiveUserId) {
       return NextResponse.json(
-        { success: false, error: 'ข้อมูลไม่ครบถ้วน (ต้องการ pollId, optionId, userId)' },
+        { success: false, error: 'ข้อมูลไม่ครบถ้วน กรุณาเข้าสู่ระบบก่อนโหวต' },
         { status: 400 }
       );
     }
@@ -15,7 +19,7 @@ export async function POST(req: Request) {
     const result = await castPollVote(
       Number(pollId),
       Number(optionId),
-      Number(userId)
+      Number(effectiveUserId)
     );
 
     if (!result.success) {

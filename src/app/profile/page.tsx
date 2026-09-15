@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { ProfileCard } from '@/modules/profile/components/profile-card';
 import { AppShell } from '@/components/layout/app-shell';
 import { api } from '@/lib/api-client';
 import { USER_POINTS_UPDATED_EVENT } from '@/lib/events';
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [taggedPhotos, setTaggedPhotos] = useState<any[]>([]);
   const [unlockedPhotos, setUnlockedPhotos] = useState<any[]>([]);
@@ -16,75 +18,57 @@ export default function ProfilePage() {
   const loadProfile = useCallback(async (isSilent = false) => {
     try {
       if (!isSilent) setLoading(true);
-      const [profileRes, activityRes, galleryRes] = await Promise.allSettled([
+      const [profileRes, activityRes, photosRes] = await Promise.allSettled([
         api.user.getProfile(),
         api.user.getActivity(),
-        api.gallery.getItems(),
+        fetch('/api/user/photos').then((r) => r.json()),
       ]);
 
-        if (profileRes.status === 'fulfilled' && profileRes.value && !profileRes.value.error) {
-          const u = profileRes.value;
-          setUser({
-            id: u.id || 2,
-            name: u.name || 'สมชาย ใจดี',
-            student_id: u.studentId || u.student_id || '60010001',
-            email: u.email || 'somchai.j@example.edu',
-            generation: u.generation || 'รุ่น 43',
-            province: u.province || 'กรุงเทพมหานคร',
-            career_type: u.careerType || u.career_type || 'เอกชน',
-            company: u.company ?? 'บริษัท เอบีซี จำกัด',
-            position: u.position ?? 'Senior Developer',
-            bio: u.bio ?? 'ดูแลระบบและพัฒนาโปรดักต์ให้ทีมงานภายใน',
-            total_points: u.totalPoints ?? u.total_points ?? 16,
-            avatar_url: u.avatarUrl || u.avatar_url || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=600&q=80',
-            is_available_for_mentorship: Boolean(u.isAvailableForMentorship ?? u.is_available_for_mentorship),
-            show_hometown_on_map: Boolean(u.showHometownOnMap ?? u.show_hometown_on_map),
-            show_workplace_on_map: Boolean(u.showWorkplaceOnMap ?? u.show_workplace_on_map),
-          });
-        } else {
-          // Fallback mock profile for preview
-          setUser({
-            id: 2,
-            name: 'สมชาย ใจดี',
-            student_id: '60010001',
-            email: 'somchai.j@example.edu',
-            generation: 'รุ่น 43',
-            province: 'กรุงเทพมหานคร',
-            career_type: 'เอกชน',
-            company: 'บริษัท เอบีซี จำกัด',
-            position: 'Senior Developer',
-            bio: 'ดูแลระบบและพัฒนาโปรดักต์ให้ทีมงานภายใน',
-            total_points: 16,
-            avatar_url: 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=600&q=80',
-            is_available_for_mentorship: false,
-            show_hometown_on_map: false,
-            show_workplace_on_map: false,
-          });
-        }
+      if (profileRes.status === 'fulfilled' && profileRes.value && !profileRes.value.error) {
+        const u = profileRes.value;
+        setUser({
+          id: u.id,
+          name: u.name,
+          student_id: u.studentId || u.student_id || '',
+          email: u.email || '',
+          generation: u.generation || '',
+          province: u.province || '',
+          career_type: u.careerType || u.career_type || '',
+          company: u.company || '',
+          position: u.position || '',
+          bio: u.bio || '',
+          total_points: u.totalPoints ?? u.total_points ?? 0,
+          avatar_url: u.avatarUrl || u.avatar_url || '',
+          is_available_for_mentorship: Boolean(u.isAvailableForMentorship ?? u.is_available_for_mentorship),
+          show_hometown_on_map: Boolean(u.showHometownOnMap ?? u.show_hometown_on_map),
+          show_workplace_on_map: Boolean(u.showWorkplaceOnMap ?? u.show_workplace_on_map),
+        });
+      } else {
+        router.replace('/login?callbackUrl=/profile');
+      }
 
         if (activityRes.status === 'fulfilled' && Array.isArray(activityRes.value)) {
           setActivityLog(activityRes.value);
         } else {
-          setActivityLog([
-            { id: 1, description: 'ร่วมโหวตโพลสำรวจความคิดเห็น (+5 แต้ม)', points: 5, createdAt: '1 ก.พ. 2569' },
-            { id: 2, description: 'ร่วมโหวต Hall of Fame (+10 แต้ม)', points: 10, createdAt: '5 ก.พ. 2569' },
-            { id: 3, description: 'แสดงความคิดเห็นในโพสต์ (+1 แต้ม)', points: 1, createdAt: '16 ม.ค. 2569' },
-          ]);
+          setActivityLog([]);
         }
 
-        if (galleryRes.status === 'fulfilled' && Array.isArray(galleryRes.value)) {
-          const photos = galleryRes.value;
-          setTaggedPhotos(photos.slice(0, 2).map((p: any) => ({
+        if (photosRes.status === 'fulfilled' && photosRes.value) {
+          const { taggedPhotos: tagged = [], unlockedPhotos: unlocked = [] } = photosRes.value;
+          setTaggedPhotos(tagged.map((p: any) => ({
             id: p.id,
-            image_url: p.originalImage || p.image,
-            title: p.title,
-            generation: p.generation,
+            image_url: p.image_url,
+            watermark_url: p.watermark_url || null,
+            caption: p.caption || 'รูปภาพกิจกรรม',
+            created_at: p.created_at,
+            tagged_by_name: p.tagged_by_name || null,
           })));
-          setUnlockedPhotos(photos.filter((p: any) => !p.locked).map((p: any) => ({
+          setUnlockedPhotos(unlocked.map((p: any) => ({
             id: p.id,
-            image_url: p.originalImage || p.image,
-            title: p.title,
-            generation: p.generation,
+            image_url: p.image_url,
+            watermark_url: p.watermark_url || null,
+            caption: p.caption || 'รูปภาพที่ปลดล็อก',
+            created_at: p.created_at,
           })));
         }
       } catch (err) {

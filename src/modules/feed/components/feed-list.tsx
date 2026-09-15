@@ -1,8 +1,26 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { notifyPointsUpdated, notifyNewNotification } from '@/lib/events';
+
+function formatPostDateTime(dateStr: string) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+
+  const dateFormatted = d.toLocaleDateString('th-TH', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+  const timeFormatted = d.toLocaleTimeString('th-TH', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  return `${dateFormatted} เวลา ${timeFormatted} น.`;
+}
 import {
   Heart,
   MessageCircle,
@@ -54,6 +72,7 @@ interface PollOption {
   id: number;
   text: string;
   votes: number;
+  voteCount?: number;
 }
 
 interface PollData {
@@ -61,6 +80,8 @@ interface PollData {
   question: string;
   pointsPerVote?: number;
   options: PollOption[];
+  hasVoted?: boolean;
+  userVotedOptionId?: number;
   votedUserIds?: number[];
   userVotes?: { user_id: number; option_id: number }[];
 }
@@ -155,6 +176,21 @@ export function FeedList({
 
   // Feed State
   const [feedPosts, setFeedPosts] = useState<Post[]>(posts);
+
+  useEffect(() => {
+    setFeedPosts(posts);
+  }, [posts]);
+
+  // เรียงฟีดตามวันเวลาที่โพสต์ (ล่าสุดอยู่บนสุด, ปักหมุดไว้บนสุดถ้ามี)
+  const sortedFeedPosts = useMemo(() => {
+    return [...feedPosts].sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      const timeA = new Date(a.created_at || (a as any).createdAt || 0).getTime();
+      const timeB = new Date(b.created_at || (b as any).createdAt || 0).getTime();
+      return timeB - timeA;
+    });
+  }, [feedPosts]);
   const [openComments, setOpenComments] = useState<Record<number, boolean>>({});
   const [commentInputs, setCommentInputs] = useState<Record<number, string>>({});
   const [submittingComment, setSubmittingComment] = useState<Record<number, boolean>>({});
@@ -291,7 +327,8 @@ export function FeedList({
     const currentPoll = targetPost.poll;
     const isAlreadyVoted =
       currentPoll.votedUserIds?.includes(currentUserId) ||
-      currentPoll.userVotes?.some((v) => v.user_id === currentUserId);
+      currentPoll.userVotes?.some((v) => v.user_id === currentUserId) ||
+      Boolean(currentPoll.hasVoted);
 
     if (isAlreadyVoted) {
       setDeleteToast({ message: '💡 คุณได้ร่วมลงคะแนนโหวตในโพลนี้เรียบร้อยแล้ว', type: 'error' });
@@ -304,13 +341,17 @@ export function FeedList({
       prev.map((post) => {
         if (post.id !== postId || !post.poll) return post;
         const updatedOptions = post.poll.options.map((opt) =>
-          opt.id === optionId ? { ...opt, votes: opt.votes + 1 } : opt
+          opt.id === optionId
+            ? { ...opt, votes: (opt.votes ?? (opt as any).voteCount ?? 0) + 1, voteCount: ((opt as any).voteCount ?? opt.votes ?? 0) + 1 }
+            : opt
         );
         return {
           ...post,
           poll: {
             ...post.poll,
             options: updatedOptions,
+            hasVoted: true,
+            userVotedOptionId: optionId,
             votedUserIds: [...(post.poll.votedUserIds || []), currentUserId],
             userVotes: [...(post.poll.userVotes || []), { user_id: currentUserId, option_id: optionId }],
           },
@@ -336,6 +377,13 @@ export function FeedList({
       } else {
         setDeleteToast({ message: data.error || 'ไม่สามารถบันทึกการโหวตได้', type: 'error' });
         setTimeout(() => setDeleteToast(null), 3500);
+        // Refresh feed posts to sync accurate state from server
+        fetch('/api/feed')
+          .then((r) => r.json())
+          .then((fresh) => {
+            if (Array.isArray(fresh)) setFeedPosts(fresh);
+          })
+          .catch(() => {});
       }
     } catch (err: any) {
       setDeleteToast({ message: err.message || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', type: 'error' });
@@ -959,13 +1007,13 @@ export function FeedList({
         </div>
 
         {/* ===== POST CARDS ===== */}
-        {feedPosts.length === 0 ? (
+        {sortedFeedPosts.length === 0 ? (
           <div className="rounded-[32px] border border-slate-100 bg-white p-20 text-center text-slate-400 shadow-xs">
             <Sparkles className="mx-auto h-12 w-12 text-pink-300 animate-pulse" />
             <p className="mt-4 text-base font-medium">ยังไม่มีโพสต์บนวอลล์ในขณะนี้</p>
           </div>
         ) : (
-          feedPosts.map((post) => {
+          sortedFeedPosts.map((post) => {
             const isLiked = post.likedUserIds?.includes(currentUserId);
             const currentEmoji = post.selectedEmoji || (isLiked ? '💖' : '💖');
             const isMenuOpen = activePostMenuId === post.id;
@@ -1003,7 +1051,7 @@ export function FeedList({
                           )}
                         </div>
                         <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1 flex-wrap">
-                          <span className="whitespace-nowrap">{new Date(post.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                          <span className="whitespace-nowrap">{formatPostDateTime(post.created_at)}</span>
                           <span>•</span>
                           {post.category && (
                             <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 shrink-0 whitespace-nowrap">
@@ -1094,10 +1142,11 @@ export function FeedList({
                   {/* Poll Box (Interactive Real Voting) */}
                   {post.poll && (() => {
                     const poll = post.poll;
-                    const totalVotes = poll.options.reduce((sum, o) => sum + (o.votes || 0), 0);
-                    const userVote = poll.userVotes?.find((v) => v.user_id === currentUserId);
+                    const totalVotes = poll.options.reduce((sum, o) => sum + (o.votes ?? (o as any).voteCount ?? 0), 0);
+                    const userVote = poll.userVotes?.find((v) => v.user_id === currentUserId) ||
+                      (poll.hasVoted && poll.userVotedOptionId ? { user_id: currentUserId, option_id: poll.userVotedOptionId } : undefined);
                     const hasVoted = Boolean(
-                      poll.votedUserIds?.includes(currentUserId) || userVote
+                      poll.hasVoted || poll.votedUserIds?.includes(currentUserId) || userVote
                     );
 
                     return (
@@ -1115,8 +1164,9 @@ export function FeedList({
 
                         <div className="space-y-3">
                           {poll.options.map((opt) => {
-                            const percent = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0;
-                            const isMyChoice = userVote?.option_id === opt.id;
+                            const optVotes = opt.votes ?? (opt as any).voteCount ?? 0;
+                            const percent = totalVotes > 0 ? Math.round((optVotes / totalVotes) * 100) : 0;
+                            const isMyChoice = userVote?.option_id === opt.id || poll.userVotedOptionId === opt.id;
 
                             return (
                               <button
@@ -1173,7 +1223,7 @@ export function FeedList({
                                         ? 'bg-purple-200/80 text-purple-800'
                                         : 'bg-slate-100 text-slate-600'
                                     }`}>
-                                      {opt.votes} โหวต
+                                      {optVotes} โหวต
                                     </span>
                                   </div>
                                 </div>
