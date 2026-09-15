@@ -31,6 +31,7 @@ export default function HallOfFamePage() {
               generation_label: genLabel,
               generationNumber,
               votes: typeof p.hofPoints === 'number' ? p.hofPoints : (typeof p.hof_points === 'number' ? p.hof_points : 0),
+              employmentType: p.employmentType || p.employment_type || undefined,
             };
           });
           setCandidates(formatted);

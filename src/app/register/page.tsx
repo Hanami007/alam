@@ -104,8 +104,8 @@ export default function RegisterPage() {
       try {
         setLoadingOptions(true);
         const res = await fetch('/api/lookup/register-data');
-        const data = await res.json();
-        if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (res.ok && data) {
           setGenerations(data.generations || []);
           setProvinces(data.provinces || []);
           setCareerTypes(data.careerTypes || []);
@@ -295,10 +295,10 @@ export default function RegisterPage() {
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        setError(data.error || 'เกิดข้อผิดพลาดในการลงทะเบียน');
+        setError(data?.error || 'เกิดข้อผิดพลาดในการลงทะเบียน');
         return;
       }
 

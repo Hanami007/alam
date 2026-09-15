@@ -9,7 +9,6 @@ import {
   Search,
   Heart,
   Briefcase,
-  GraduationCap,
   Building2,
   CheckCircle2,
   Star,
@@ -24,6 +23,8 @@ import {
   LayoutGrid,
   Award,
   Flame,
+  MapPin,
+  Quote,
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════
@@ -40,6 +41,7 @@ export interface Candidate {
   generation_label: string;
   generationNumber?: number;
   votes?: number;
+  employmentType?: string;
 }
 
 interface HallOfFameGridProps {
@@ -176,16 +178,34 @@ const DEFAULT_CANDIDATES: Candidate[] = [
    MAIN COMPONENT
 ═══════════════════════════════════════════════ */
 export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) {
-  /* ── Merged initial data, sorted by votes ── */
+  /* ── Merged initial data: ให้มีข้อมูลครบ 10 อันดับเสมอ ── */
   const mergedInitial = useMemo<Candidate[]>(() => {
-    const raw =
-      initialCandidates && initialCandidates.length >= 3
-        ? initialCandidates.map((c, i) => ({
-            ...c,
-            votes: c.votes && c.votes > 0 ? c.votes : Math.max(10, 248 - i * 22),
-          }))
-        : DEFAULT_CANDIDATES;
-    return [...raw].sort((a, b) => (b.votes || 0) - (a.votes || 0));
+    // 1. นำข้อมูลศิษย์เก่าจาก DB มาใส่คะแนน
+    const fromApi = (initialCandidates || []).map((c, i) => ({
+      ...c,
+      votes: typeof c.votes === 'number' && c.votes > 0 ? c.votes : Math.max(10, 248 - i * 22),
+    }));
+
+    // 2. ป้องกันชื่อซ้ำ (deduplicate)
+    const seenNames = new Set<string>();
+    const uniqueFromApi: Candidate[] = [];
+    for (const item of fromApi) {
+      if (item.name && !seenNames.has(item.name.trim())) {
+        seenNames.add(item.name.trim());
+        uniqueFromApi.push(item);
+      }
+    }
+
+    // 3. เติมรายชื่อจาก DEFAULT_CANDIDATES ให้ครบอย่างน้อย 10 อันดับเสมอ
+    const filledList: Candidate[] = [...uniqueFromApi];
+    for (const def of DEFAULT_CANDIDATES) {
+      if (def.name && !seenNames.has(def.name.trim())) {
+        seenNames.add(def.name.trim());
+        filledList.push(def);
+      }
+    }
+
+    return filledList.sort((a, b) => (b.votes || 0) - (a.votes || 0));
   }, [initialCandidates]);
 
   /* ── State ── */
@@ -194,81 +214,20 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [votedIds, setVotedIds] = useState<Record<number, boolean>>({});
   const [votingId, setVotingId] = useState<number | null>(null);
-  const [selectedGen, setSelectedGen] = useState<number | null>(null);
   const [voteAnimId, setVoteAnimId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
 
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
-
-  /* ── Sync candidates when initial changes ── */
+  /* ── Initialize / sync candidates once API data arrives ── */
+  const hasInitializedApiRef = useRef(false);
   useEffect(() => {
-    if (query.trim() === '') {
+    if (!hasInitializedApiRef.current && initialCandidates && initialCandidates.length > 0) {
+      hasInitializedApiRef.current = true;
       setCandidates(mergedInitial);
     }
-  }, [mergedInitial, query]);
+  }, [mergedInitial, initialCandidates]);
 
-  /* ── Generation list derived from merged data ── */
-  const generations = useMemo(() => {
-    const genNums = [
-      ...new Set(
-        mergedInitial
-          .map((c) => c.generationNumber)
-          .filter((n): n is number => typeof n === 'number')
-      ),
-    ].sort((a, b) => a - b);
-    return genNums;
-  }, [mergedInitial]);
-
-  /* ── Search effect with debounce ── */
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(async () => {
-      if (query.trim() === '') {
-        setCandidates(mergedInitial);
-        return;
-      }
-      setIsSearchLoading(true);
-      try {
-        const res = await fetch(`/api/hof/search?q=${encodeURIComponent(query)}`);
-        const data = await res.json();
-        if (data.results && data.results.length > 0) {
-          setCandidates([...data.results].sort((a, b) => (b.votes || 0) - (a.votes || 0)));
-        } else {
-          // Client-side fallback: search by name, studentId, company, position
-          const q = query.toLowerCase().trim();
-          const filtered = mergedInitial.filter(
-            (c) =>
-              c.name.toLowerCase().includes(q) ||
-              (c.studentId && c.studentId.includes(q)) ||
-              c.company?.toLowerCase().includes(q) ||
-              c.position?.toLowerCase().includes(q) ||
-              c.generation_label?.toLowerCase().includes(q) ||
-              c.description?.toLowerCase().includes(q)
-          );
-          setCandidates(filtered);
-        }
-      } catch {
-        const q = query.toLowerCase().trim();
-        const filtered = mergedInitial.filter(
-          (c) =>
-            c.name.toLowerCase().includes(q) ||
-            (c.studentId && c.studentId.includes(q)) ||
-            c.company?.toLowerCase().includes(q) ||
-            c.position?.toLowerCase().includes(q) ||
-            c.generation_label?.toLowerCase().includes(q)
-        );
-        setCandidates(filtered);
-      } finally {
-        setIsSearchLoading(false);
-      }
-    }, 250);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [query, mergedInitial]);
-
-  /* ── Vote handler ── */
+  /* ── Vote handler: เพิ่มคะแนนโหวตให้คนที่โดนกดทันที ── */
   async function handleVote(e: React.MouseEvent, candidateId: number) {
     e.stopPropagation();
     if (votedIds[candidateId] || votingId !== null) return;
@@ -276,13 +235,16 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
     setVoteAnimId(candidateId);
     setTimeout(() => setVoteAnimId(null), 600);
 
-    // Optimistic update
+    // อัปเดตคะแนนโหวตเพิ่มให้คนที่โดนกดทันที (+1 vote)
     setCandidates((prev) =>
-      prev
-        .map((c) => (c.id === candidateId ? { ...c, votes: (c.votes || 0) + 1 } : c))
-        .sort((a, b) => (b.votes || 0) - (a.votes || 0))
+      prev.map((c) => (c.id === candidateId ? { ...c, votes: (c.votes || 0) + 1 } : c))
     );
     setVotedIds((prev) => ({ ...prev, [candidateId]: true }));
+
+    // ถ้าเปิด Modal คนนี้อยู่ ให้เพิ่มคะแนนใน Modal ด้วย
+    if (selectedCandidate && selectedCandidate.id === candidateId) {
+      setSelectedCandidate((prev) => (prev ? { ...prev, votes: (prev.votes || 0) + 1 } : null));
+    }
 
     try {
       const res = await fetch('/api/hof/vote', {
@@ -290,8 +252,8 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ candidateId }),
       });
-      const data = await res.json();
-      if (data.success) {
+      const data = await res.json().catch(() => null);
+      if (data?.success) {
         notifyPointsUpdated(data.pointsAwarded || 10);
       }
     } catch (err) {
@@ -301,32 +263,45 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
     }
   }
 
+  /* ── Candidates always sorted by votes descending ── */
+  const sortedCandidates = useMemo<Candidate[]>(() => {
+    return [...candidates].sort((a, b) => (b.votes || 0) - (a.votes || 0));
+  }, [candidates]);
+
   /* ── Derived display data ── */
   const isSearchActive = query.trim().length > 0;
 
-  // Top 3 from sorted full list
-  const top1 = mergedInitial[0];
-  const top2 = mergedInitial[1];
-  const top3 = mergedInitial[2];
+  // Top 3 from sorted list
+  const top1 = sortedCandidates[0];
+  const top2 = sortedCandidates[1];
+  const top3 = sortedCandidates[2];
   const maxVotes = top1?.votes || 1;
 
-  // List candidates for table (when no filter/search, show #4 onwards; when filtered/searched, show filtered items)
+  // List candidates for table:
+  // - ค้นหา: ค้นหาจากรายชื่อทั้งหมด
+  // - กรองรุ่น: กรองตามรุ่นที่เลือก
+  // - ปกติ: โชว์ถึงอันดับ 10 (อันดับ 4 ถึง 10)
   const remainingCandidates = useMemo(() => {
-    let list = isSearchActive ? candidates : mergedInitial;
-    if (!isSearchActive && selectedGen !== null) {
-      list = list.filter((c) => c.generationNumber === selectedGen);
+    if (isSearchActive) {
+      const q = query.toLowerCase().trim();
+      return sortedCandidates.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          (c.studentId && c.studentId.includes(q)) ||
+          c.company?.toLowerCase().includes(q) ||
+          c.position?.toLowerCase().includes(q) ||
+          c.generation_label?.toLowerCase().includes(q) ||
+          c.description?.toLowerCase().includes(q)
+      );
     }
-    if (!isSearchActive && selectedGen === null) {
-      list = list.slice(3); // Rank 4 onwards
-    }
-    return list;
-  }, [isSearchActive, candidates, mergedInitial, selectedGen]);
+    // ในตารางโชว์ถึงอันดับ 10 (index 3 ถึง 10 คืออันดับ 4 - 10)
+    return sortedCandidates.slice(3, 10);
+  }, [sortedCandidates, isSearchActive, query]);
 
   const totalVotesCount = useMemo(() => {
-    return candidates.reduce((sum, c) => sum + (c.votes || 0), 0);
-  }, [candidates]);
+    return sortedCandidates.reduce((sum, c) => sum + (c.votes || 0), 0);
+  }, [sortedCandidates]);
 
-  const hasActiveFilter = isSearchActive || selectedGen !== null;
 
   /* ═══════════════════════════════════════════
      RENDER
@@ -399,7 +374,7 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
       {/* ╔══════════════════════════════════════════╗
           ║  2. TOP 3 - FLOATING CIRCULAR AVATARS    ║
           ╚══════════════════════════════════════════╝ */}
-      {!isSearchActive && selectedGen === null && top1 && top2 && top3 && (
+      {top1 && top2 && top3 && (
         <section className="relative rounded-[36px] border border-violet-100 bg-gradient-to-b from-white via-violet-50/30 to-pink-50/20 p-6 sm:p-9 shadow-xs overflow-hidden">
           {/* Subtle background pastel glow aura */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-72 w-96 rounded-full bg-gradient-to-r from-amber-100/60 via-pink-100/50 to-violet-100/60 blur-3xl pointer-events-none" />
@@ -471,20 +446,24 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
       {/* ╔══════════════════════════════════════════╗
           ║  3. SEARCH & FILTER TOOLBAR              ║
           ╚══════════════════════════════════════════╝ */}
-      <section className="bg-white rounded-3xl border border-slate-200/70 shadow-xs p-4 sm:p-5 space-y-3.5">
+      <section className="bg-white rounded-3xl border border-slate-200/70 shadow-xs p-4 sm:p-5">
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
           <div>
             <h3 className="text-sm sm:text-base font-extrabold text-slate-800 flex items-center gap-2">
               <Award className="h-4 w-4 text-violet-500" />
               <span>รายชื่อศิษย์เก่าดีเด่น</span>
-              {!isSearchActive && selectedGen === null && (
+              {isSearchActive ? (
+                <span className="text-xs font-bold text-pink-700 bg-pink-50 border border-pink-200/70 px-2.5 py-0.5 rounded-full">
+                  ผลการค้นหา ({remainingCandidates.length})
+                </span>
+              ) : (
                 <span className="text-xs font-bold text-violet-700 bg-violet-50 border border-violet-200/70 px-2.5 py-0.5 rounded-full">
-                  อันดับ 4 เป็นต้นไป
+                  อันดับ 4 - 10
                 </span>
               )}
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              ค้นหาตามชื่อ รหัสนักศึกษา หรือเลือกกรองตามรุ่น
+              ค้นหาตามชื่อ หรือรหัสนักศึกษา
             </p>
           </div>
 
@@ -540,64 +519,6 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
             </div>
           </div>
         </div>
-
-        {/* Generation Filter Chips in Soft Pastel */}
-        {!isSearchActive && (
-          <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100 overflow-x-auto scrollbar-hide pb-0.5">
-            <span className="text-xs font-bold text-slate-400 shrink-0 flex items-center gap-1 mr-1">
-              <GraduationCap className="h-3.5 w-3.5 text-slate-400" />
-              รุ่น:
-            </span>
-
-            <button
-              onClick={() => setSelectedGen(null)}
-              className={`shrink-0 px-3.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                selectedGen === null
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
-              }`}
-            >
-              ทั้งหมด
-            </button>
-
-            {generations.map((genNum) => {
-              const count = mergedInitial.filter((c) => c.generationNumber === genNum).length;
-              return (
-                <button
-                  key={genNum}
-                  onClick={() => setSelectedGen(genNum === selectedGen ? null : genNum)}
-                  className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    selectedGen === genNum
-                      ? 'bg-violet-600 text-white shadow-xs'
-                      : 'bg-violet-50/70 text-violet-800 border border-violet-200/60 hover:bg-violet-100/80'
-                  }`}
-                >
-                  รุ่น {genNum}
-                  <span
-                    className={`inline-flex items-center justify-center text-[10px] font-black px-1.5 py-0.2 rounded-full ${
-                      selectedGen === genNum ? 'bg-white/30 text-white' : 'bg-violet-200/80 text-violet-900'
-                    }`}
-                  >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-
-            {hasActiveFilter && (
-              <button
-                onClick={() => {
-                  setSelectedGen(null);
-                  setQuery('');
-                }}
-                className="shrink-0 ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 transition-colors cursor-pointer"
-              >
-                <RotateCcw className="h-3 w-3" />
-                ล้างตัวกรอง
-              </button>
-            )}
-          </div>
-        )}
       </section>
 
       {/* ╔══════════════════════════════════════════╗
@@ -617,7 +538,6 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
           <button
             onClick={() => {
               setQuery('');
-              setSelectedGen(null);
             }}
             className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-full hover:bg-slate-800 transition-colors cursor-pointer shadow-xs"
           >
@@ -639,12 +559,8 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
           {/* List Rows */}
           <div className="divide-y divide-slate-100">
             {remainingCandidates.map((c, index) => {
-              const rankInFull = mergedInitial.findIndex((x) => x.id === c.id) + 1;
-              const displayRank = isSearchActive
-                ? index + 1
-                : selectedGen !== null
-                ? index + 1
-                : rankInFull;
+              const rankInFull = sortedCandidates.findIndex((x) => x.id === c.id) + 1;
+              const displayRank = rankInFull > 0 ? rankInFull : index + 1;
 
               const voted = votedIds[c.id];
               const isVoting = votingId === c.id;
@@ -772,12 +688,8 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
         /* ── CARD GRID VIEW (Optional switch) ── */
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {remainingCandidates.map((c, index) => {
-            const rankInFull = mergedInitial.findIndex((x) => x.id === c.id) + 1;
-            const displayRank = isSearchActive
-              ? index + 1
-              : selectedGen !== null
-              ? index + 1
-              : rankInFull;
+            const rankInFull = sortedCandidates.findIndex((x) => x.id === c.id) + 1;
+            const displayRank = rankInFull > 0 ? rankInFull : index + 1;
 
             const voted = votedIds[c.id];
             const isVoting = votingId === c.id;
@@ -843,75 +755,124 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
       )}
 
       {/* ╔══════════════════════════════════════════╗
-          ║  5. CANDIDATE PROFILE MODAL (CUTE PASTEL)║
+          ║  5. CANDIDATE PROFILE MODAL (YEARBOOK)   ║
           ╚══════════════════════════════════════════╝ */}
       {selectedCandidate && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm"
           onClick={() => setSelectedCandidate(null)}
         >
           <div
-            className="relative w-full max-w-md bg-white rounded-[32px] p-6 sm:p-7 shadow-2xl border border-violet-200/80 overflow-hidden"
+            className="relative w-full max-w-md bg-white rounded-[36px] p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close button */}
             <button
               onClick={() => setSelectedCandidate(null)}
-              className="absolute top-4 right-4 h-8 w-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+              className="absolute top-4 right-4 h-8 w-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer z-10"
             >
               <X className="h-4 w-4" />
             </button>
 
-            {/* Profile Circular Avatar + Badges */}
-            <div className="flex flex-col items-center text-center">
-              <div className="relative mb-3.5">
+            {/* ── Profile Header (Photo square-rounded, Gen badge, Name, studentId) ── */}
+            <div className="text-center space-y-3">
+              <div className="relative inline-block">
                 <img
                   src={selectedCandidate.avatar_url}
                   alt={selectedCandidate.name}
-                  className="h-24 w-24 rounded-full object-cover ring-4 ring-violet-200 shadow-md"
+                  className="h-32 w-32 rounded-3xl object-cover mx-auto ring-4 ring-indigo-100 shadow-md"
                 />
-                <span className="absolute -bottom-1 -right-1 text-xs font-bold bg-violet-600 text-white px-2.5 py-0.5 rounded-full shadow-xs">
-                  {selectedCandidate.generation_label}
-                </span>
               </div>
 
-              <h3 className="text-lg font-black text-slate-800">{selectedCandidate.name}</h3>
-              {selectedCandidate.studentId && (
-                <p className="text-xs font-mono text-slate-400 mt-0.5">
-                  รหัสนักศึกษา: {selectedCandidate.studentId}
-                </p>
-              )}
-
-              <div className="mt-2 text-xs text-slate-600 font-medium">
-                <p>{selectedCandidate.position}</p>
-                <p className="text-violet-600 font-bold mt-0.5">{selectedCandidate.company}</p>
+              <div>
+                <div className="flex flex-wrap items-center justify-center gap-1.5 mb-1.5">
+                  {selectedCandidate.generation_label && (
+                    <span className="inline-block bg-indigo-50 text-indigo-700 px-3 py-0.5 text-xs font-extrabold rounded-full border border-indigo-100">
+                      {selectedCandidate.generation_label}
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-xl font-bold text-slate-900">
+                  {selectedCandidate.name}
+                </h2>
+                {selectedCandidate.studentId && (
+                  <p className="text-xs text-slate-500 font-mono mt-0.5">
+                    รหัส: {selectedCandidate.studentId}
+                  </p>
+                )}
               </div>
+            </div>
 
-              {/* Bio description */}
-              <div className="mt-4 p-3.5 bg-violet-50/60 rounded-2xl border border-violet-100 text-xs text-slate-600 leading-relaxed text-left w-full">
-                <p className="font-bold text-violet-900 mb-1 flex items-center gap-1">
-                  <Award className="h-3.5 w-3.5 text-violet-600" /> ผลงานและคุณประโยชน์:
-                </p>
-                {selectedCandidate.description}
-              </div>
-
-              {/* Vote Info & Action */}
-              <div className="mt-5 w-full flex items-center justify-between pt-3 border-t border-slate-100">
-                <div className="text-left">
-                  <span className="text-[11px] text-slate-400 font-medium">คะแนนโหวตปัจจุบัน</span>
-                  <p className="text-lg font-black text-violet-600">
-                    {selectedCandidate.votes || 0} <span className="text-xs font-normal text-slate-400">คะแนน</span>
+            {/* ── Info rows (position, company, careerType) ── */}
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 space-y-3 text-left">
+              <div className="flex items-start gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 mt-0.5">
+                  <Briefcase className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">ตำแหน่งงาน</p>
+                  <p className="text-sm font-bold text-slate-800 break-words">
+                    {selectedCandidate.position || 'ไม่ได้ระบุ'}
                   </p>
                 </div>
-
-                <VoteButton
-                  size="lg"
-                  voted={votedIds[selectedCandidate.id]}
-                  isVoting={votingId === selectedCandidate.id}
-                  animating={voteAnimId === selectedCandidate.id}
-                  onVote={(e) => handleVote(e, selectedCandidate.id)}
-                />
               </div>
+
+              <div className="flex items-start gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-600 mt-0.5">
+                  <Building2 className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">สถานที่ทำงาน / องค์กร</p>
+                  <p className="text-sm font-bold text-slate-800 break-words">
+                    {selectedCandidate.company || 'ไม่ได้ระบุ'}
+                  </p>
+                </div>
+              </div>
+
+              {selectedCandidate.employmentType && (
+                <div className="flex items-start gap-3 pt-2 border-t border-slate-200/60">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 mt-0.5">
+                    <MapPin className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">ประเภทสายงาน</p>
+                    <p className="text-sm font-semibold text-slate-700">
+                      {selectedCandidate.employmentType}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── Achievement / Description (like Senior Quote) ── */}
+            {selectedCandidate.description && (
+              <div className="rounded-2xl bg-violet-50/80 p-4 border border-violet-200/60 text-left shadow-2xs relative">
+                <p className="text-xs font-bold text-violet-700 flex items-center gap-1.5 mb-2">
+                  <Award className="h-3.5 w-3.5" />
+                  ผลงานและคุณประโยชน์
+                </p>
+                <p className="text-sm text-slate-700 leading-relaxed">
+                  {selectedCandidate.description}
+                </p>
+              </div>
+            )}
+
+            {/* ── Vote Footer ── */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+              <div className="text-left">
+                <span className="text-[11px] text-slate-400 font-medium">คะแนนโหวตปัจจุบัน</span>
+                <p className="text-lg font-black text-violet-600">
+                  {selectedCandidate.votes || 0} <span className="text-xs font-normal text-slate-400">คะแนน</span>
+                </p>
+              </div>
+
+              <VoteButton
+                size="lg"
+                voted={votedIds[selectedCandidate.id]}
+                isVoting={votingId === selectedCandidate.id}
+                animating={voteAnimId === selectedCandidate.id}
+                onVote={(e) => handleVote(e, selectedCandidate.id)}
+              />
             </div>
           </div>
         </div>

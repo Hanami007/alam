@@ -44,10 +44,10 @@ function LoginForm() {
         body: JSON.stringify({ identifier: identifier.trim(), password }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        setError(data.error || 'เข้าสู่ระบบไม่สำเร็จ');
+        setError(data?.error || 'เข้าสู่ระบบไม่สำเร็จ');
         return;
       }
 
