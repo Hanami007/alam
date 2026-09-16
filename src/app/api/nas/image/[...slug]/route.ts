@@ -94,6 +94,8 @@ export async function GET(
     const { searchParams } = new URL(req.url);
 
     // 1. ถ้าส่งมาเป็น query parameter path ตรงๆ เช่น ?path=รุ่น 28/ธรรมเนียบ/6504101302.JPG
+    // ถ้ารู้ path ที่แน่นอนอยู่แล้วแต่โหลดไม่สำเร็จ ให้ไปที่ fallback ทันที
+    // ไม่ต้องไล่เดา path อื่นด้านล่าง (ช้ามาก เพราะ path ที่ถูกต้องรู้อยู่แล้วตั้งแต่แรก)
     const explicitPath = searchParams.get('path');
     if (explicitPath) {
       const decodedPath = decodeURIComponent(explicitPath);
@@ -107,6 +109,18 @@ export async function GET(
           },
         });
       }
+
+      const genFromPath = decodedPath.match(/รุ่น\s*(\d+)/);
+      const svgFallback = generateGraduationPortraitSvg(
+        decodedPath,
+        'ศิษย์เก่า',
+        '',
+        genFromPath ? `รุ่น ${genFromPath[1]}` : 'รุ่น 20'
+      );
+      return new NextResponse(svgFallback, {
+        status: 200,
+        headers: { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+      });
     }
 
     let genInput = searchParams.get('gen') || '';
