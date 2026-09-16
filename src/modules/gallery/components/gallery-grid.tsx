@@ -50,12 +50,24 @@ interface GalleryGridProps {
     company?: string;
     position?: string;
   }[];
+  /** role ของผู้ใช้ปัจจุบัน — เฉพาะ 'admin' เท่านั้นที่เรียกดูทำเนียบรุ่น NAS ข้ามรุ่นได้ */
+  currentUserRole?: string;
+  /** รุ่นของผู้ใช้ปัจจุบัน (เช่น "รุ่น 43") — สมาชิกทั่วไปจะเห็นเฉพาะทำเนียบรุ่นของตัวเอง */
+  currentUserGeneration?: string;
 }
 
 type GalleryViewMode = 'nas_yearbook' | 'activities';
 type FilterType = 'generation' | 'year';
 
-export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers = [] }: GalleryGridProps) {
+export function GalleryGrid({
+  items: initialItems = [],
+  currentUserId,
+  allUsers = [],
+  currentUserRole,
+  currentUserGeneration,
+}: GalleryGridProps) {
+  const isAdmin = currentUserRole === 'admin';
+
   const [items, setItems] = useState(initialItems);
   const [activeTab, setActiveTab] = useState<GalleryViewMode>('nas_yearbook');
 
@@ -66,8 +78,11 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
   const [catalogLoading, setCatalogLoading] = useState<boolean>(true);
 
   // Filters
+  // สมาชิกทั่วไป (ไม่ใช่ admin) ถูกจำกัดให้ดูได้เฉพาะรุ่นของตัวเอง — ไม่ใช่ 'รุ่น 20' เป็นค่าเริ่มต้นเหมือน admin
   const [filterMode, setFilterMode] = useState<FilterType>('generation');
-  const [selectedGen, setSelectedGen] = useState<string>('รุ่น 20');
+  const [selectedGen, setSelectedGen] = useState<string>(
+    !isAdmin && currentUserGeneration ? currentUserGeneration : 'รุ่น 20'
+  );
   const [selectedYear, setSelectedYear] = useState<number | 'all'>(57);
   const [selectedSubfolder, setSelectedSubfolder] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -81,8 +96,8 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
     'รุ่น 24': true,
   });
 
-  // Generation Unlock Quiz State
-  const [unlockedGenerations, setUnlockedGenerations] = useState<string[]>(['รุ่น 20']);
+  // Generation Unlock Quiz State — ไม่มีรุ่นใดปลดล็อกให้ฟรี ทุกรุ่น (รวมรุ่นของตัวเอง) ต้องตอบคำถามก่อนเสมอ
+  const [unlockedGenerations, setUnlockedGenerations] = useState<string[]>([]);
   const [genQuizAnswer, setGenQuizAnswer] = useState<string>('');
   const [genUnlocking, setGenUnlocking] = useState<boolean>(false);
   const [genUnlockSuccess, setGenUnlockSuccess] = useState<boolean>(false);
@@ -190,6 +205,13 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
   const activeGenObj = generationsSummary.find((g) => g.generationLabel === selectedGen);
   const activeQuiz = activeGenObj?.quiz || 'อาจารย์ประจำสาขาหรือที่ปรึกษาของรุ่นนี้คือใคร?';
   const isCurrentGenUnlocked = unlockedGenerations.includes(selectedGen);
+
+  // สมาชิกทั่วไปเห็นเฉพาะทำเนียบรุ่นของตัวเองใน sidebar — admin เห็นทุกรุ่นเหมือนเดิม
+  const visibleGenerations = isAdmin
+    ? generationsSummary
+    : generationsSummary.filter((g) => g.generationLabel === currentUserGeneration);
+  // true เมื่อรุ่นของสมาชิกไม่อยู่ในช่วงที่คลัง NAS มีข้อมูล (รุ่น 20-32) เลย
+  const ownGenerationNotArchived = !isAdmin && !!currentUserGeneration && visibleGenerations.length === 0;
 
   // Handle generation unlock quiz submit
   async function handleUnlockGeneration() {
@@ -321,15 +343,20 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 text-xs font-bold text-slate-700">
               <div className="flex items-center gap-2">
                 <FolderTree className="h-4 w-4 text-indigo-600" />
-                <span>ธรรมเนียมรุ่น 20 - ปัจจุบัน</span>
+                <span>{isAdmin ? 'ธรรมเนียมรุ่น 20 - ปัจจุบัน' : 'ทำเนียบรุ่นของคุณ'}</span>
               </div>
               <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs text-indigo-600 font-extrabold">
                 {catalogPhotos.length} รูป
               </span>
             </div>
 
+            {ownGenerationNotArchived ? (
+              <p className="text-xs text-slate-400 px-1 py-2">
+                ยังไม่มีคลังภาพทำเนียบรุ่น NAS สำหรับ {currentUserGeneration} (ระบบมีข้อมูลย้อนหลังเฉพาะรุ่น 20-32)
+              </p>
+            ) : (
             <div className="space-y-1 max-h-[640px] overflow-y-auto pr-1 scrollbar-thin text-xs">
-              {generationsSummary.map((genInfo) => {
+              {visibleGenerations.map((genInfo) => {
                 const isSelected = selectedGen === genInfo.generationLabel;
                 const isExpanded = !!expandedGens[genInfo.generationLabel];
                 const isUnlocked = unlockedGenerations.includes(genInfo.generationLabel);
@@ -410,10 +437,23 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
                 );
               })}
             </div>
+            )}
           </div>
 
           {/* ─── RIGHT: Filter Controls & Dynamic Photos ─────────────────── */}
           <div className="space-y-5">
+            {ownGenerationNotArchived ? (
+              <div className="rounded-[28px] border border-slate-200/90 bg-white p-12 text-center">
+                <ImageIcon className="mx-auto h-10 w-10 text-slate-300" />
+                <p className="mt-3 text-sm font-medium text-slate-500">
+                  ยังไม่มีคลังภาพทำเนียบรุ่น NAS สำหรับ {currentUserGeneration}
+                </p>
+                <p className="text-xs text-slate-400 mt-1">
+                  ระบบมีข้อมูลภาพย้อนหลังเฉพาะรุ่น 20-32 (ปีการศึกษา 2557-2569) เท่านั้น
+                </p>
+              </div>
+            ) : (
+              <>
             {/* Filter Bar Header */}
             <div className="rounded-[28px] border border-slate-200/90 bg-white p-5 shadow-card space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -421,7 +461,7 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-semibold text-slate-400">โฟลเดอร์:</span>
                     <span className="rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                      📁 ธรรมเนียมรุ่น 20 - ปัจจุบัน
+                      📁 {isAdmin ? 'ธรรมเนียมรุ่น 20 - ปัจจุบัน' : 'ทำเนียบรุ่นของคุณ'}
                     </span>
                     <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
                     <span className="rounded-xl bg-indigo-50 px-2.5 py-1 text-xs font-extrabold text-indigo-700 border border-indigo-100">
@@ -433,27 +473,29 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
                   </p>
                 </div>
 
-                {/* Filter Mode Switcher: By Gen / By Year */}
-                <div className="flex items-center gap-2">
-                  <div className="flex rounded-xl bg-slate-100 p-1 border border-slate-200/80">
-                    <button
-                      onClick={() => setFilterMode('generation')}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        filterMode === 'generation' ? 'bg-white text-indigo-700 shadow-2xs' : 'text-slate-500'
-                      }`}
-                    >
-                      กรองตามรุ่น
-                    </button>
-                    <button
-                      onClick={() => setFilterMode('year')}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        filterMode === 'year' ? 'bg-white text-indigo-700 shadow-2xs' : 'text-slate-500'
-                      }`}
-                    >
-                      กรองตามปี พ.ศ.
-                    </button>
+                {/* Filter Mode Switcher: By Gen / By Year — เฉพาะ admin เท่านั้นที่สลับดูรุ่นอื่นได้ */}
+                {isAdmin && (
+                  <div className="flex items-center gap-2">
+                    <div className="flex rounded-xl bg-slate-100 p-1 border border-slate-200/80">
+                      <button
+                        onClick={() => setFilterMode('generation')}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          filterMode === 'generation' ? 'bg-white text-indigo-700 shadow-2xs' : 'text-slate-500'
+                        }`}
+                      >
+                        กรองตามรุ่น
+                      </button>
+                      <button
+                        onClick={() => setFilterMode('year')}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          filterMode === 'year' ? 'bg-white text-indigo-700 shadow-2xs' : 'text-slate-500'
+                        }`}
+                      >
+                        กรองตามปี พ.ศ.
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Search Inputs (Name, Full ID, 3-digit Code) */}
@@ -725,6 +767,8 @@ export function GalleryGrid({ items: initialItems = [], currentUserId, allUsers 
                   </button>
                 </div>
               </div>
+            )}
+              </>
             )}
           </div>
         </div>

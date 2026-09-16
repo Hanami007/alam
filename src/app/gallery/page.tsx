@@ -9,6 +9,8 @@ export default function GalleryPage() {
   const [items, setItems] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<number>(2);
+  const [currentUserRole, setCurrentUserRole] = useState<string | undefined>(undefined);
+  const [currentUserGeneration, setCurrentUserGeneration] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,6 +31,8 @@ export default function GalleryPage() {
         }
         if (meRes.status === 'fulfilled' && meRes.value?.user?.id) {
           setCurrentUserId(meRes.value.user.id);
+          setCurrentUserRole(meRes.value.user.role);
+          setCurrentUserGeneration(meRes.value.user.generation);
         }
       } catch (err) {
         console.error('[GalleryPage] Error loading gallery:', err);
@@ -55,7 +59,13 @@ export default function GalleryPage() {
             ))}
           </div>
         ) : (
-          <GalleryGrid items={items} currentUserId={currentUserId} allUsers={allUsers} />
+          <GalleryGrid
+            items={items}
+            currentUserId={currentUserId}
+            allUsers={allUsers}
+            currentUserRole={currentUserRole}
+            currentUserGeneration={currentUserGeneration}
+          />
         )}
       </div>
     </AppShell>
