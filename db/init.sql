@@ -139,13 +139,13 @@ create table hof_candidates (
   description   text
 );
 
--- 12) hof_votes  (same_generation = 5 คะแนน, other_generation = 10 คะแนน)
+-- 12) hof_votes  (โหวตได้ในรุ่นตัวเอง 1 ครั้ง + นอกรุ่นตัวเอง 1 ครั้ง, ได้ 1 คะแนนต่อโหวตเสมอ)
 create table hof_votes (
   id              serial primary key,
   campaign_id     int references hof_campaigns(id),
   voter_id        int references users(id),
   candidate_id    int references hof_candidates(id),
-  vote_category   text not null,  -- same_generation | other_generation
+  vote_category   text not null,  -- same_generation | other_generation (คุมโควตาสิทธิ์โหวต)
   points          int not null,
   voted_at        timestamptz not null default now(),
   unique (campaign_id, voter_id, vote_category)

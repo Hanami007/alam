@@ -126,9 +126,8 @@ export class HofDbService {
 
   /**
    * บันทึกการโหวต Hall of Fame
-   * กฎการคำนวณแต้ม:
-   * - โหวตคนในรุ่นเดียวกัน = 5 คะแนน
-   * - โหวตนอกรุ่น = 10 คะแนน
+   * กติกา: โหวตได้ในรุ่นตัวเอง 1 ครั้ง และนอกรุ่นตัวเอง 1 ครั้ง (รวมสูงสุด 2 โหวตต่อแคมเปญ)
+   * ผู้ถูกโหวตได้ 1 คะแนนเสมอต่อโหวต (ไม่แบ่ง 5/10 ตามรุ่นแล้ว — รุ่นมีผลแค่กับโควตาสิทธิ์โหวต)
    */
   async voteCandidate(voterId: number, candidateId: number) {
     const { rows: existing } = await pool.query(
@@ -139,6 +138,9 @@ export class HofDbService {
       throw new Error('คุณได้โหวตให้ผู้ได้รับการเสนอชื่อท่านนี้ไปแล้ว');
     }
 
+    const { rows: campaignRows } = await pool.query(`SELECT id FROM hof_campaigns LIMIT 1`);
+    const campaignId = campaignRows[0]?.id;
+
     const { rows: voter } = await pool.query(`SELECT generation_option_id FROM users WHERE id = $1`, [voterId]);
     const { rows: candidate } = await pool.query(
       `SELECT u.generation_option_id
@@ -147,30 +149,40 @@ export class HofDbService {
        WHERE hc.id = $1`,
       [candidateId]
     );
-
     const voterGen = voter[0]?.generation_option_id;
     const candidateGen = candidate[0]?.generation_option_id;
-
     const voteCategory = voterGen && candidateGen && voterGen === candidateGen ? 'same_generation' : 'other_generation';
-    const pointsAwarded = voteCategory === 'same_generation' ? 5 : 10;
+
+    const { rows: existingInCategory } = await pool.query(
+      `SELECT id FROM hof_votes WHERE campaign_id = $1 AND voter_id = $2 AND vote_category = $3`,
+      [campaignId, voterId, voteCategory]
+    );
+    if (existingInCategory.length > 0) {
+      throw new Error(
+        voteCategory === 'same_generation' ? 'คุณใช้สิทธิ์โหวตในรุ่นตัวเองไปแล้ว' : 'คุณใช้สิทธิ์โหวตนอกรุ่นตัวเองไปแล้ว'
+      );
+    }
+
+    const candidatePoints = 1; // ผู้ถูกโหวตได้เพิ่ม 1 คะแนนต่อโหวตเสมอ
+    const voterReward = 10; // แต้มสะสมของผู้โหวตเอง (คนละระบบกับคะแนน Hall of Fame ของผู้ถูกโหวต)
 
     await pool.query(
       `INSERT INTO hof_votes (campaign_id, voter_id, candidate_id, vote_category, points)
-       VALUES ((SELECT id FROM hof_campaigns LIMIT 1), $1, $2, $3, $4)`,
-      [voterId, candidateId, voteCategory, pointsAwarded]
+       VALUES ($1, $2, $3, $4, $5)`,
+      [campaignId, voterId, candidateId, voteCategory, candidatePoints]
     );
 
-    await pool.query(`UPDATE users SET total_points = total_points + $1 WHERE id = $2`, [pointsAwarded, voterId]);
+    await pool.query(`UPDATE users SET total_points = total_points + $1 WHERE id = $2`, [voterReward, voterId]);
 
     try {
       await pool.query(
         `INSERT INTO point_transactions (user_id, points, reason, reference_id)
          VALUES ($1, $2, 'hof_vote', $3)`,
-        [voterId, pointsAwarded, String(candidateId)]
+        [voterId, voterReward, String(candidateId)]
       );
     } catch {}
 
-    return { success: true, pointsAwarded };
+    return { success: true, pointsAwarded: voterReward };
   }
 
   // ---------------------------------------------------------------
