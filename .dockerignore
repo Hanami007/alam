@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.env
+.env.*
+deploy.env
+scratch
+_reference
+tsconfig.tsbuildinfo
+npm-debug.log*
+.DS_Store
