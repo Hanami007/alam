@@ -32,9 +32,14 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+!.env.production.example
 
 # vercel
 .vercel
+
+# deploy — ข้อมูล Postgres จริงบนเซิร์ฟเวอร์ (docker-compose.prod.yml bind mount)
+/data/
 
 # typescript
 *.tsbuildinfo
