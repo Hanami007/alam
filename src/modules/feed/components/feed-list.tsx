@@ -63,7 +63,7 @@ interface Comment {
   content: string;
   created_at: string;
   author: string;
-  avatar_url?: string;
+  userAvatar?: string;
   isAvailableForMentorship?: boolean;
   parentCommentId?: number | null;
 }
@@ -91,6 +91,7 @@ interface Post {
   title: string;
   body: string;
   author: string;
+  authorAvatar?: string;
   pinned?: boolean;
   category?: string;
   created_at: string;
@@ -1029,9 +1030,17 @@ export function FeedList({
                   <div className="flex items-start justify-between gap-2.5 sm:gap-3">
                     <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
                       {/* Avatar with fixed aspect square and shrink-0 */}
-                      <div className="flex h-11 w-11 sm:h-13 sm:w-13 shrink-0 aspect-square items-center justify-center rounded-2xl bg-gradient-to-tr from-purple-100 via-pink-100 to-rose-100 border border-purple-200/50 text-purple-700 font-extrabold text-sm sm:text-base shadow-2xs">
-                        {post.author ? post.author.substring(0, 2) : 'CS'}
-                      </div>
+                      {post.authorAvatar ? (
+                        <img
+                          src={post.authorAvatar}
+                          alt={post.author || 'ผู้โพสต์'}
+                          className="h-11 w-11 sm:h-13 sm:w-13 shrink-0 aspect-square rounded-2xl object-cover border border-purple-200/50 shadow-2xs"
+                        />
+                      ) : (
+                        <div className="flex h-11 w-11 sm:h-13 sm:w-13 shrink-0 aspect-square items-center justify-center rounded-2xl bg-gradient-to-tr from-purple-100 via-pink-100 to-rose-100 border border-purple-200/50 text-purple-700 font-extrabold text-sm sm:text-base shadow-2xs">
+                          {post.author ? post.author.substring(0, 2) : 'CS'}
+                        </div>
+                      )}
 
                       {/* Author & meta container */}
                       <div className="min-w-0 flex-1">
@@ -1336,9 +1345,17 @@ export function FeedList({
                             return (
                               <div key={comment.id} className="flex items-start gap-2.5">
                                 {/* Avatar */}
-                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-indigo-300 to-purple-300 font-bold text-white text-xs mt-0.5 shadow-sm">
-                                  {comment.author ? comment.author.substring(0, 2) : 'CS'}
-                                </div>
+                                {comment.userAvatar ? (
+                                  <img
+                                    src={comment.userAvatar}
+                                    alt={comment.author || 'ผู้แสดงความคิดเห็น'}
+                                    className="h-8 w-8 shrink-0 rounded-full object-cover mt-0.5 shadow-sm"
+                                  />
+                                ) : (
+                                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-indigo-300 to-purple-300 font-bold text-white text-xs mt-0.5 shadow-sm">
+                                    {comment.author ? comment.author.substring(0, 2) : 'CS'}
+                                  </div>
+                                )}
                                 {/* Bubble + actions */}
                                 <div className="flex-1 min-w-0">
                                   <div className="relative inline-block max-w-full">

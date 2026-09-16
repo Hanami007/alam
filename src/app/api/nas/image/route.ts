@@ -88,6 +88,8 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
 
     // 1. ดึงภาพตาม Path ตรง เช่น ?path=รุ่น 28/ธรรมเนียบ/6504101302.JPG
+    // ถ้ารู้ path ที่แน่นอนอยู่แล้วแต่โหลดไม่สำเร็จ ให้ไปที่ fallback ทันที
+    // ไม่ต้องไล่เดา path อื่นด้านล่าง (ช้ามาก เพราะ path ที่ถูกต้องรู้อยู่แล้วตั้งแต่แรก)
     const explicitPath = searchParams.get('path');
     if (explicitPath) {
       const decodedPath = decodeURIComponent(explicitPath);
@@ -101,6 +103,18 @@ export async function GET(req: Request) {
           },
         });
       }
+
+      const genFromPath = decodedPath.match(/รุ่น\s*(\d+)/);
+      const svgFallback = generateGraduationPortraitSvg(
+        decodedPath,
+        'ศิษย์เก่า',
+        '',
+        genFromPath ? `รุ่น ${genFromPath[1]}` : 'รุ่น 20'
+      );
+      return new NextResponse(svgFallback, {
+        status: 200,
+        headers: { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+      });
     }
 
     // 2. ดึงภาพตามพารามิเตอร์ gen, code, album
@@ -146,7 +160,11 @@ export async function GET(req: Request) {
       }
     }
 
+    // จำกัดเวลารวมของการไล่เดา path (แต่ละ path อาจกิน 15-30 วิ ถ้า NAS ไม่ตอบ
+    // ถ้าปล่อยให้ลองครบทุก path ~240 แบบ จะรวมกันเกิน 100 วิ ของ Cloudflare timeout ได้)
+    const candidateSearchDeadline = Date.now() + 8000;
     for (const relPath of candidatePaths) {
+      if (Date.now() > candidateSearchDeadline) break;
       const result = await synologyApi.downloadFile(relPath);
       if (result) {
         return new NextResponse(result.buffer, {

@@ -38,6 +38,7 @@ export interface FeedPostItem {
   author: string;
   authorId: number;
   authorName: string;
+  authorAvatar?: string;
   authorRole: string;
   pinned: boolean;
   createdAt: string;
@@ -64,6 +65,7 @@ export class FeedDbService {
           p.id, p.category, p.title, p.content as body, p.pinned, p.created_at, p.status,
           COALESCE(admin.id, req.id, 1) as author_id,
           COALESCE(admin.name, req.name, 'ผู้ดูแลระบบ') as author_name,
+          COALESCE(admin.avatar_url, req.avatar_url) as author_avatar,
           COALESCE(admin.role, req.role, 'admin') as author_role,
           COALESCE(admin.is_available_for_mentorship, req.is_available_for_mentorship, false) as is_available_for_mentorship,
           COALESCE(like_stat.like_count, 0)::int as like_count,
@@ -188,6 +190,7 @@ export class FeedDbService {
           author: p.author_name,
           authorId: p.author_id,
           authorName: p.author_name,
+          authorAvatar: p.author_avatar || undefined,
           authorRole: p.author_role,
           pinned: p.pinned,
           createdAt: p.created_at,

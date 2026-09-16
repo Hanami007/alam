@@ -15,6 +15,7 @@ export interface UserProfileData {
   bio: string | null;
   generation: string | null;
   province: string | null;
+  workProvince: string | null;
   careerType: string | null;
   showHometownOnMap: boolean;
   showWorkplaceOnMap: boolean;
@@ -40,12 +41,14 @@ export class UserDbService {
         u.id, u.student_id, u.email, u.name, u.role, u.status, u.student_status,
         u.total_points, u.avatar_url, u.company, u.position, u.bio,
         u.show_hometown_on_map, u.show_workplace_on_map, u.is_available_for_mentorship, u.created_at,
-        gen.label as generation, 
-        prov.label as province, 
+        gen.label as generation,
+        prov.label as province,
+        work_prov.label as work_province,
         ct.label as career_type
       FROM users u
       LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
       LEFT JOIN lookup_options prov ON prov.id = u.province_option_id
+      LEFT JOIN lookup_options work_prov ON work_prov.id = u.work_province_id
       LEFT JOIN lookup_options ct ON ct.id = u.career_option_id
       WHERE u.id = $1
     `, [userId]);
@@ -68,6 +71,7 @@ export class UserDbService {
       bio: r.bio,
       generation: r.generation,
       province: r.province,
+      workProvince: r.work_province,
       careerType: r.career_type,
       showHometownOnMap: r.show_hometown_on_map,
       showWorkplaceOnMap: r.show_workplace_on_map,

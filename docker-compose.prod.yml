@@ -1,0 +1,55 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: alam-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-alumni}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-alumni_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-alam_db}
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-alumni} -d ${POSTGRES_DB:-alam_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      target: runner
+    container_name: alam-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-4007}:3000"
+    env_file:
+      - .env
+
+  # ไม่ใช่ service ที่รันตลอด — ใช้ครั้งคราวผ่าน:
+  #   docker compose -f docker-compose.prod.yml --env-file .env run --rm migrate
+  # (ต้องใช้ target: builder เพราะมี devDependencies (node-pg-migrate) + โฟลเดอร์ migrations/
+  #  ที่ image ของ app (target: runner) ไม่มี เนื่องจากตัดออกเพื่อให้ image รันจริงมีขนาดเล็ก)
+  migrate:
+    build:
+      context: .
+      target: builder
+    profiles: ["tools"]
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    entrypoint: ["npx", "node-pg-migrate", "up", "--config", ".node-pg-migrate.json"]
+
+# กำหนด subnet ตายตัว ไม่ให้ Docker ดึงจาก default address pool เอง
+# (เซิร์ฟเวอร์นี้ pool เต็มแล้วจากเว็บสาขาอื่น — ดู deploy/02-deploy.sh ตอน "failed to
+#  create network" ถ้าเจอ error แบบนี้อีกในอนาคต ให้เปลี่ยนเลข subnet นี้เป็นช่วงอื่นที่ว่าง)
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.5.0/24
