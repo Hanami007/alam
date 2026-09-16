@@ -160,7 +160,11 @@ export async function GET(req: Request) {
       }
     }
 
+    // จำกัดเวลารวมของการไล่เดา path (แต่ละ path อาจกิน 15-30 วิ ถ้า NAS ไม่ตอบ
+    // ถ้าปล่อยให้ลองครบทุก path ~240 แบบ จะรวมกันเกิน 100 วิ ของ Cloudflare timeout ได้)
+    const candidateSearchDeadline = Date.now() + 8000;
     for (const relPath of candidatePaths) {
+      if (Date.now() > candidateSearchDeadline) break;
       const result = await synologyApi.downloadFile(relPath);
       if (result) {
         return new NextResponse(result.buffer, {
