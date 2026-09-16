@@ -8,33 +8,21 @@ import {
   Globe,
   Users,
   MapPin,
-  RotateCcw,
   Sparkles,
   X,
-  ChevronRight,
   GraduationCap,
   Building2,
   Briefcase,
-  TrendingUp,
-  Home,
   ZoomIn,
   ZoomOut,
-  Compass,
   Map as MapIcon,
-  Eye,
-  Moon,
-  Sun,
-  Layers,
 } from 'lucide-react';
 import {
   GLOBE_CLUSTERS,
-  GLOBE_REGION_NAVS,
-  MAEJO_ORIGIN,
-  TOTAL_ALUMNI_COUNT,
   type GlobeCountryCluster,
   type GlobeAlumni,
 } from '@/lib/globe-data';
-import { getProvinceCoords, THAILAND_PROVINCE_COORDS } from '@/lib/thailand-province-coords';
+import { getProvinceCoords } from '@/lib/thailand-province-coords';
 
 // ─── Dynamic import (ssr: false) สำหรับ react-globe.gl ───────────────────────
 const ReactGlobe = dynamic(() => import('react-globe.gl').then((m) => m.default ?? m), {
@@ -52,7 +40,6 @@ const ReactGlobe = dynamic(() => import('react-globe.gl').then((m) => m.default 
 });
 
 export type MapMode = 'hometown' | 'workplace';
-export type RegionKey = 'all' | 'thailand' | 'asia' | 'americas' | 'europe' | 'oceania' | 'middleeast';
 export type GlobeTheme = 'satellite' | 'night' | 'clean';
 
 export interface MapPoint {
@@ -152,7 +139,7 @@ function geoJsonToSvgPath(geometry: any): string {
     ring
       .map(([lng, lat]: number[], i: number) => {
         const [x, y] = projectLngLat(lng, lat);
-        return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+        return `${i === 0 ? 'M' : 'L'}${x.toFixed(4)},${y.toFixed(4)}`;
       })
       .join(' ') + ' Z';
 
@@ -320,6 +307,8 @@ function World2DMap({
   onClickCountry: (cluster: GlobeCountryCluster) => void;
 }) {
   const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
+  const [hoverInfo, setHoverInfo] = useState<{ label: string; count: number; flag: string } | null>(null);
+  const [mousePos, setMousePos] = useState<{ x: number; y: number; containerWidth: number } | null>(null);
   const aspect = containerAspect > 0 ? containerAspect : WORLD_MAP_VIEWBOX.width / WORLD_MAP_VIEWBOX.height;
 
   // แปลงเขตแดนทุกผืน (ประเทศทั่วโลก + 77 จังหวัดไทย) เป็น path ล่วงหน้าครั้งเดียว
@@ -396,10 +385,43 @@ function World2DMap({
   const latestRef = useRef({ viewBox, aspect, baseWindowWidth: baseWindow.width });
   const suppressClickRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [svgSize, setSvgSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     latestRef.current = { viewBox, aspect, baseWindowWidth: baseWindow.width };
   });
+
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      setSvgSize({ width: rect.width, height: rect.height });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // ─── ป้อปอัพค้างแสดงข้อมูลของประเทศ/จังหวัดที่ "เลือกอยู่" (ตอนคลิก ไม่ใช่แค่ hover) ─
+  // อ้างอิงตำแหน่งจาก zoomBBox (ขอบเขตจริงของพื้นที่ที่เลือก) แปลงผ่าน viewBox ปัจจุบัน
+  // ทำให้ป้อปอัพเกาะติดรูปทรงถูกต้องเสมอ ไม่ว่าจะกำลังเล่นแอนิเมชันซูมอยู่หรือไม่
+  const selectedPopup = useMemo(() => {
+    const item = selectedArea || selectedCluster;
+    if (!item || !zoomBBox || svgSize.width === 0 || svgSize.height === 0) return null;
+    const cx = (zoomBBox.minX + zoomBBox.maxX) / 2;
+    const topY = zoomBBox.minY;
+    const screenX = ((cx - viewBox.x) / viewBox.width) * svgSize.width;
+    const screenY = ((topY - viewBox.y) / viewBox.height) * svgSize.height;
+    return {
+      label: selectedArea ? selectedArea.city : item.country_name,
+      count: item.count,
+      flag: item.flag,
+      x: screenX,
+      y: screenY,
+    };
+  }, [selectedArea, selectedCluster, zoomBBox, viewBox, svgSize]);
 
   useEffect(() => {
     const el = svgRef.current;
@@ -492,6 +514,10 @@ function World2DMap({
         className={`w-full h-full touch-none select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         preserveAspectRatio="xMidYMid meet"
         onPointerDown={handlePointerDown}
+        onMouseMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top, containerWidth: rect.width });
+        }}
       >
         <rect x={-2000} y={-2000} width={4000} height={4000} fill="#EFF6FF" />
 
@@ -502,11 +528,13 @@ function World2DMap({
           let count = 0;
           let isSelected = false;
           let label = '';
+          let flag = '🌐';
           let fill: string;
           let stroke: string;
 
           if (isThaiProvince) {
             label = p.name_th;
+            flag = '🇹🇭';
             count = activeClusters.find((c) => c.country_code === 'TH' && c.city === label)?.count ?? 0;
             isSelected = selectedArea?.country_code === 'TH' && selectedArea?.city === label;
             fill = getThaiProvinceFill(count, isSelected, hoveredLabel === label);
@@ -515,6 +543,7 @@ function World2DMap({
             const c = getClusterForFeature(feature, activeClusters);
             label = c ? c.country_name : p.NAME || p.NAME_LONG || '';
             if (c) {
+              flag = c.flag || '🌐';
               count = countryLevelClusters.find((x) => x.country_code === c.country_code)?.count ?? c.count;
               isSelected = !!selectedCluster && !selectedArea && selectedCluster.country_code === c.country_code;
             }
@@ -531,8 +560,16 @@ function World2DMap({
               strokeWidth={isSelected ? 1.3 : 0.8}
               vectorEffect="non-scaling-stroke"
               strokeLinejoin="round"
-              onMouseEnter={() => setHoveredLabel(label)}
-              onMouseLeave={() => setHoveredLabel(null)}
+              strokeLinecap="round"
+              shapeRendering="geometricPrecision"
+              onMouseEnter={() => {
+                setHoveredLabel(label);
+                setHoverInfo({ label, count, flag });
+              }}
+              onMouseLeave={() => {
+                setHoveredLabel(null);
+                setHoverInfo(null);
+              }}
               onClick={handleGuardedClick(() => {
                 if (isThaiProvince) {
                   onClickThaiProvince(label);
@@ -545,9 +582,7 @@ function World2DMap({
                 }
               })}
               className="cursor-pointer transition-colors duration-150"
-            >
-              <title>{count > 0 ? `${label}: ${count} คน` : label}</title>
-            </path>
+            />
           );
         })}
 
@@ -610,6 +645,46 @@ function World2DMap({
           );
         })}
       </svg>
+
+      {/* ป้อปอัพลอยตามเมาส์ตอน hover เขตแดน/จังหวัด (แทนทูลทิปเบราว์เซอร์ default) */}
+      {hoverInfo && mousePos && (
+        <div
+          className="pointer-events-none absolute z-30 flex items-center gap-2 rounded-xl border border-cyan-500/40 bg-slate-900/95 px-3 py-2 text-xs font-bold text-white shadow-xl backdrop-blur-md"
+          style={{
+            left: mousePos.x + 16,
+            top: mousePos.y + 16,
+            transform: mousePos.x > mousePos.containerWidth - 160 ? 'translateX(-100%)' : undefined,
+          }}
+        >
+          <span className="text-base leading-none">{hoverInfo.flag}</span>
+          <div className="flex flex-col">
+            <span className="whitespace-nowrap">{hoverInfo.label}</span>
+            <span className="text-[11px] font-semibold text-cyan-300">
+              {hoverInfo.count > 0 ? `👥 ${hoverInfo.count} คน • คลิกเพื่อดู` : 'ยังไม่มีศิษย์เก่า'}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ป้อปอัพค้างแสดงหลังคลิกเลือกประเทศ/จังหวัด ลอยเหนือรูปทรงที่เลือกอยู่เสมอ */}
+      {selectedPopup && (
+        <div
+          className="pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-[calc(100%+10px)]"
+          style={{ left: selectedPopup.x, top: selectedPopup.y }}
+        >
+          <div className="flex items-center gap-2 rounded-xl border border-pink-400/60 bg-slate-900/95 px-3 py-2 text-xs font-bold text-white shadow-xl backdrop-blur-md whitespace-nowrap">
+            <span className="text-base leading-none">{selectedPopup.flag}</span>
+            <div className="flex flex-col">
+              <span>{selectedPopup.label}</span>
+              <span className="text-[11px] font-semibold text-pink-300">
+                {selectedPopup.count > 0 ? `👥 ${selectedPopup.count} คน` : 'ยังไม่มีศิษย์เก่า'}
+              </span>
+            </div>
+          </div>
+          {/* ลูกศรชี้ลงไปที่รูปทรงที่เลือก */}
+          <div className="mx-auto h-2.5 w-2.5 -translate-y-1 rotate-45 bg-slate-900/95 border-r border-b border-pink-400/60" />
+        </div>
+      )}
     </div>
   );
 }
@@ -836,8 +911,7 @@ export function GlobePanel({
   const [dimensions, setDimensions] = useState({ width: 720, height: 620 });
   const [mode, setMode] = useState<MapMode>('hometown');
   const [mapView, setMapView] = useState<'3d' | '2d'>('3d');
-  const [globeTheme, setGlobeTheme] = useState<GlobeTheme>('clean');
-  const [selectedRegion, setSelectedRegion] = useState<RegionKey>('all');
+  const [globeTheme] = useState<GlobeTheme>('clean');
   const [selectedCluster, setSelectedCluster] = useState<GlobeCountryCluster | null>(null);
   const [selectedArea, setSelectedArea] = useState<GlobeCountryCluster | null>(null);
   const [selectedAlumnus, setSelectedAlumnus] = useState<GlobeAlumni | null>(null);
@@ -1116,17 +1190,6 @@ export function GlobePanel({
         1400
       );
     }
-  }, []);
-
-  // บินไปยัง region
-  const flyToRegion = useCallback((regionKey: RegionKey) => {
-    const nav = GLOBE_REGION_NAVS.find((r) => r.key === regionKey);
-    if (!nav || !globeRef.current) return;
-    setAutoRotate(regionKey === 'all');
-    setSelectedCluster(null);
-    setSelectedArea(null);
-    setIsZoomedIn(false);
-    globeRef.current.pointOfView({ lat: nav.lat, lng: nav.lng, altitude: nav.altitude }, 1200);
   }, []);
 
   // รายชื่อพื้นที่ในประเทศที่เลือก
