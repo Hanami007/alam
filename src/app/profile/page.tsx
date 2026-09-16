@@ -33,6 +33,7 @@ export default function ProfilePage() {
           email: u.email || '',
           generation: u.generation || '',
           province: u.province || '',
+          work_province: u.workProvince || u.work_province || '',
           career_type: u.careerType || u.career_type || '',
           company: u.company || '',
           position: u.position || '',

@@ -315,7 +315,7 @@ export function ProfileCard({ user, taggedPhotos = [], unlockedPhotos = [], acti
                     <div className="min-w-0 flex-1">
                       <dt className="text-xs font-bold text-slate-500 uppercase tracking-wider">ประเภทสายงาน & พื้นที่ทำงาน</dt>
                       <dd className="text-slate-800 font-medium text-xs sm:text-sm mt-0.5">
-                        {user.career_type ? `${user.career_type}` : 'สายงานทั่วไป'} • {user.province ?? 'กรุงเทพมหานคร'}
+                        {user.career_type ? `${user.career_type}` : 'สายงานทั่วไป'} • {user.work_province ?? user.province ?? 'กรุงเทพมหานคร'}
                       </dd>
                     </div>
                   </div>
