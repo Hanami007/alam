@@ -1,5 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
-import { galleryDbService } from '@/services/db/gallery.service';
+import { galleryDbService } from '@/modules/gallery/services/gallery.service';
 import { NextResponse } from 'next/server';
 
 export async function GET() {

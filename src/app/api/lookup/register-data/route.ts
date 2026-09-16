@@ -1,12 +1,12 @@
-import { getGenerations, getAllProvinces, getCareerTypes } from '@/lib/db';
+import { lookupDbService } from '@/services/db/lookup.service';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
     const [generations, provinces, careerTypes] = await Promise.all([
-      getGenerations(),
-      getAllProvinces(),
-      getCareerTypes(),
+      lookupDbService.getGenerations(),
+      lookupDbService.getAllProvinces(),
+      lookupDbService.getCareerTypes(),
     ]);
 
     return NextResponse.json({

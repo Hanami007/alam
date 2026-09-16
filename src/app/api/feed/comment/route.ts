@@ -1,4 +1,4 @@
-import { addPostComment } from '@/lib/db';
+import { feedDbService } from '@/modules/feed/services/feed.service';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
@@ -7,7 +7,7 @@ export async function POST(req: Request) {
     if (!postId || !userId || !content?.trim()) {
       return NextResponse.json({ error: 'ข้อมูลไม่ครบถ้วน' }, { status: 400 });
     }
-    const comment = await addPostComment(Number(postId), Number(userId), content.trim());
+    const comment = await feedDbService.addComment(Number(postId), Number(userId), content.trim());
     return NextResponse.json({ success: true, comment, pointsAwarded: 1 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

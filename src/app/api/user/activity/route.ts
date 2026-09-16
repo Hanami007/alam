@@ -1,5 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
-import { getActivityLog } from '@/lib/db';
+import { userDbService } from '@/modules/profile/services/user.service';
 import { NextResponse } from 'next/server';
 
 export async function GET(req: Request) {
@@ -22,7 +22,7 @@ export async function GET(req: Request) {
       });
     }
 
-    const logs = await getActivityLog(user.id);
+    const logs = await userDbService.getActivityLog(user.id);
     return NextResponse.json(logs);
   } catch (err: any) {
     console.error('[API /api/user/activity] Error:', err);

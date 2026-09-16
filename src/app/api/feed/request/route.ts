@@ -1,5 +1,6 @@
 import { getCurrentUser } from '@/lib/auth';
-import { createPostRequest, checkForBannedKeywords } from '@/lib/db';
+import { feedDbService } from '@/modules/feed/services/feed.service';
+import { adminDbService } from '@/modules/admin/services/admin.service';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
@@ -62,7 +63,7 @@ export async function POST(req: Request) {
       ...(pollData?.options ?? []),
     ].filter(Boolean);
 
-    const foundKeywords = await checkForBannedKeywords(textsToCheck);
+    const foundKeywords = await adminDbService.checkForBannedKeywords(textsToCheck);
     if (foundKeywords.length > 0) {
       return NextResponse.json(
         {
@@ -75,7 +76,7 @@ export async function POST(req: Request) {
     }
     // ───────────────────────────
 
-    const post = await createPostRequest(
+    const post = await feedDbService.submitPostRequest(
       requesterId,
       title.trim(),
       content ? content.trim() : (pollData?.question || ''),

@@ -1,5 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
-import { userDbService } from '@/services/db/user.service';
+import { userDbService } from '@/modules/profile/services/user.service';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {

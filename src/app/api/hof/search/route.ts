@@ -1,4 +1,4 @@
-import { searchHofCandidates, getAlumniProfiles } from '@/lib/db';
+import { hofDbService } from '@/modules/hall-of-fame/services/hof.service';
 import { NextResponse } from 'next/server';
 
 export async function GET(req: Request) {
@@ -7,7 +7,7 @@ export async function GET(req: Request) {
     const q = searchParams.get('q') ?? '';
 
     if (q.trim() === '') {
-      const profiles = await getAlumniProfiles();
+      const profiles = await hofDbService.getCandidatesLegacyFormat();
       const results = profiles.map((p: any, idx: number) => ({
         id: p.id,
         name: p.name,
@@ -21,7 +21,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ results });
     }
 
-    const rows = await searchHofCandidates(q.trim());
+    const rows = await hofDbService.searchCandidatesLegacyFormat(q.trim());
     const results = rows.map((r: any, idx: number) => ({
       id: r.id,
       name: r.name,

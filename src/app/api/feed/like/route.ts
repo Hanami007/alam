@@ -1,4 +1,4 @@
-import { togglePostLike } from '@/lib/db';
+import { feedDbService } from '@/modules/feed/services/feed.service';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
@@ -7,7 +7,7 @@ export async function POST(req: Request) {
     if (!postId || !userId) {
       return NextResponse.json({ error: 'ข้อมูลไม่ครบถ้วน' }, { status: 400 });
     }
-    const result = await togglePostLike(Number(postId), Number(userId));
+    const result = await feedDbService.toggleLike(Number(postId), Number(userId));
     return NextResponse.json({ success: true, ...result });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

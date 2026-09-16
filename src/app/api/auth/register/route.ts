@@ -1,4 +1,6 @@
-import { pool, notifyAdminNewRegistration, notifyBatchmatesNewRegistration, promoteEligibleStudentsToAlumni } from '@/lib/db';
+import { pool } from '@/lib/db';
+import { notificationDbService } from '@/modules/notifications/services/notification.service';
+import { userDbService } from '@/modules/profile/services/user.service';
 import { hashPassword, createSession } from '@/lib/auth';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
@@ -189,14 +191,14 @@ export async function POST(req: Request) {
 
     // 1. ส่ง Notification แจ้งเตือนไปยัง Admin
     try {
-      await notifyAdminNewRegistration(newUser.id, newUser.name, genLabel);
+      await notificationDbService.notifyAdminNewRegistration(newUser.id, newUser.name, genLabel);
     } catch (e) {
       console.error('[Register] Error notifying admin:', e);
     }
 
     // 2. ส่ง Notification แจ้งเตือนไปยังเพื่อนร่วมรุ่นที่อนุมัติแล้ว
     try {
-      await notifyBatchmatesNewRegistration(
+      await notificationDbService.notifyBatchmatesNewRegistration(
         newUser.generation_option_id,
         newUser.id,
         newUser.name,
@@ -234,7 +236,7 @@ export async function POST(req: Request) {
 
     // ตรวจสอบเลื่อนสถานะ 4 ปีระบบรวม
     try {
-      await promoteEligibleStudentsToAlumni();
+      await userDbService.promoteEligibleStudentsToAlumni();
     } catch {}
 
     // สร้าง Session และตั้งค่า Cookie ทันทีเพื่อให้ผู้ใช้สามารถเข้าสู่ระบบและใช้งานหน้าเว็บได้ทันที

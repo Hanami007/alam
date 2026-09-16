@@ -131,7 +131,6 @@ export class HofDbService {
    * - โหวตนอกรุ่น = 10 คะแนน
    */
   async voteCandidate(voterId: number, candidateId: number) {
-    // ตรวจสอบว่าโหวตแล้วหรือยัง
     const { rows: existing } = await pool.query(
       `SELECT id FROM hof_votes WHERE voter_id = $1 AND candidate_id = $2`,
       [voterId, candidateId]
@@ -140,15 +139,11 @@ export class HofDbService {
       throw new Error('คุณได้โหวตให้ผู้ได้รับการเสนอชื่อท่านนี้ไปแล้ว');
     }
 
-    // ดึงรุ่นของผู้โหวตและผู้ถูกโหวต
-    const { rows: voter } = await pool.query(
-      `SELECT generation_option_id FROM users WHERE id = $1`,
-      [voterId]
-    );
+    const { rows: voter } = await pool.query(`SELECT generation_option_id FROM users WHERE id = $1`, [voterId]);
     const { rows: candidate } = await pool.query(
-      `SELECT u.generation_option_id 
-       FROM hof_candidates hc 
-       JOIN users u ON u.id = hc.user_id 
+      `SELECT u.generation_option_id
+       FROM hof_candidates hc
+       JOIN users u ON u.id = hc.user_id
        WHERE hc.id = $1`,
       [candidateId]
     );
@@ -156,7 +151,6 @@ export class HofDbService {
     const voterGen = voter[0]?.generation_option_id;
     const candidateGen = candidate[0]?.generation_option_id;
 
-    // คำนวณแต้ม: ในรุ่นเดียวกัน = 5, นอกรุ่น = 10
     const voteCategory = voterGen && candidateGen && voterGen === candidateGen ? 'same_generation' : 'other_generation';
     const pointsAwarded = voteCategory === 'same_generation' ? 5 : 10;
 
@@ -166,11 +160,7 @@ export class HofDbService {
       [voterId, candidateId, voteCategory, pointsAwarded]
     );
 
-    // ให้แต้มผู้โหวตด้วย (+pointsAwarded คะแนนสำหรับการมีส่วนร่วม)
-    await pool.query(
-      `UPDATE users SET total_points = total_points + $1 WHERE id = $2`,
-      [pointsAwarded, voterId]
-    );
+    await pool.query(`UPDATE users SET total_points = total_points + $1 WHERE id = $2`, [pointsAwarded, voterId]);
 
     try {
       await pool.query(
@@ -181,6 +171,58 @@ export class HofDbService {
     } catch {}
 
     return { success: true, pointsAwarded };
+  }
+
+  // ---------------------------------------------------------------
+  // ฟังก์ชันด้านล่างย้ายมาจาก src/lib/db.ts (god-file) — ใช้งานจริงใน hof/search/route.ts
+  // คงชื่อ/รูปแบบข้อมูลเดิม (snake_case) ไว้แยกจาก getCandidates/searchCandidates ด้านบน
+  // เพื่อไม่ให้พฤติกรรมของ /api/hof/search เปลี่ยนแปลง
+  // ---------------------------------------------------------------
+
+  /** รายชื่อศิษย์เก่า Hall of Fame รูปแบบเดิม (ใช้เมื่อไม่มีคำค้นหาใน /api/hof/search) */
+  async getCandidatesLegacyFormat() {
+    const { rows } = await pool.query(`
+      select
+        u.id,
+        u.name,
+        u.avatar_url as image,
+        u.position as occupation,
+        u.company,
+        ct.label as employment_type,
+        gen.label as generation,
+        hc.description as achievement,
+        coalesce(sum(hv.points), 0)::int as hof_points
+      from hof_candidates hc
+      join users u on u.id = hc.user_id
+      left join lookup_options gen on gen.id = u.generation_option_id
+      left join lookup_options ct on ct.id = u.career_option_id
+      left join hof_votes hv on hv.candidate_id = hc.id
+      group by u.id, u.name, u.avatar_url, u.position, u.company, ct.label, gen.label, hc.description
+      order by hof_points desc
+    `);
+    return rows;
+  }
+
+  /** ค้นหา Hall of Fame แบบ single search box (รูปแบบข้อมูลเดิม) */
+  async searchCandidatesLegacyFormat(query: string) {
+    const searchTerm = `%${query}%`;
+    const { rows } = await pool.query(`
+      select
+        hc.id, hc.description,
+        u.name, u.company, u.position, u.avatar_url,
+        gen.label as generation_label
+      from hof_candidates hc
+      join users u on u.id = hc.user_id
+      left join lookup_options gen on gen.id = u.generation_option_id
+      where u.name ilike $1
+         or u.company ilike $1
+         or u.position ilike $1
+         or hc.description ilike $1
+         or gen.label ilike $1
+      order by hc.id desc
+      limit 50
+    `, [searchTerm]);
+    return rows;
   }
 }
 

@@ -1,5 +1,6 @@
 import { getCurrentUser } from '@/lib/auth';
-import { getLeaderboard, pool } from '@/lib/db';
+import { pool } from '@/lib/db';
+import { feedDbService } from '@/modules/feed/services/feed.service';
 import { NextResponse } from 'next/server';
 
 /**
@@ -11,7 +12,7 @@ export async function GET() {
     const user = await getCurrentUser();
 
     // 1. Leaderboard top 3
-    const leaderboard = await getLeaderboard(3);
+    const leaderboard = await feedDbService.getLeaderboard(3);
 
     // 2. Birthday alumni this month (users with birthday in current month)
     //    We check admission month as a proxy since we store admission_year not birthday

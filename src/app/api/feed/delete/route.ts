@@ -1,4 +1,5 @@
-import { deletePost, getUserById } from '@/lib/db';
+import { feedDbService } from '@/modules/feed/services/feed.service';
+import { userDbService } from '@/modules/profile/services/user.service';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
@@ -13,7 +14,7 @@ export async function POST(req: Request) {
     }
 
     // ตรวจสอบสิทธิ์ผู้ใช้งานว่ามีสถานะเป็น Admin หรือไม่
-    const user = await getUserById(Number(adminId));
+    const user = await userDbService.getUserById(Number(adminId));
     if (!user || user.role !== 'admin') {
       return NextResponse.json(
         {
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const deleted = await deletePost(Number(postId), Number(adminId));
+    const deleted = await feedDbService.deletePost(Number(postId), Number(adminId));
     if (!deleted) {
       return NextResponse.json(
         { success: false, error: 'ไม่พบโพสต์ที่ต้องการลบ หรือโพสต์ถูกลบไปแล้ว' },

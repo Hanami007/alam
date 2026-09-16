@@ -1,9 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
-import {
-  getBannedKeywords,
-  addBannedKeyword,
-  removeBannedKeyword,
-} from '@/lib/db';
+import { adminDbService } from '@/modules/admin/services/admin.service';
 import { NextResponse } from 'next/server';
 
 async function requireAdmin() {
@@ -18,7 +14,7 @@ export async function GET() {
   if (!admin) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const keywords = await getBannedKeywords();
+  const keywords = await adminDbService.getBannedKeywords();
   return NextResponse.json({ keywords });
 }
 
@@ -46,7 +42,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const result = await addBannedKeyword(keyword, admin.id);
+  const result = await adminDbService.addBannedKeyword(keyword, admin.id);
   if (!result) {
     return NextResponse.json(
       { success: false, error: 'คำนี้มีอยู่ในรายการแล้ว' },
@@ -73,7 +69,7 @@ export async function DELETE(req: Request) {
     );
   }
 
-  const deleted = await removeBannedKeyword(id);
+  const deleted = await adminDbService.removeBannedKeyword(id);
   if (!deleted) {
     return NextResponse.json(
       { success: false, error: 'ไม่พบรายการที่ต้องการลบ' },

@@ -1,4 +1,4 @@
-import { hofDbService } from '@/services/db/hof.service';
+import { hofDbService } from '@/modules/hall-of-fame/services/hof.service';
 import { NextResponse } from 'next/server';
 
 export async function GET() {

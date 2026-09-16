@@ -254,6 +254,106 @@ export class AdminDbService {
       return null;
     }
   }
+
+  // ---------------------------------------------------------------
+  // Banned Keywords (Keyword Filter) — ใช้จริงใน /api/admin/keywords และ /api/feed/request
+  // ---------------------------------------------------------------
+
+  /** สร้างตาราง banned_keywords หากยังไม่มี (auto-migrate) */
+  private async ensureBannedKeywordsTable() {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS banned_keywords (
+        id         SERIAL PRIMARY KEY,
+        keyword    TEXT NOT NULL,
+        added_by   INT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        CONSTRAINT banned_keywords_keyword_uq UNIQUE (keyword)
+      )
+    `);
+  }
+
+  /** ดึงรายการคำต้องห้ามทั้งหมด */
+  async getBannedKeywords() {
+    await this.ensureBannedKeywordsTable();
+    const { rows } = await pool.query(
+      `SELECT bk.id, bk.keyword, bk.created_at, u.name AS added_by_name
+       FROM banned_keywords bk
+       LEFT JOIN users u ON u.id = bk.added_by
+       ORDER BY bk.created_at DESC`
+    );
+    return rows;
+  }
+
+  /** เพิ่มคำต้องห้ามใหม่ */
+  async addBannedKeyword(keyword: string, adminId: number) {
+    await this.ensureBannedKeywordsTable();
+    const { rows } = await pool.query(
+      `INSERT INTO banned_keywords (keyword, added_by)
+       VALUES ($1, $2)
+       ON CONFLICT (keyword) DO NOTHING
+       RETURNING *`,
+      [keyword.trim().toLowerCase(), adminId]
+    );
+    return rows[0] ?? null;
+  }
+
+  /** ลบคำต้องห้าม */
+  async removeBannedKeyword(id: number) {
+    await this.ensureBannedKeywordsTable();
+    const { rows } = await pool.query(`DELETE FROM banned_keywords WHERE id = $1 RETURNING *`, [id]);
+    return rows[0] ?? null;
+  }
+
+  /**
+   * ตรวจสอบข้อความว่ามีคำต้องห้ามหรือไม่
+   * คืนค่า array ของคำที่พบ (ถ้าไม่พบจะเป็น [])
+   */
+  async checkForBannedKeywords(texts: string[]): Promise<string[]> {
+    await this.ensureBannedKeywordsTable();
+    const { rows } = await pool.query(`SELECT keyword FROM banned_keywords`);
+    const keywords: string[] = rows.map((r: any) => r.keyword as string);
+    const combined = texts.join(' ').toLowerCase();
+    return keywords.filter((kw) => combined.includes(kw));
+  }
+
+  // ---------------------------------------------------------------
+  // ฟังก์ชันด้านล่างย้ายมาจาก src/lib/db.ts (god-file) — ปัจจุบันไม่มี route ใดเรียกใช้
+  // คงไว้เพื่อรักษาพฤติกรรมเดิมทั้งหมด ไม่ได้ผูกกับ route ใดในตอนนี้
+  // ---------------------------------------------------------------
+
+  /** สถิติแดชบอร์ดรูปแบบเดิม (legacy, ยังไม่ได้ใช้งาน — ถูกแทนที่ด้วย getOverviewStats) */
+  async getDashboardStatsLegacy() {
+    const { rows: alumniCount } = await pool.query(
+      `select count(*)::int as count from users where role = 'alumni' and status = 'approved'`
+    );
+    const { rows: genCount } = await pool.query(
+      `select count(*)::int as count from lookup_options where category = 'generation'`
+    );
+    const { rows: candidateCount } = await pool.query(`select count(*)::int as count from hof_candidates`);
+    const { rows: pendingCount } = await pool.query(`select count(*)::int as count from users where status = 'pending'`);
+
+    return {
+      totalAlumni: alumniCount[0].count,
+      totalGenerations: genCount[0].count,
+      outstandingAlumni: candidateCount[0].count,
+      pendingApprovals: pendingCount[0].count,
+    };
+  }
+
+  /** ดึง audit logs สำหรับ admin (legacy, ยังไม่ได้ใช้งาน — ไม่มีหน้า UI เรียกใช้ในปัจจุบัน) */
+  async getAuditLogs(limit = 50) {
+    const { rows } = await pool.query(
+      `SELECT al.id, al.action, al.target_type, al.target_id,
+              al.metadata, al.created_at,
+              u.name AS actor_name
+       FROM audit_logs al
+       LEFT JOIN users u ON u.id = al.actor_id
+       ORDER BY al.created_at DESC
+       LIMIT $1`,
+      [limit]
+    );
+    return rows;
+  }
 }
 
 export const adminDbService = new AdminDbService();

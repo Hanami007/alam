@@ -1,4 +1,4 @@
-import { removeUserPhotoTag } from '@/lib/db';
+import { galleryDbService } from '@/modules/gallery/services/gallery.service';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const removed = await removeUserPhotoTag(Number(mediaAssetId), Number(userId));
+    const removed = await galleryDbService.removeUserPhotoTag(Number(mediaAssetId), Number(userId));
 
     if (!removed) {
       return NextResponse.json(

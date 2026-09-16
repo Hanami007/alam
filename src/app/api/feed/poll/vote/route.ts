@@ -1,4 +1,4 @@
-import { castPollVote } from '@/lib/db';
+import { feedDbService } from '@/modules/feed/services/feed.service';
 import { getCurrentUser } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = await castPollVote(
+    const result = await feedDbService.votePoll(
       Number(pollId),
       Number(optionId),
       Number(effectiveUserId)

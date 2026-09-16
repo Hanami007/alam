@@ -1,5 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
-import { feedDbService } from '@/services/db/feed.service';
+import { feedDbService } from '@/modules/feed/services/feed.service';
 import { NextResponse } from 'next/server';
 
 export async function GET() {

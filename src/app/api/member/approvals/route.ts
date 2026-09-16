@@ -1,5 +1,6 @@
 import { getCurrentUser } from '@/lib/auth';
-import { getPendingBatchmates, approveBatchmate, pool } from '@/lib/db';
+import { pool } from '@/lib/db';
+import { memberDbService } from '@/modules/member/services/member.service';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
@@ -26,7 +27,7 @@ export async function GET() {
 
     let pendingBatchmates = [];
     if (genId) {
-      pendingBatchmates = await getPendingBatchmates(genId);
+      pendingBatchmates = await memberDbService.getPendingBatchmates(genId);
     } else if (user.role === 'admin') {
       // แอดมินสามารถดูทั้งหมดได้
       const { rows } = await pool.query(
@@ -65,7 +66,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing applicantId' }, { status: 400 });
     }
 
-    const approved = await approveBatchmate(Number(applicantId), user.id);
+    const approved = await memberDbService.approveBatchmate(Number(applicantId), user.id);
 
     return NextResponse.json({
       success: true,

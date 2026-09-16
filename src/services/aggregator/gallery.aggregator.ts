@@ -1,5 +1,5 @@
 import { apistudio } from '../apistudio/client';
-import { galleryDbService } from '../db/gallery.service';
+import { galleryDbService } from '@/modules/gallery/services/gallery.service';
 
 export interface UnifiedGalleryItem {
   id: string;

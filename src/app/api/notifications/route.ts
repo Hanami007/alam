@@ -1,5 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
-import { getUserNotifications, getUnreadNotificationCount, markNotificationAsRead, markAllNotificationsAsRead } from '@/lib/db';
+import { notificationDbService } from '@/modules/notifications/services/notification.service';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
@@ -10,8 +10,8 @@ export async function GET() {
     }
 
     const [notifications, unreadCount] = await Promise.all([
-      getUserNotifications(user.id, 25),
-      getUnreadNotificationCount(user.id),
+      notificationDbService.getUserNotifications(user.id, 25),
+      notificationDbService.getUnreadNotificationCount(user.id),
     ]);
 
     return NextResponse.json({
@@ -33,12 +33,12 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     if (body.all) {
-      await markAllNotificationsAsRead(user.id);
+      await notificationDbService.markAllNotificationsAsRead(user.id);
       return NextResponse.json({ success: true });
     }
 
     if (body.notifId) {
-      const updated = await markNotificationAsRead(Number(body.notifId), user.id);
+      const updated = await notificationDbService.markNotificationAsRead(Number(body.notifId), user.id);
       return NextResponse.json({ success: true, notification: updated });
     }
 

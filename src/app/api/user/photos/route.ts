@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { getUserTaggedPhotos, getUserUnlockedPhotos } from '@/lib/db';
+import { userDbService } from '@/modules/profile/services/user.service';
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,8 +14,8 @@ export async function GET(req: NextRequest) {
     }
 
     const [taggedPhotos, unlockedPhotos] = await Promise.all([
-      getUserTaggedPhotos(targetUserId),
-      getUserUnlockedPhotos(targetUserId),
+      userDbService.getUserTaggedPhotos(targetUserId),
+      userDbService.getUserUnlockedPhotos(targetUserId),
     ]);
 
     return NextResponse.json({

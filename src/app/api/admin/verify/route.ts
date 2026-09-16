@@ -1,5 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
-import { adminDbService } from '@/services/db/admin.service';
+import { adminDbService } from '@/modules/admin/services/admin.service';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
