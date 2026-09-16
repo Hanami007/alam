@@ -44,3 +44,12 @@ services:
     env_file:
       - .env
     entrypoint: ["npx", "node-pg-migrate", "up", "--config", ".node-pg-migrate.json"]
+
+# กำหนด subnet ตายตัว ไม่ให้ Docker ดึงจาก default address pool เอง
+# (เซิร์ฟเวอร์นี้ pool เต็มแล้วจากเว็บสาขาอื่น — ดู deploy/02-deploy.sh ตอน "failed to
+#  create network" ถ้าเจอ error แบบนี้อีกในอนาคต ให้เปลี่ยนเลข subnet นี้เป็นช่วงอื่นที่ว่าง)
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.5.0/24
