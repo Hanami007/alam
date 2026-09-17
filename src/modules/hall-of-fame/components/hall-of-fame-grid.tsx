@@ -80,6 +80,14 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
   const [voteAnimId, setVoteAnimId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
+  const [voteError, setVoteError] = useState<string | null>(null);
+  const voteErrorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (voteErrorTimeoutRef.current) clearTimeout(voteErrorTimeoutRef.current);
+    };
+  }, []);
 
   /* ── Initialize / sync candidates once API data arrives ── */
   const hasInitializedApiRef = useRef(false);
@@ -90,7 +98,14 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
     }
   }, [mergedInitial, initialCandidates]);
 
-  /* ── Vote handler: เพิ่มคะแนนโหวตให้คนที่โดนกดทันที ── */
+  /* ── แสดงข้อความแจ้งเตือนตอนโหวตไม่สำเร็จ (เช่น ใช้สิทธิ์โควตาหมดแล้ว) ── */
+  function showVoteError(message: string) {
+    if (voteErrorTimeoutRef.current) clearTimeout(voteErrorTimeoutRef.current);
+    setVoteError(message);
+    voteErrorTimeoutRef.current = setTimeout(() => setVoteError(null), 4000);
+  }
+
+  /* ── Vote handler: เพิ่มคะแนนโหวตให้คนที่โดนกดทันที (โควตา: ในรุ่นตัวเอง 1 + นอกรุ่นตัวเอง 1) ── */
   async function handleVote(e: React.MouseEvent, candidateId: number) {
     e.stopPropagation();
     if (votedIds[candidateId] || votingId !== null) return;
@@ -98,7 +113,7 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
     setVoteAnimId(candidateId);
     setTimeout(() => setVoteAnimId(null), 600);
 
-    // อัปเดตคะแนนโหวตเพิ่มให้คนที่โดนกดทันที (+1 vote)
+    // อัปเดตคะแนนโหวตเพิ่มให้คนที่โดนกดทันที (+1 vote) แบบ optimistic
     setCandidates((prev) =>
       prev.map((c) => (c.id === candidateId ? { ...c, votes: (c.votes || 0) + 1 } : c))
     );
@@ -118,9 +133,32 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
       const data = await res.json().catch(() => null);
       if (data?.success) {
         notifyPointsUpdated(data.pointsAwarded || 10);
+      } else {
+        // โหวตไม่สำเร็จ (เช่น ใช้สิทธิ์โควตาในรุ่น/นอกรุ่นไปแล้ว) → ย้อนคะแนนที่เพิ่มไปแบบ optimistic กลับ
+        setCandidates((prev) =>
+          prev.map((c) => (c.id === candidateId ? { ...c, votes: Math.max((c.votes || 1) - 1, 0) } : c))
+        );
+        setVotedIds((prev) => {
+          const next = { ...prev };
+          delete next[candidateId];
+          return next;
+        });
+        if (selectedCandidate && selectedCandidate.id === candidateId) {
+          setSelectedCandidate((prev) => (prev ? { ...prev, votes: Math.max((prev.votes || 1) - 1, 0) } : null));
+        }
+        showVoteError(data?.error || 'โหวตไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
       }
     } catch (err) {
       console.error('Vote failed:', err);
+      setCandidates((prev) =>
+        prev.map((c) => (c.id === candidateId ? { ...c, votes: Math.max((c.votes || 1) - 1, 0) } : c))
+      );
+      setVotedIds((prev) => {
+        const next = { ...prev };
+        delete next[candidateId];
+        return next;
+      });
+      showVoteError('โหวตไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
     } finally {
       setVotingId(null);
     }
@@ -171,6 +209,14 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
   ═══════════════════════════════════════════ */
   return (
     <div className="space-y-6 sm:space-y-8 max-w-6xl mx-auto px-2 sm:px-4 py-2">
+
+      {/* แจ้งเตือนตอนโหวตไม่สำเร็จ (เช่น ใช้สิทธิ์โควตาในรุ่น/นอกรุ่นไปแล้ว) */}
+      {voteError && (
+        <div className="fixed bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700 shadow-hero animate-fade-in max-w-[90vw]">
+          <span>⚠️</span>
+          <span>{voteError}</span>
+        </div>
+      )}
 
       {/* ╔══════════════════════════════════════════╗
           ║  1. HERO BANNER - SOFT PASTEL THEME      ║
@@ -235,30 +281,32 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
       </div>
 
       {/* ╔══════════════════════════════════════════╗
+          ║  2+4. TOP 3 (ซ้าย) วางข้างลิสต์อันดับ 4-10 (ขวา)  ║
+          ╚══════════════════════════════════════════╝ */}
+      <div className="grid grid-cols-1 lg:grid-cols-[560px_1fr] gap-6 items-start">
+
+      {/* ╔══════════════════════════════════════════╗
           ║  2. TOP 3 - FLOATING CIRCULAR AVATARS    ║
           ╚══════════════════════════════════════════╝ */}
       {top1 && top2 && top3 && (
-        <section className="relative rounded-[36px] border border-violet-100 bg-gradient-to-b from-white via-violet-50/30 to-pink-50/20 p-6 sm:p-9 shadow-xs overflow-hidden">
+        <section className="relative rounded-[36px] border border-violet-100 bg-gradient-to-b from-white via-violet-50/30 to-pink-50/20 p-6 sm:p-7 shadow-xs overflow-hidden">
           {/* Subtle background pastel glow aura */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-72 w-96 rounded-full bg-gradient-to-r from-amber-100/60 via-pink-100/50 to-violet-100/60 blur-3xl pointer-events-none" />
 
           {/* Section Header */}
-          <div className="relative z-10 text-center mb-8 space-y-1.5">
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-white/90 border border-amber-200/80 px-3.5 py-1 text-xs font-bold text-amber-700 shadow-2xs">
+          <div className="relative z-10 text-center mb-6 space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-white/90 border border-amber-200/80 px-3 py-1 text-xs font-bold text-amber-700 shadow-2xs">
               <Sparkles className="h-3.5 w-3.5 text-amber-500 fill-amber-400" />
               <span>TOP 3 LEADERBOARD</span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-800 flex items-center justify-center gap-2">
-              <span>ผู้นำคะแนนโหวต 3 อันดับแรก</span>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-800 flex items-center justify-center gap-1.5">
+              <span>ผู้นำคะแนนโหวต</span>
               <span>🏆</span>
             </h2>
-            <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-              ศิษย์เก่าที่ได้รับคะแนนโหวตและกำลังใจสูงสุดจากพี่น้องทุกรุ่น
-            </p>
           </div>
 
           {/* Floating Circular Top 3 Cards (2nd | 1st | 3rd) */}
-          <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6 items-end max-w-4xl mx-auto">
+          <div className="relative z-10 grid grid-cols-3 gap-4 sm:gap-5 items-end">
             
             {/* 🥈 Rank 2 (Left / Floating Pastel Sky-Lavender) */}
             <FloatingTopCard
@@ -271,7 +319,7 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
               onVote={(e) => handleVote(e, top2.id)}
               onSelect={() => setSelectedCandidate(top2)}
               theme="silver"
-              className="order-2 md:order-1"
+              className="order-1"
             />
 
             {/* 🥇 Rank 1 (Center / Floating Pastel Gold - Center Stage) */}
@@ -286,7 +334,7 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
               onSelect={() => setSelectedCandidate(top1)}
               theme="gold"
               isChampion
-              className="order-1 md:order-2 md:-translate-y-4 z-10"
+              className="order-2 -translate-y-2 z-10"
             />
 
             {/* 🥉 Rank 3 (Right / Floating Pastel Peach-Rose) */}
@@ -300,27 +348,29 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
               onVote={(e) => handleVote(e, top3.id)}
               onSelect={() => setSelectedCandidate(top3)}
               theme="bronze"
-              className="order-3 md:order-3"
+              className="order-3"
             />
           </div>
         </section>
       )}
 
+      <div className="space-y-6">
+
       {/* ╔══════════════════════════════════════════╗
           ║  3. SEARCH & FILTER TOOLBAR              ║
           ╚══════════════════════════════════════════╝ */}
-      <section className="bg-white rounded-3xl border border-slate-200/70 shadow-xs p-4 sm:p-5">
-        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+      <section className="bg-white rounded-3xl border border-slate-200/70 shadow-xs p-4 sm:p-5 md:max-w-[540px] md:ml-auto">
+        <div className="flex flex-col gap-3">
           <div>
-            <h3 className="text-sm sm:text-base font-extrabold text-slate-800 flex items-center gap-2">
-              <Award className="h-4 w-4 text-violet-500" />
+            <h3 className="text-sm sm:text-base font-extrabold text-slate-800 flex items-center gap-2 flex-wrap">
+              <Award className="h-4 w-4 text-violet-500 shrink-0" />
               <span>รายชื่อศิษย์เก่าดีเด่น</span>
               {isSearchActive ? (
-                <span className="text-xs font-bold text-pink-700 bg-pink-50 border border-pink-200/70 px-2.5 py-0.5 rounded-full">
+                <span className="shrink-0 text-xs font-bold text-pink-700 bg-pink-50 border border-pink-200/70 px-2.5 py-0.5 rounded-full">
                   ผลการค้นหา ({remainingCandidates.length})
                 </span>
               ) : (
-                <span className="text-xs font-bold text-violet-700 bg-violet-50 border border-violet-200/70 px-2.5 py-0.5 rounded-full">
+                <span className="shrink-0 text-xs font-bold text-violet-700 bg-violet-50 border border-violet-200/70 px-2.5 py-0.5 rounded-full">
                   อันดับ 4 - 10
                 </span>
               )}
@@ -388,7 +438,7 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
           ║  4. LEADERBOARD TABLE / LIST (RANK 4+)   ║
           ╚══════════════════════════════════════════╝ */}
       {remainingCandidates.length === 0 && !isSearchLoading ? (
-        <div className="bg-white rounded-3xl border border-slate-100 p-12 text-center shadow-xs">
+        <div className="bg-white rounded-3xl border border-slate-100 p-12 text-center shadow-xs md:max-w-[540px] md:ml-auto">
           <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-500 mb-3">
             <Trophy className="h-7 w-7" />
           </div>
@@ -410,13 +460,12 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
         </div>
       ) : viewMode === 'table' ? (
         /* ── TABLE / ROW LIST VIEW (Minimal & Clean) ── */
-        <div className="bg-white rounded-[28px] border border-slate-200/80 shadow-xs overflow-hidden">
+        <div className="bg-white rounded-[28px] border border-slate-200/80 shadow-xs overflow-hidden md:max-w-[540px] md:ml-auto">
           {/* Desktop Table Header */}
-          <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3.5 bg-slate-50/90 border-b border-slate-200/70 text-xs font-extrabold text-slate-500 uppercase tracking-wider">
-            <div className="col-span-1 text-center">อันดับ</div>
-            <div className="col-span-5">ศิษย์เก่า</div>
-            <div className="col-span-3">ตำแหน่ง & องค์กร</div>
-            <div className="col-span-3 text-right pr-2">คะแนนโหวต & สนับสนุน</div>
+          <div className="hidden md:flex items-center gap-3 px-5 py-3 bg-slate-50/90 border-b border-slate-200/70 text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+            <div className="w-9 shrink-0 text-center">อันดับ</div>
+            <div className="md:max-w-[260px] flex-1 min-w-0">ศิษย์เก่า</div>
+            <div className="md:ml-auto w-[95px] shrink-0 text-right pr-2 whitespace-nowrap">คะแนนโหวต</div>
           </div>
 
           {/* List Rows */}
@@ -428,26 +477,25 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
               const voted = votedIds[c.id];
               const isVoting = votingId === c.id;
               const animating = voteAnimId === c.id;
-              const votePercent = Math.min(100, Math.round(((c.votes || 0) / maxVotes) * 100));
 
               return (
                 <div
                   key={c.id}
                   id={`hof-row-${c.id}`}
                   onClick={() => setSelectedCandidate(c)}
-                  className="group p-4 sm:px-6 sm:py-3.5 transition-colors duration-150 hover:bg-violet-50/40 cursor-pointer flex flex-col md:grid md:grid-cols-12 md:gap-4 md:items-center gap-3"
+                  className="group p-3.5 sm:px-5 sm:py-3 transition-colors duration-150 hover:bg-violet-50/40 cursor-pointer flex flex-col md:flex-row gap-3 md:gap-3 md:items-center"
                 >
                   {/* Rank (Mobile & Desktop) */}
-                  <div className="flex items-center justify-between md:justify-center md:col-span-1">
+                  <div className="flex items-center justify-between md:justify-center md:w-9 md:shrink-0">
                     <div className="flex items-center gap-2">
                       <span
-                        className={`inline-flex items-center justify-center font-black rounded-xl text-xs sm:text-sm ${
+                        className={`inline-flex items-center justify-center font-black rounded-lg text-xs ${
                           displayRank <= 3
-                            ? 'h-8 w-8 bg-amber-50 text-amber-800 border border-amber-200/80 shadow-2xs'
-                            : 'h-7 w-7 sm:h-8 sm:w-8 bg-slate-100 text-slate-600 border border-slate-200/80'
+                            ? 'h-7 w-7 bg-amber-50 text-amber-800 border border-amber-200/80 shadow-2xs'
+                            : 'h-6 w-6 sm:h-7 sm:w-7 bg-slate-100 text-slate-600 border border-slate-200/80'
                         }`}
                       >
-                        #{displayRank}
+                        {displayRank}
                       </span>
                       {displayRank === 4 && (
                         <span className="md:hidden inline-flex items-center gap-1 text-[11px] font-bold text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full border border-pink-200/70">
@@ -469,12 +517,12 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
                   </div>
 
                   {/* Alumni Info with Circular Avatar */}
-                  <div className="md:col-span-5 flex items-center gap-3.5 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0 md:flex-1 md:max-w-[260px]">
                     <div className="relative shrink-0">
                       <img
                         src={c.avatar_url}
                         alt={c.name}
-                        className="h-11 w-11 sm:h-12 sm:w-12 rounded-full object-cover ring-2 ring-violet-100 group-hover:ring-violet-300 transition-all shadow-2xs"
+                        className="h-9 w-9 sm:h-10 sm:w-10 rounded-full object-cover ring-2 ring-violet-100 group-hover:ring-violet-300 transition-all shadow-2xs"
                       />
                       {voted && (
                         <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white rounded-full p-0.5 shadow-xs">
@@ -485,7 +533,7 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-extrabold text-slate-800 text-sm sm:text-base leading-snug group-hover:text-violet-700 transition-colors truncate">
+                        <h4 className="font-extrabold text-slate-800 text-sm leading-snug group-hover:text-violet-700 transition-colors truncate">
                           {c.name}
                         </h4>
                         <span className="shrink-0 text-[10px] font-bold bg-violet-50 text-violet-700 px-2 py-0.5 rounded-md border border-violet-200/70">
@@ -498,43 +546,23 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
                           รหัส: {c.studentId}
                         </p>
                       )}
-
-                      <p className="text-xs text-slate-500 truncate mt-0.5 md:hidden">
-                        {c.position} • {c.company}
-                      </p>
                     </div>
                   </div>
 
-                  {/* Position & Company (Desktop) */}
-                  <div className="hidden md:block md:col-span-3 min-w-0">
-                    <p className="text-xs font-bold text-slate-800 truncate">{c.position}</p>
-                    <p className="text-xs text-violet-600 font-medium truncate flex items-center gap-1 mt-0.5">
-                      <Building2 className="h-3 w-3 shrink-0 text-violet-400" />
-                      <span>{c.company}</span>
-                    </p>
-                  </div>
-
-                  {/* Vote Progress & Action (Desktop & Mobile) */}
-                  <div className="md:col-span-3 flex items-center justify-between md:justify-end gap-3.5">
-                    {/* Progress Bar & Count */}
-                    <div className="flex-1 md:max-w-[120px] text-left md:text-right">
-                      <div className="flex items-center justify-between md:justify-end gap-1.5 mb-1">
-                        <span className="text-[11px] text-slate-400 font-medium md:hidden">คะแนน</span>
-                        <span className="text-xs font-black text-slate-800">
-                          {c.votes || 0} <span className="text-[10px] font-normal text-slate-400">โหวต</span>
-                        </span>
-                      </div>
-                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden w-full">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-violet-400 via-pink-400 to-amber-400 transition-all duration-500"
-                          style={{ width: `${votePercent}%` }}
-                        />
-                      </div>
+                  {/* Vote Count & Action (Desktop & Mobile) */}
+                  <div className="flex items-center justify-between gap-2 self-start md:self-auto md:ml-auto md:justify-end md:w-[95px] md:shrink-0">
+                    {/* Vote Count */}
+                    <div className="text-left md:text-right">
+                      <span className="text-[11px] text-slate-400 font-medium md:hidden">คะแนน</span>
+                      <span className="text-sm font-black text-slate-800 whitespace-nowrap">
+                        {c.votes || 0} <span className="text-[10px] font-normal text-slate-400">โหวต</span>
+                      </span>
                     </div>
 
                     {/* Desktop Vote Button */}
                     <div className="hidden md:block shrink-0">
                       <VoteButton
+                        iconOnly
                         voted={voted}
                         isVoting={isVoting}
                         animating={animating}
@@ -549,7 +577,7 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
         </div>
       ) : (
         /* ── CARD GRID VIEW (Optional switch) ── */
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 md:max-w-[540px] md:ml-auto">
           {remainingCandidates.map((c, index) => {
             const rankInFull = sortedCandidates.findIndex((x) => x.id === c.id) + 1;
             const displayRank = rankInFull > 0 ? rankInFull : index + 1;
@@ -589,14 +617,6 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
                       รหัสนักศึกษา: {c.studentId}
                     </p>
                   )}
-                  <p className="text-xs text-slate-600 truncate mt-1 flex items-center gap-1">
-                    <Briefcase className="h-3 w-3 text-slate-400 shrink-0" />
-                    <span>{c.position}</span>
-                  </p>
-                  <p className="text-xs text-violet-600 font-semibold truncate flex items-center gap-1 mt-0.5">
-                    <Building2 className="h-3 w-3 text-violet-400 shrink-0" />
-                    <span>{c.company}</span>
-                  </p>
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
@@ -616,6 +636,9 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
           })}
         </div>
       )}
+
+      </div>
+      </div>
 
       {/* ╔══════════════════════════════════════════╗
           ║  5. CANDIDATE PROFILE MODAL (YEARBOOK)   ║
@@ -753,13 +776,16 @@ function VoteButton({
   animating,
   onVote,
   size = 'sm',
+  iconOnly = false,
 }: {
   voted?: boolean;
   isVoting?: boolean;
   animating?: boolean;
   onVote: (e: React.MouseEvent) => void;
   size?: 'sm' | 'lg';
+  iconOnly?: boolean;
 }) {
+  const iconSize = size === 'lg' ? 'h-4.5 w-4.5' : 'h-3.5 w-3.5';
   return (
     <button
       onClick={onVote}
@@ -768,8 +794,8 @@ function VoteButton({
         transform: animating ? 'scale(0.85)' : 'scale(1)',
         transition: 'transform 0.15s ease',
       }}
-      className={`inline-flex items-center gap-1.5 font-bold rounded-full transition-all duration-200 shadow-2xs cursor-pointer disabled:cursor-default shrink-0
-        ${size === 'lg' ? 'px-5 py-2 text-xs sm:text-sm' : 'px-3.5 py-1.5 text-xs'}
+      className={`inline-flex items-center justify-center font-bold rounded-full transition-all duration-200 shadow-2xs cursor-pointer disabled:cursor-default shrink-0
+        ${iconOnly ? (size === 'lg' ? 'h-10 w-10' : 'h-8 w-8') : size === 'lg' ? 'gap-1.5 px-5 py-2 text-xs sm:text-sm' : 'gap-1.5 px-3.5 py-1.5 text-xs'}
         ${
           voted
             ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
@@ -777,16 +803,16 @@ function VoteButton({
         }`}
     >
       {isVoting ? (
-        <Loader2 className={`animate-spin ${size === 'lg' ? 'h-4 w-4' : 'h-3.5 w-3.5'}`} />
+        <Loader2 className={`animate-spin ${iconSize}`} />
       ) : voted ? (
         <>
-          <CheckCircle2 className={`${size === 'lg' ? 'h-4 w-4' : 'h-3.5 w-3.5'} text-emerald-600`} />
-          <span>โหวตแล้ว ✨</span>
+          <CheckCircle2 className={`${iconSize} ${iconOnly ? '' : 'text-emerald-600'}`} />
+          {!iconOnly && <span>โหวตแล้ว ✨</span>}
         </>
       ) : (
         <>
-          <Heart className={`${size === 'lg' ? 'h-4 w-4' : 'h-3.5 w-3.5'} fill-white text-white`} />
-          <span>โหวต 💖</span>
+          <Heart className={`${iconSize} fill-white text-white`} />
+          {!iconOnly && <span>โหวต 💖</span>}
         </>
       )}
     </button>
@@ -827,7 +853,7 @@ function FloatingTopCard({
     gold: {
       avatarSize: 'h-28 w-28 sm:h-32 sm:w-32',
       glowBg: 'bg-amber-300/40',
-      ringColor: 'ring-4 ring-amber-300 ring-offset-4 ring-offset-amber-50/60',
+      ringColor: 'ring-2 ring-amber-300 ring-offset-2 ring-offset-amber-50/60',
       cardBg: 'bg-white/95 hover:bg-white',
       cardBorder: 'border-amber-200/90 shadow-md shadow-amber-200/40',
       badgeBg: 'bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 text-amber-950',
@@ -835,12 +861,12 @@ function FloatingTopCard({
       voteCountColor: 'text-amber-600',
       voteBar: 'from-amber-400 to-yellow-400',
       medalIcon: '🥇',
-      rankTitle: 'อันดับ 1 ขวัญใจมหาชน',
+      rankTitle: 'อันดับ 1',
     },
     silver: {
-      avatarSize: 'h-24 w-24 sm:h-28 sm:w-28',
+      avatarSize: 'h-22 w-22 sm:h-26 sm:w-26',
       glowBg: 'bg-sky-200/40',
-      ringColor: 'ring-4 ring-sky-300 ring-offset-4 ring-offset-sky-50/60',
+      ringColor: 'ring-2 ring-sky-300 ring-offset-2 ring-offset-sky-50/60',
       cardBg: 'bg-white/90 hover:bg-white',
       cardBorder: 'border-sky-200/80 shadow-xs shadow-sky-100',
       badgeBg: 'bg-gradient-to-r from-sky-300 via-blue-200 to-sky-300 text-sky-950',
@@ -851,9 +877,9 @@ function FloatingTopCard({
       rankTitle: 'อันดับ 2',
     },
     bronze: {
-      avatarSize: 'h-24 w-24 sm:h-28 sm:w-28',
+      avatarSize: 'h-22 w-22 sm:h-26 sm:w-26',
       glowBg: 'bg-rose-200/40',
-      ringColor: 'ring-4 ring-rose-300 ring-offset-4 ring-offset-rose-50/60',
+      ringColor: 'ring-2 ring-rose-300 ring-offset-2 ring-offset-rose-50/60',
       cardBg: 'bg-white/90 hover:bg-white',
       cardBorder: 'border-rose-200/80 shadow-xs shadow-rose-100',
       badgeBg: 'bg-gradient-to-r from-rose-300 via-pink-200 to-rose-300 text-rose-950',
@@ -870,7 +896,7 @@ function FloatingTopCard({
   return (
     <div className={`flex flex-col items-center group ${className}`}>
       {/* ─── 1. FLOATING CIRCULAR AVATAR WITH GLOW & BADGE ─── */}
-      <div className="relative mb-3 flex flex-col items-center">
+      <div className="relative mb-2.5 flex flex-col items-center">
         {/* Floating Halo Glow Circle */}
         <div
           className={`absolute -inset-2 rounded-full ${THEME_CONFIG.glowBg} blur-lg group-hover:scale-110 transition-transform duration-300 pointer-events-none`}
@@ -878,11 +904,8 @@ function FloatingTopCard({
 
         {/* Floating Crown above Avatar for Rank 1 */}
         {isChampion && (
-          <div className="mb-1.5 -mt-3 flex items-center gap-1 animate-bounce duration-1000">
-            <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 to-yellow-400 px-3 py-0.5 text-[11px] font-black text-amber-950 shadow-xs border border-amber-200">
-              <Crown className="h-3 w-3 fill-amber-700 text-amber-700" />
-              <span>{THEME_CONFIG.rankTitle}</span>
-            </span>
+          <div className="mb-1 -mt-2.5 flex items-center gap-1 animate-bounce duration-1000">
+            <Crown className="h-7 w-7 fill-amber-400 text-amber-500" />
           </div>
         )}
 
@@ -899,7 +922,7 @@ function FloatingTopCard({
 
           {/* Floating Circular Medal Badge */}
           <div
-            className={`absolute -bottom-1 -right-1 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full ${THEME_CONFIG.badgeBg} border-2 border-white font-black text-xs sm:text-sm shadow-md`}
+            className={`absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full ${THEME_CONFIG.badgeBg} border-2 border-white font-black text-base shadow-md`}
           >
             {THEME_CONFIG.medalIcon}
           </div>
@@ -909,43 +932,25 @@ function FloatingTopCard({
       {/* ─── 2. SOFT PASTEL CARD CONTENT ─── */}
       <div
         onClick={onSelect}
-        className={`w-full rounded-[28px] border ${THEME_CONFIG.cardBg} ${THEME_CONFIG.cardBorder} p-4 sm:p-5 text-center transition-all duration-200 hover:-translate-y-1 hover:shadow-lg cursor-pointer backdrop-blur-xs`}
+        className={`w-full rounded-2xl border ${THEME_CONFIG.cardBg} ${THEME_CONFIG.cardBorder} px-4 py-4 text-center transition-all duration-200 hover:-translate-y-1 hover:shadow-lg cursor-pointer backdrop-blur-xs`}
       >
-        {/* Generation Pill */}
-        <div>
-          <span
-            className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${THEME_CONFIG.genBadge}`}
-          >
-            {candidate.generation_label}
-          </span>
-        </div>
-
         {/* Name */}
         <h3
-          className={`font-black text-slate-800 leading-tight mt-1.5 truncate group-hover:text-violet-700 transition-colors ${
-            isChampion ? 'text-base sm:text-lg' : 'text-sm sm:text-base'
+          className={`font-black text-slate-800 leading-tight truncate group-hover:text-violet-700 transition-colors ${
+            isChampion ? 'text-lg sm:text-xl' : 'text-base sm:text-lg'
           }`}
+          title={candidate.name}
         >
           {candidate.name}
         </h3>
 
-        {candidate.studentId && (
-          <p className="text-[10px] font-mono text-slate-400 mt-0.5">
-            รหัส {candidate.studentId}
-          </p>
-        )}
-
-        <p className="text-xs text-slate-600 font-medium mt-1 truncate">{candidate.position}</p>
-        <p className="text-xs text-violet-600 font-bold truncate">{candidate.company}</p>
-
-        {/* Quote-style Bio Description */}
-        <p className="mt-2 text-xs text-slate-500 line-clamp-2 leading-relaxed bg-slate-50/80 rounded-xl p-2 text-left border border-slate-100 shadow-2xs">
-          "{candidate.description}"
+        <p className="text-sm text-slate-500 font-medium mt-0.5 truncate" title={candidate.position}>
+          {candidate.position}
         </p>
 
         {/* Progress Bar */}
-        <div className="mt-3 space-y-1">
-          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+        <div className="mt-3">
+          <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full bg-gradient-to-r ${THEME_CONFIG.voteBar} transition-all duration-700`}
               style={{ width: `${votePercent}%` }}
@@ -954,16 +959,14 @@ function FloatingTopCard({
         </div>
 
         {/* Vote Footer */}
-        <div className="mt-3.5 flex items-center justify-between border-t border-slate-100/90 pt-3">
-          <div className="text-left">
-            <span className="text-[10px] text-slate-400 font-medium">คะแนนโหวต</span>
-            <p className={`font-black ${isChampion ? 'text-lg sm:text-xl' : 'text-base'} ${THEME_CONFIG.voteCountColor}`}>
-              {candidate.votes || 0}
-            </p>
-          </div>
+        <div className="mt-3 flex items-center justify-between gap-1.5">
+          <p className={`font-black ${isChampion ? 'text-2xl' : 'text-xl'} ${THEME_CONFIG.voteCountColor}`}>
+            {candidate.votes || 0} <span className="text-sm font-medium text-slate-400">โหวต</span>
+          </p>
 
           <VoteButton
             size={isChampion ? 'lg' : 'sm'}
+            iconOnly
             voted={voted}
             isVoting={isVoting}
             animating={animating}
