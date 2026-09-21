@@ -1,18 +1,25 @@
 import { galleryDbService } from '@/modules/gallery/services/gallery.service';
+import { getCurrentUser } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   try {
-    const { mediaAssetId, userId } = await req.json();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'กรุณาเข้าสู่ระบบก่อนลบแท็ก' }, { status: 401 });
+    }
 
-    if (!mediaAssetId || !userId) {
+    const { mediaAssetId } = await req.json();
+
+    if (!mediaAssetId) {
       return NextResponse.json(
-        { success: false, error: 'ข้อมูลไม่ครบถ้วน (ต้องการ mediaAssetId, userId)' },
+        { success: false, error: 'ข้อมูลไม่ครบถ้วน (ต้องการ mediaAssetId)' },
         { status: 400 }
       );
     }
 
-    const removed = await galleryDbService.removeUserPhotoTag(Number(mediaAssetId), Number(userId));
+    // ลบแท็กของตัวเองเท่านั้น — ใช้ user.id จาก session เสมอ ห้ามเชื่อ userId ที่ client ส่งมา
+    const removed = await galleryDbService.removeUserPhotoTag(Number(mediaAssetId), user.id);
 
     if (!removed) {
       return NextResponse.json(

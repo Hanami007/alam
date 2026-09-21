@@ -110,36 +110,21 @@ export async function deleteSession(sessionId: string): Promise<void> {
   await pool.query(`DELETE FROM sessions WHERE id = $1`, [sessionId]);
 }
 
-/** ดึง Current User ปัจจุบันจาก Cookie หรือดึงบัญชีศิษย์เก่าเริ่มต้นจาก Database */
+/**
+ * ดึง Current User ปัจจุบันจาก Session Cookie เท่านั้น
+ *
+ * เดิมฟังก์ชันนี้มี fallback ที่ดึงบัญชีศิษย์เก่าคนแรกจาก DB มาให้ใช้แทนเมื่อ session
+ * ไม่ถูกต้อง/ไม่พบ (เพื่อให้ "ใช้งานได้ทันที") แต่นั่นคือช่องโหว่ auth bypass ร้ายแรง:
+ * แค่ตั้ง cookie session_id เป็นค่าอะไรก็ได้ (ที่ middleware เช็คแค่ว่ามี cookie อยู่
+ * ไม่ได้ตรวจว่า valid) ก็จะได้สิทธิ์เป็นบัญชีจริงของคนอื่นทันทีโดยไม่ต้องใส่รหัสผ่าน
+ * ห้ามใส่ fallback แบบนี้กลับเข้ามาอีก — ถ้าไม่มี session ที่ถูกต้องจริง ต้อง return null เสมอ
+ */
 export async function getCurrentUser(): Promise<UserSession | null> {
   try {
     const cookieStore = await cookies();
     const sessionId = cookieStore.get('session_id')?.value;
-    if (sessionId) {
-      const user = await getSessionUser(sessionId);
-      if (user) return user;
-    }
-
-    // หากยังไม่ได้ล็อกอิน ให้ดึงบัญชีผู้ใช้จริงจาก Database (เริ่มต้นเป็นศิษย์เก่า) เพื่อให้ระบบทำงานได้ทันที
-    const { rows } = await pool.query(
-      `SELECT u.id, u.student_id, u.email, u.name, u.role, u.status, u.student_status,
-              u.total_points, u.avatar_url, u.company, u.position, u.bio, u.is_available_for_mentorship,
-              u.show_hometown_on_map, u.show_workplace_on_map,
-              gen.label as generation, prov.label as province, ct.label as career_type
-       FROM users u
-       LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
-       LEFT JOIN lookup_options prov ON prov.id = u.province_option_id
-       LEFT JOIN lookup_options ct ON ct.id = u.career_option_id
-       WHERE u.role = 'alumni' AND u.status = 'approved'
-       ORDER BY u.id ASC
-       LIMIT 1`
-    );
-
-    if (rows.length > 0) {
-      return rows[0] as UserSession;
-    }
-
-    return null;
+    if (!sessionId) return null;
+    return await getSessionUser(sessionId);
   } catch {
     return null;
   }

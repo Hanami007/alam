@@ -13,16 +13,14 @@ export async function PUT(req: Request) {
 async function handlePrivacyUpdate(req: Request) {
   try {
     const user = await getCurrentUser();
-    const body = await req.json();
-    const userId = body.userId ? Number(body.userId) : user?.id;
-
-    if (!userId) {
+    if (!user) {
       return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
     }
-
+    const body = await req.json();
+    // ใช้ user.id จาก session เสมอ — ห้ามเชื่อ userId ที่ client ส่งมา (กันแก้ privacy ของคนอื่น)
     const { showHometownOnMap = false, showWorkplaceOnMap = false } = body;
 
-    const result = await userDbService.updatePrivacySettings(userId, {
+    const result = await userDbService.updatePrivacySettings(user.id, {
       showHometownOnMap: Boolean(showHometownOnMap),
       showWorkplaceOnMap: Boolean(showWorkplaceOnMap),
     });

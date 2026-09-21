@@ -5,7 +5,10 @@ import { pool } from '@/lib/db';
 export async function POST(req: Request) {
   try {
     const user = await getCurrentUser();
-    // Allow admin announcement
+    if (!user || user.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const body = await req.json();
     const { title, body: contentText, category, imageUrl, pinned } = body;
 
@@ -13,7 +16,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'กรุณาระบุหัวข้อประกาศ' }, { status: 400 });
     }
 
-    const adminUserId = user?.id || 1;
+    const adminUserId = user.id;
 
     const { rows: insertedPost } = await pool.query(
       `INSERT INTO posts (admin_id, title, content, category, status, pinned, published_at, created_at)

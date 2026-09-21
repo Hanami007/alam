@@ -6,10 +6,18 @@ import { NextResponse } from 'next/server';
 export async function POST(req: Request) {
   try {
     const user = await getCurrentUser();
-    const body = await req.json();
-    const { requestedBy, title, content, category, postType, poll } = body;
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'กรุณาเข้าสู่ระบบก่อนสร้างโพสต์' },
+        { status: 401 }
+      );
+    }
+    // ใช้ user.id จาก session เท่านั้น — ห้ามเชื่อ requestedBy ที่ client ส่งมา
+    // (ป้องกันการโพสต์แอบอ้างเป็นบัญชีคนอื่นโดยไม่ต้องยืนยันตัวตน)
+    const requesterId = user.id;
 
-    const requesterId = user?.id || (requestedBy ? Number(requestedBy) : 1);
+    const body = await req.json();
+    const { title, content, category, postType, poll } = body;
 
     if (!title || !title.trim()) {
       return NextResponse.json(

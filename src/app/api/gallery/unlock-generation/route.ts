@@ -5,8 +5,10 @@ import { NextResponse } from 'next/server';
 export async function POST(req: Request) {
   try {
     const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบก่อนปลดล็อกทำเนียบรุ่น' }, { status: 401 });
+    }
     const body = await req.json();
-    const userId = body.userId ? Number(body.userId) : user?.id || 1;
     const generation = body.generation;
     const answer = body.answer || '';
 
@@ -14,7 +16,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'กรุณาระบุรุ่นที่ต้องการปลดล็อก' }, { status: 400 });
     }
 
-    const result = await galleryDbService.unlockGeneration(userId, generation, answer);
+    // ใช้ user.id จาก session เสมอ — ห้ามเชื่อ userId ที่ client ส่งมา (กันปลดล็อก/รับแต้มแทนคนอื่น)
+    const result = await galleryDbService.unlockGeneration(user.id, generation, answer);
 
     return NextResponse.json({
       success: true,
