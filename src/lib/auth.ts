@@ -54,13 +54,10 @@ export async function authenticateUser(identifier: string, password: string): Pr
   if (rows.length === 0) return null;
   const user = rows[0];
 
+  // บัญชีที่ยังไม่มี password_hash (เช่น รายการที่แอดมินสร้างผ่านหน้าเก็บข้อมูลรุ่น)
+  // ล็อกอินไม่ได้จนกว่าจะมีการตั้งรหัสผ่านจริงให้ — ห้ามใส่รหัสผ่านเริ่มต้นสาธารณะ (เช่น '123456')
+  // กลับเข้ามาอีก เพราะเป็นช่องโหว่ที่ทำให้ใครก็ล็อกอินเป็นบัญชีเหล่านี้ได้
   if (!user.password_hash) {
-    // ถ้ายังไม่มี password_hash ให้ลองเทียบ default '123456'
-    if (password === '123456') {
-      const newHash = await hashPassword('123456');
-      await pool.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [newHash, user.id]);
-      return user as UserSession;
-    }
     return null;
   }
 
