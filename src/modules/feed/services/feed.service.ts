@@ -333,6 +333,32 @@ export class FeedDbService {
   /**
    * สมาชิกส่งคำขอโพสต์ (รองรับโพลแบบสำรวจ) — เผยแพร่ทันที
    */
+  /**
+   * จำกัดจำนวนโพสต์ที่ user คนหนึ่งสร้างได้ภายในช่วงเวลาสั้นๆ
+   * ป้องกันการกดส่งซ้ำๆ เร็วๆ (double-click / spam-click) สร้างโพสต์ซ้ำจำนวนมากในครั้งเดียว
+   */
+  async assertNotRateLimited(userId: number): Promise<void> {
+    const { rows } = await pool.query(
+      `SELECT COUNT(*)::int AS recent_count
+       FROM posts
+       WHERE requested_by = $1 AND created_at > NOW() - INTERVAL '15 seconds'`,
+      [userId]
+    );
+    if ((rows[0]?.recent_count ?? 0) > 0) {
+      throw new Error('กรุณารอสักครู่ก่อนสร้างโพสต์ใหม่ (ป้องกันการส่งซ้ำ)');
+    }
+
+    const { rows: hourlyRows } = await pool.query(
+      `SELECT COUNT(*)::int AS hourly_count
+       FROM posts
+       WHERE requested_by = $1 AND created_at > NOW() - INTERVAL '1 hour'`,
+      [userId]
+    );
+    if ((hourlyRows[0]?.hourly_count ?? 0) >= 10) {
+      throw new Error('คุณสร้างโพสต์ครบจำนวนสูงสุดต่อชั่วโมงแล้ว กรุณาลองใหม่ภายหลัง');
+    }
+  }
+
   async submitPostRequest(
     requestedBy: number,
     title: string,
@@ -341,6 +367,8 @@ export class FeedDbService {
     postType: 'normal' | 'poll' = 'normal',
     pollData?: { question: string; options: string[]; pointsPerVote?: number }
   ) {
+    await this.assertNotRateLimited(requestedBy);
+
     let validUserId = requestedBy;
     const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [requestedBy]);
     if (userCheck.rows.length === 0) {

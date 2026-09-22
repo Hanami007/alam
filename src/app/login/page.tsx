@@ -8,12 +8,9 @@ import {
   Lock,
   User,
   ArrowRight,
-  ShieldCheck,
   AlertCircle,
   Eye,
   EyeOff,
-  Sparkles,
-  Users,
 } from 'lucide-react';
 
 function LoginForm() {
@@ -59,12 +56,6 @@ function LoginForm() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function handleQuickFill(userIdentifier: string, userPass = '123456') {
-    setIdentifier(userIdentifier);
-    setPassword(userPass);
-    setError(null);
   }
 
   return (
@@ -156,42 +147,6 @@ function LoginForm() {
             สมัครสมาชิกใหม่ที่นี่
           </Link>
         </p>
-      </div>
-
-      {/* Quick Login Helper Box */}
-      <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100 space-y-2.5">
-        <p className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-          <Sparkles className="h-3.5 w-3.5 text-amber-500" /> บัญชีทดสอบด่วน (รหัสผ่าน: 123456)
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-          <button
-            type="button"
-            onClick={() => handleQuickFill('admin@uni.ac.th')}
-            className="flex items-center gap-2 rounded-xl bg-white p-2 text-left border border-slate-200/80 hover:border-indigo-300 hover:bg-indigo-50/50 transition-all cursor-pointer"
-          >
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 text-xs font-bold shrink-0">
-              <ShieldCheck className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">แอดมิน (Admin)</p>
-              <p className="text-xs text-slate-500 truncate">admin@uni.ac.th</p>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleQuickFill('6604101313')}
-            className="flex items-center gap-2 rounded-xl bg-white p-2 text-left border border-slate-200/80 hover:border-indigo-300 hover:bg-indigo-50/50 transition-all cursor-pointer"
-          >
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 text-xs font-bold shrink-0">
-              <Users className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">จักรพรรดิ์ (ศิษย์เก่า รุ่น 29)</p>
-              <p className="text-xs text-slate-500 truncate">รหัส 6604101313</p>
-            </div>
-          </button>
-        </div>
       </div>
     </div>
   );

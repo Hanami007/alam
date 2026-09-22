@@ -12,7 +12,11 @@ export async function POST(req: Request) {
     }
 
     const currentUser = await getCurrentUser();
-    const voterId = body.voterId || currentUser?.id || 2;
+    if (!currentUser) {
+      return NextResponse.json({ success: false, error: 'กรุณาเข้าสู่ระบบก่อนโหวต' }, { status: 401 });
+    }
+    // ใช้ currentUser.id จาก session เสมอ — ห้ามเชื่อ voterId ที่ client ส่งมา (กันโหวตแทนคนอื่น)
+    const voterId = currentUser.id;
 
     // Check if user has an active campaign
     const { rows: campaigns } = await pool.query(
