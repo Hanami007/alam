@@ -141,7 +141,7 @@ export const api = {
   // User Profile & Settings API
   user: {
     getProfile: () => fetchJson<any>('/api/user/profile'),
-    updateProfile: (data: { name?: string; position?: string; company?: string; bio?: string; avatarUrl?: string; generation?: string; isAvailableForMentorship?: boolean }) =>
+    updateProfile: (data: { name?: string; position?: string; company?: string; bio?: string; avatarUrl?: string; generation?: string; isAvailableForMentorship?: boolean; birthDate?: string }) =>
       fetchJson<any>('/api/user/profile', {
         method: 'PUT',
         body: JSON.stringify(data),
@@ -206,5 +206,21 @@ export const api = {
       fetchJson<any>(`/api/admin/keywords?id=${id}`, {
         method: 'DELETE',
       }),
+    // Wall Widgets Management (เซียมซี — วันเกิดดึงจาก birth_date จริง, อันดับกิจกรรมดึงจาก Top 3 Hall of Fame จริง ไม่ได้จัดการที่นี่)
+    getWallWidgets: () =>
+      fetchJson<{ fortunes: any[] }>('/api/admin/wall-widgets'),
+    addWallFortune: (message: string) =>
+      fetchJson<any>('/api/admin/wall-widgets', {
+        method: 'POST',
+        body: JSON.stringify({ type: 'fortune', message }),
+      }),
+    removeWallFortune: (id: number) =>
+      fetchJson<any>(`/api/admin/wall-widgets?type=fortune&id=${id}`, { method: 'DELETE' }),
+  },
+
+  // Public Wall Widgets (หน้าฟีด/วอลล์)
+  wall: {
+    getWidgets: () =>
+      fetchJson<{ fortunes: any[]; birthdays: any[]; leaderboard: any[] }>('/api/wall-widgets'),
   },
 };

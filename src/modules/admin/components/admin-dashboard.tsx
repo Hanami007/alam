@@ -21,6 +21,7 @@ import { PostRequestQueue } from './post-request-queue';
 import { AdminAnnouncementForm } from './admin-announcement-form';
 import { KeywordFilterManager } from './keyword-filter-manager';
 import { MemberList, type AdminMember } from './member-list';
+import { WallWidgetManager } from './wall-widget-manager';
 import { api } from '@/lib/api-client';
 
 interface AdminDashboardProps {
@@ -28,7 +29,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'posts' | 'announcement' | 'users' | 'members' | 'keywords'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'announcement' | 'users' | 'members' | 'widgets' | 'keywords'>('posts');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>({
     totalAlumni: 0,
@@ -225,6 +226,17 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
           <span>รายชื่อสมาชิกทั้งหมด ({members.length})</span>
         </button>
         <button
+          onClick={() => setActiveTab('widgets')}
+          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
+            activeTab === 'widgets'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <Sparkles className="h-4 w-4" />
+          <span>จัดการวิดเจ็ตหน้าวอลล์</span>
+        </button>
+        <button
           onClick={() => setActiveTab('keywords')}
           className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
             activeTab === 'keywords'
@@ -252,6 +264,10 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
 
       {activeTab === 'members' && (
         <MemberList members={members} onDelete={handleDeleteMember} />
+      )}
+
+      {activeTab === 'widgets' && (
+        <WallWidgetManager />
       )}
 
       {activeTab === 'users' && (

@@ -69,6 +69,7 @@ export default function RegisterPage() {
   const [provinceOptionId, setProvinceOptionId] = useState<string>('');
   const [admissionYear, setAdmissionYear] = useState<string>('2566');
   const [autoMatchedGen, setAutoMatchedGen] = useState<any | null>(null);
+  const [birthDate, setBirthDate] = useState<string>('');
 
   // Alumni Specific Fields
   const [company, setCompany] = useState('');
@@ -284,6 +285,7 @@ export default function RegisterPage() {
           bio: bio.trim(),
           avatarUrl: avatarUrl.trim(),
           isAvailableForMentorship,
+          birthDate: birthDate || undefined,
           // Consents (4 ตัวเลือกเดิมรวมเป็น 1 ตัวเลือก ส่งครบถ้วนเข้าสู่ระบบ)
           consentPdpa,
           consentTerms,
@@ -516,6 +518,20 @@ export default function RegisterPage() {
                         placeholder="เลือกจังหวัด หรือ ประเทศภูมิลำเนา"
                       />
                     </div>
+                  </div>
+
+                  {/* Birth Date */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                      <span>วันเกิด</span>
+                      <span className="text-[10px] text-slate-400">ใช้แสดงในวิดเจ็ต &ldquo;สุขสันต์วันเกิด&rdquo; หน้าฟีดเมื่อถึงวันจริง</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={birthDate}
+                      onChange={(e) => setBirthDate(e.target.value)}
+                      className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-indigo-500 focus:bg-slate-950 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all [color-scheme:dark]"
+                    />
                   </div>
 
                   {/* Password & Confirm */}

@@ -20,6 +20,7 @@ export interface UserProfileData {
   showHometownOnMap: boolean;
   showWorkplaceOnMap: boolean;
   isAvailableForMentorship: boolean;
+  birthDate: string | null;
   createdAt: string;
 }
 
@@ -40,7 +41,7 @@ export class UserDbService {
       SELECT 
         u.id, u.student_id, u.email, u.name, u.role, u.status, u.student_status,
         u.total_points, u.avatar_url, u.company, u.position, u.bio,
-        u.show_hometown_on_map, u.show_workplace_on_map, u.is_available_for_mentorship, u.created_at,
+        u.show_hometown_on_map, u.show_workplace_on_map, u.is_available_for_mentorship, u.birth_date, u.created_at,
         gen.label as generation,
         prov.label as province,
         work_prov.label as work_province,
@@ -76,6 +77,7 @@ export class UserDbService {
       showHometownOnMap: r.show_hometown_on_map,
       showWorkplaceOnMap: r.show_workplace_on_map,
       isAvailableForMentorship: Boolean(r.is_available_for_mentorship),
+      birthDate: r.birth_date,
       createdAt: r.created_at,
     };
   }
@@ -140,6 +142,7 @@ export class UserDbService {
       avatarUrl?: string;
       generation?: string;
       isAvailableForMentorship?: boolean;
+      birthDate?: string;
     }
   ) {
     const updates: string[] = [];
@@ -165,6 +168,10 @@ export class UserDbService {
     if (data.avatarUrl !== undefined) {
       updates.push(`avatar_url = $${idx++}`);
       values.push(data.avatarUrl);
+    }
+    if (data.birthDate !== undefined) {
+      updates.push(`birth_date = $${idx++}`);
+      values.push(data.birthDate || null);
     }
     const mentorshipVal = data.isAvailableForMentorship !== undefined ? data.isAvailableForMentorship : (data as any).is_available_for_mentorship;
     if (mentorshipVal !== undefined) {

@@ -12,6 +12,11 @@ export default function FeedPage() {
   const [stats, setStats] = useState<any>(null);
   const [latestPhotos, setLatestPhotos] = useState<any[]>([]);
   const [featuredAlumni, setFeaturedAlumni] = useState<any[]>([]);
+  const [wallWidgets, setWallWidgets] = useState<{ fortunes: any[]; birthdays: any[]; leaderboard: any[] }>({
+    fortunes: [],
+    birthdays: [],
+    leaderboard: [],
+  });
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
@@ -19,12 +24,13 @@ export default function FeedPage() {
       try {
         setLoading(true);
         // Fetch data via Browser HTTP Client from Backend API Gateway
-        const [meRes, feedRes, photosRes, alumniRes, overviewRes] = await Promise.allSettled([
+        const [meRes, feedRes, photosRes, alumniRes, overviewRes, wallRes] = await Promise.allSettled([
           api.auth.me(),
           api.feed.getPosts(),
           api.gallery.getItems(),
           api.alumni.getList(),
           api.admin.getOverview(),
+          api.wall.getWidgets(),
         ]);
 
         if (meRes.status === 'fulfilled' && meRes.value?.user) {
@@ -48,6 +54,14 @@ export default function FeedPage() {
 
         if (overviewRes.status === 'fulfilled') {
           setStats(overviewRes.value);
+        }
+
+        if (wallRes.status === 'fulfilled' && wallRes.value) {
+          setWallWidgets({
+            fortunes: wallRes.value.fortunes || [],
+            birthdays: wallRes.value.birthdays || [],
+            leaderboard: wallRes.value.leaderboard || [],
+          });
         }
       } catch (err) {
         console.error('[FeedPage] Error loading feed data:', err);
@@ -84,6 +98,9 @@ export default function FeedPage() {
           stats={stats}
           latestPhotos={latestPhotos}
           featuredAlumni={featuredAlumni}
+          fortunes={wallWidgets.fortunes}
+          birthdays={wallWidgets.birthdays}
+          leaderboard={wallWidgets.leaderboard}
           currentUserId={currentUser?.id || 1}
           currentUserRole={currentUser?.role || 'admin'}
           currentUserName={currentUser?.name || 'ผู้ดูแลระบบ'}

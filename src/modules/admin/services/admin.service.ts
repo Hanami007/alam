@@ -434,6 +434,75 @@ export class AdminDbService {
   }
 
   // ---------------------------------------------------------------
+  // Wall Widgets (เซียมซี / วันเกิดประจำเดือน / อันดับกิจกรรม)
+  // ใช้จริงใน /api/admin/wall-widgets (แอดมินจัดการ) และ /api/wall-widgets (หน้าวอลล์ดึงไปแสดง)
+  // หมายเหตุ: วันเกิด ดึงจาก users.birth_date จริง, อันดับกิจกรรม ดึงจาก Top 3 Hall of Fame จริง
+  // เหลือแค่ "เซียมซี" ที่ยังเป็นข้อความจัดการมือ เพราะไม่มีข้อมูลจริงในระบบให้ดึงมาแทน
+  // ---------------------------------------------------------------
+
+  /** สร้างตารางวิดเจ็ตหน้าวอลล์หากยังไม่มี (auto-migrate) */
+  private async ensureWallWidgetsTables() {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS wall_fortunes (
+        id         SERIAL PRIMARY KEY,
+        message    TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT now()
+      );
+    `);
+  }
+
+  /** ดึงข้อความเซียมซีทั้งหมด */
+  async getWallFortunes() {
+    await this.ensureWallWidgetsTables();
+    const { rows } = await pool.query(
+      `SELECT id, message, created_at FROM wall_fortunes ORDER BY created_at DESC`
+    );
+    return rows;
+  }
+
+  /** เพิ่มข้อความเซียมซีใหม่ */
+  async addWallFortune(message: string) {
+    await this.ensureWallWidgetsTables();
+    const { rows } = await pool.query(
+      `INSERT INTO wall_fortunes (message) VALUES ($1) RETURNING *`,
+      [message.trim()]
+    );
+    return rows[0];
+  }
+
+  /** ลบข้อความเซียมซี */
+  async removeWallFortune(id: number) {
+    await this.ensureWallWidgetsTables();
+    const { rows } = await pool.query(`DELETE FROM wall_fortunes WHERE id = $1 RETURNING *`, [id]);
+    return rows[0] ?? null;
+  }
+
+  /**
+   * ดึงรายชื่อสมาชิกที่วันนี้ตรงกับวันเกิดจริง (เดือน+วันของ birth_date ตรงกับวันนี้)
+   * มาจากข้อมูลที่สมาชิกกรอกตอนสมัคร หรือแก้ไขย้อนหลังในหน้าทำเนียบรุ่น — ไม่ใช่ข้อมูลจำลอง
+   */
+  async getTodaysBirthdays() {
+    const { rows } = await pool.query(`
+      SELECT u.id, u.name, u.birth_date, gen.label as generation
+      FROM users u
+      LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
+      WHERE u.status = 'approved'
+        AND u.birth_date IS NOT NULL
+        AND EXTRACT(MONTH FROM u.birth_date) = EXTRACT(MONTH FROM CURRENT_DATE)
+        AND EXTRACT(DAY FROM u.birth_date) = EXTRACT(DAY FROM CURRENT_DATE)
+      ORDER BY u.name
+    `);
+
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      generation: r.generation,
+      birthLabel: new Date(r.birth_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }),
+      avatar: r.name ? String(r.name).trim().slice(0, 2) : null,
+    }));
+  }
+
+  // ---------------------------------------------------------------
   // ฟังก์ชันด้านล่างย้ายมาจาก src/lib/db.ts (god-file) — ปัจจุบันไม่มี route ใดเรียกใช้
   // คงไว้เพื่อรักษาพฤติกรรมเดิมทั้งหมด ไม่ได้ผูกกับ route ใดในตอนนี้
   // ---------------------------------------------------------------
