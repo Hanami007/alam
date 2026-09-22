@@ -13,6 +13,7 @@ import {
   Star,
   CalendarDays,
   ShieldCheck,
+  Trash2,
 } from 'lucide-react';
 
 export interface AdminMember {
@@ -35,6 +36,7 @@ export interface AdminMember {
 
 interface MemberListProps {
   members: AdminMember[];
+  onDelete?: (userId: number) => Promise<void> | void;
 }
 
 type StatusFilter = 'all' | 'approved' | 'pending' | 'rejected';
@@ -52,11 +54,35 @@ const STATUS_LABEL: Record<string, string> = {
   rejected: 'ปฏิเสธแล้ว',
 };
 
-export function MemberList({ members }: MemberListProps) {
+export function MemberList({ members, onDelete }: MemberListProps) {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
   const [selectedMember, setSelectedMember] = useState<AdminMember | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  function closeModal() {
+    setSelectedMember(null);
+    setConfirmingDelete(false);
+    setDeleteError('');
+  }
+
+  async function handleConfirmDelete() {
+    if (!selectedMember || !onDelete) return;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await onDelete(selectedMember.id);
+      setSelectedMember(null);
+      setConfirmingDelete(false);
+    } catch (err: any) {
+      setDeleteError(err?.message || 'เกิดข้อผิดพลาดในการลบสมาชิก');
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -251,7 +277,7 @@ export function MemberList({ members }: MemberListProps) {
       {/* Member Detail Modal */}
       {selectedMember && (
         <div
-          onClick={() => setSelectedMember(null)}
+          onClick={closeModal}
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-fade-in"
         >
           <div
@@ -259,7 +285,7 @@ export function MemberList({ members }: MemberListProps) {
             className="relative w-full max-w-md bg-white p-6 shadow-2xl rounded-[32px] border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto animate-scale-up"
           >
             <button
-              onClick={() => setSelectedMember(null)}
+              onClick={closeModal}
               className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors cursor-pointer"
             >
               <X className="h-4 w-4" />
@@ -404,6 +430,49 @@ export function MemberList({ members }: MemberListProps) {
                 </div>
               </div>
             </div>
+
+            {onDelete && (
+              <div className="pt-1">
+                {!confirmingDelete ? (
+                  <button
+                    onClick={() => setConfirmingDelete(true)}
+                    className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-2xl border border-rose-200 bg-rose-50 text-rose-700 font-extrabold text-sm hover:bg-rose-100 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    ลบสมาชิกนี้
+                  </button>
+                ) : (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3.5 space-y-2.5">
+                    <p className="text-xs font-bold text-rose-700">
+                      ยืนยันการลบ &ldquo;{selectedMember.name}&rdquo;? ระบบจะลบข้อมูลทั้งหมดของสมาชิกคนนี้
+                      (โพสต์ คอมเมนต์ โหวต รูปภาพ ฯลฯ) การกระทำนี้ไม่สามารถย้อนกลับได้
+                    </p>
+                    {deleteError && (
+                      <p className="text-[11px] font-semibold text-rose-600">{deleteError}</p>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleConfirmDelete}
+                        disabled={deleting}
+                        className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
+                      >
+                        {deleting ? 'กำลังลบ...' : 'ยืนยันลบ'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setConfirmingDelete(false);
+                          setDeleteError('');
+                        }}
+                        disabled={deleting}
+                        className="flex-1 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 font-extrabold text-xs hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
+                      >
+                        ยกเลิก
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

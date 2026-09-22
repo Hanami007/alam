@@ -171,6 +171,65 @@ export class AdminDbService {
   }
 
   /**
+   * ลบสมาชิกออกจากระบบ พร้อมล้างข้อมูลทั้งหมดที่ผูกกับสมาชิกคนนั้น
+   * (โพสต์ที่ขอลง, คอมเมนต์/ปฏิกิริยา, โหวตโพล, การเป็นผู้สมัคร/โหวต HOF,
+   *  รูปที่อัปโหลด, การถูกแท็ก/แท็กผู้อื่นในรูป, ประวัติปลดล็อกรูป)
+   * ส่วนข้อมูลของ "คนอื่น" ที่แค่มีสมาชิกคนนี้เป็นแอดมินผู้อนุมัติ จะแค่ล้างอ้างอิง (set null)
+   * ไม่ลบข้อมูลของคนอื่นทิ้งไปด้วย
+   */
+  async deleteUser(userId: number): Promise<{ success: boolean; error?: string }> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // ล้างอ้างอิงที่สมาชิกคนนี้เป็นเพียง "ผู้ดำเนินการ" ให้คนอื่น — ไม่ลบข้อมูลของคนอื่น
+      await client.query(`UPDATE posts SET admin_id = NULL WHERE admin_id = $1`, [userId]);
+      await client.query(`UPDATE user_verifications SET admin_id = NULL WHERE admin_id = $1`, [userId]);
+
+      // ลบโพสต์ที่สมาชิกคนนี้ร้องขอเอง (ลบโพลของโพสต์ก่อน เพราะไม่มี cascade จาก posts)
+      await client.query(
+        `DELETE FROM polls WHERE post_id IN (SELECT id FROM posts WHERE requested_by = $1)`,
+        [userId]
+      );
+      await client.query(`DELETE FROM posts WHERE requested_by = $1`, [userId]);
+
+      // ลบกิจกรรมของสมาชิกคนนี้บนโพสต์/โพลของคนอื่น
+      await client.query(`DELETE FROM post_interactions WHERE user_id = $1`, [userId]);
+      await client.query(`DELETE FROM poll_votes WHERE user_id = $1`, [userId]);
+      await client.query(`DELETE FROM hof_votes WHERE voter_id = $1`, [userId]);
+
+      // ลบการเป็นผู้สมัคร HOF ของสมาชิกคนนี้ (cascade ลบโหวตที่ตนเองได้รับไปด้วย)
+      await client.query(`DELETE FROM hof_candidates WHERE user_id = $1`, [userId]);
+
+      // ลบรูปที่อัปโหลด (cascade ลบแท็ก/ประวัติปลดล็อกของรูปนั้นไปด้วย) และแท็กที่เกี่ยวข้องกับตัวเอง
+      await client.query(`DELETE FROM media_assets WHERE uploaded_by = $1`, [userId]);
+      await client.query(
+        `DELETE FROM photo_tags WHERE tagged_user_id = $1 OR tagged_by = $1`,
+        [userId]
+      );
+      await client.query(`DELETE FROM photo_view_verifications WHERE user_id = $1`, [userId]);
+
+      // ลบประวัติการยืนยันตัวตนของสมาชิกคนนี้เอง
+      await client.query(`DELETE FROM user_verifications WHERE user_id = $1`, [userId]);
+
+      const { rowCount } = await client.query(`DELETE FROM users WHERE id = $1`, [userId]);
+      if (!rowCount) {
+        await client.query('ROLLBACK');
+        return { success: false, error: 'ไม่พบสมาชิกที่ต้องการลบ' };
+      }
+
+      await client.query('COMMIT');
+      return { success: true };
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      console.error('[AdminDbService] deleteUser error:', err);
+      return { success: false, error: 'เกิดข้อผิดพลาดในการลบสมาชิก' };
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * อนุมัติ หรือ ปฏิเสธผู้ใช้งาน
    */
   async decideUserVerification(

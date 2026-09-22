@@ -118,6 +118,11 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
     };
   }, []);
 
+  async function handleDeleteMember(userId: number) {
+    await api.admin.deleteUser(userId);
+    setMembers((prev) => prev.filter((m) => m.id !== userId));
+  }
+
   async function handleUserVerification(userId: number, decision: 'approved' | 'rejected') {
     setActionLoadingId(userId);
     try {
@@ -246,7 +251,7 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
       )}
 
       {activeTab === 'members' && (
-        <MemberList members={members} />
+        <MemberList members={members} onDelete={handleDeleteMember} />
       )}
 
       {activeTab === 'users' && (
