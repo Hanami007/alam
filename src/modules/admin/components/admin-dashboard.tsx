@@ -20,6 +20,7 @@ import {
 import { PostRequestQueue } from './post-request-queue';
 import { AdminAnnouncementForm } from './admin-announcement-form';
 import { KeywordFilterManager } from './keyword-filter-manager';
+import { MemberList, type AdminMember } from './member-list';
 import { api } from '@/lib/api-client';
 
 interface AdminDashboardProps {
@@ -27,7 +28,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'posts' | 'announcement' | 'users' | 'keywords'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'announcement' | 'users' | 'members' | 'keywords'>('posts');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>({
     totalAlumni: 0,
@@ -38,15 +39,17 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
   });
   const [pendingUsers, setPendingUsers] = useState<any[]>([]);
   const [postRequests, setPostRequests] = useState<any[]>([]);
+  const [members, setMembers] = useState<AdminMember[]>([]);
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
 
   async function loadAdminData(showLoading = false) {
     if (showLoading) setLoading(true);
     try {
-      const [statsRes, usersRes, postsRes] = await Promise.allSettled([
+      const [statsRes, usersRes, postsRes, membersRes] = await Promise.allSettled([
         api.admin.getOverview(),
         api.admin.getVerifications(),
         api.admin.getPostRequests(),
+        api.admin.getAllUsers(),
       ]);
 
       if (statsRes.status === 'fulfilled' && statsRes.value) {
@@ -67,6 +70,9 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
           poll: p.poll,
         })));
       }
+      if (membersRes.status === 'fulfilled' && Array.isArray(membersRes.value)) {
+        setMembers(membersRes.value);
+      }
     } catch (err) {
       console.error('[AdminDashboard] Error loading data:', err);
     } finally {
@@ -80,7 +86,8 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
       api.admin.getOverview(),
       api.admin.getVerifications(),
       api.admin.getPostRequests(),
-    ]).then(([statsRes, usersRes, postsRes]) => {
+      api.admin.getAllUsers(),
+    ]).then(([statsRes, usersRes, postsRes, membersRes]) => {
       if (!isMounted) return;
       if (statsRes.status === 'fulfilled' && statsRes.value) {
         setStats(statsRes.value);
@@ -99,6 +106,9 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
           created_at: p.createdAt,
           poll: p.poll,
         })));
+      }
+      if (membersRes.status === 'fulfilled' && Array.isArray(membersRes.value)) {
+        setMembers(membersRes.value);
       }
       setLoading(false);
     });
@@ -199,6 +209,17 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
           <span>อนุมัติสมาชิกศิษย์เก่า ({pendingUsers.length})</span>
         </button>
         <button
+          onClick={() => setActiveTab('members')}
+          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
+            activeTab === 'members'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <Users className="h-4 w-4" />
+          <span>รายชื่อสมาชิกทั้งหมด ({members.length})</span>
+        </button>
+        <button
           onClick={() => setActiveTab('keywords')}
           className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
             activeTab === 'keywords'
@@ -222,6 +243,10 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
 
       {activeTab === 'keywords' && (
         <KeywordFilterManager />
+      )}
+
+      {activeTab === 'members' && (
+        <MemberList members={members} />
       )}
 
       {activeTab === 'users' && (

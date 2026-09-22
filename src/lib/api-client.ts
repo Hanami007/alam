@@ -158,6 +158,7 @@ export const api = {
   admin: {
     getOverview: () => fetchJson<any>('/api/admin/overview'),
     getVerifications: () => fetchJson<any[]>('/api/admin/verifications'),
+    getAllUsers: () => fetchJson<any[]>('/api/admin/users'),
     verifyUser: (userId: number, decision: 'approved' | 'rejected', remark?: string) =>
       fetchJson<any>('/api/admin/verify', {
         method: 'POST',

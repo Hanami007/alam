@@ -19,6 +19,24 @@ export interface PendingUserVerification {
   createdAt: string;
 }
 
+export interface AdminMemberSummary {
+  id: number;
+  studentId: string | null;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  studentStatus: string | null;
+  generation: string | null;
+  province: string | null;
+  careerType: string | null;
+  company: string | null;
+  position: string | null;
+  avatarUrl: string | null;
+  totalPoints: number;
+  createdAt: string;
+}
+
 export interface PendingPostRequest {
   id: number;
   authorId: number;
@@ -108,6 +126,46 @@ export class AdminDbService {
       }));
     } catch (err) {
       console.error('[AdminDbService] getPendingVerifications error:', err);
+      return [];
+    }
+  }
+
+  /**
+   * ดึงรายชื่อสมาชิกทั้งหมดในระบบ (ทุกสถานะ) สำหรับหน้าจัดการระบบของแอดมิน
+   */
+  async getAllUsers(): Promise<AdminMemberSummary[]> {
+    try {
+      const { rows } = await pool.query(`
+        SELECT
+          u.id, u.student_id, u.name, u.email, u.role, u.status, u.student_status,
+          u.company, u.position, u.avatar_url, u.total_points, u.created_at,
+          gen.label as generation, prov.label as province, ct.label as career_type
+        FROM users u
+        LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
+        LEFT JOIN lookup_options prov ON prov.id = u.province_option_id
+        LEFT JOIN lookup_options ct ON ct.id = u.career_option_id
+        ORDER BY u.created_at DESC
+      `);
+
+      return rows.map((r) => ({
+        id: r.id,
+        studentId: r.student_id,
+        name: r.name,
+        email: r.email,
+        role: r.role,
+        status: r.status,
+        studentStatus: r.student_status,
+        generation: r.generation,
+        province: r.province,
+        careerType: r.career_type,
+        company: r.company,
+        position: r.position,
+        avatarUrl: r.avatar_url,
+        totalPoints: r.total_points,
+        createdAt: r.created_at,
+      }));
+    } catch (err) {
+      console.error('[AdminDbService] getAllUsers error:', err);
       return [];
     }
   }
