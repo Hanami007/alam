@@ -400,6 +400,35 @@ export function FeedList({
           .catch(() => {});
       }
     } catch (err: any) {
+      // เดิม catch นี้แค่โชว์ toast error แต่ไม่ย้อน optimistic update ที่ทำไปก่อนหน้า —
+      // ถ้า fetch ล้มเหลว (เน็ตหลุด) โพลจะค้างสถานะ "โหวตแล้ว" ในหน้าจอ ทั้งที่ฝั่ง server
+      // ไม่มีการบันทึกโหวตจริง ต้องย้อน state กลับให้ตรงกับ DB เหมือน handleVote ใน
+      // hall-of-fame-grid.tsx
+      setFeedPosts((prev) =>
+        prev.map((post) => {
+          if (post.id !== postId || !post.poll) return post;
+          const revertedOptions = post.poll.options.map((opt) =>
+            opt.id === optionId
+              ? {
+                  ...opt,
+                  votes: Math.max((opt.votes ?? (opt as any).voteCount ?? 1) - 1, 0),
+                  voteCount: Math.max(((opt as any).voteCount ?? opt.votes ?? 1) - 1, 0),
+                }
+              : opt
+          );
+          return {
+            ...post,
+            poll: {
+              ...post.poll,
+              options: revertedOptions,
+              hasVoted: false,
+              userVotedOptionId: undefined,
+              votedUserIds: (post.poll.votedUserIds || []).filter((id) => id !== currentUserId),
+              userVotes: (post.poll.userVotes || []).filter((v) => v.user_id !== currentUserId),
+            },
+          };
+        })
+      );
       setDeleteToast({ message: err.message || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', type: 'error' });
       setTimeout(() => setDeleteToast(null), 3500);
     }

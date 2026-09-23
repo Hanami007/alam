@@ -41,9 +41,11 @@ export async function POST(req: Request) {
       pointsAwarded: result.pointsAwarded ?? 0,
     });
   } catch (err: any) {
+    // log ข้อความ error จริงไว้ฝั่ง server เท่านั้น — เดิมส่ง err.message ตรงๆ กลับไปให้ client
+    // ซึ่งอาจหลุดรายละเอียดภายในของ DB (เช่นชื่อ constraint) ออกไปโดยไม่ตั้งใจ
     console.error('Error voting in poll:', err);
     return NextResponse.json(
-      { success: false, error: err.message || 'เกิดข้อผิดพลาดในการโหวต' },
+      { success: false, error: 'เกิดข้อผิดพลาดในการโหวต กรุณาลองใหม่อีกครั้ง' },
       { status: 500 }
     );
   }

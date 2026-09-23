@@ -49,6 +49,8 @@ export default function DynamicMemberProfilePage() {
             student_status: u.studentStatus || u.student_status || 'alumni',
             total_points: u.totalPoints ?? u.total_points ?? 0,
             avatar_url: u.avatarUrl || u.avatar_url || '',
+            facebook_url: u.facebookUrl ?? u.facebook_url ?? '',
+            line_id: u.lineId ?? u.line_id ?? '',
           });
         } else {
           setUser(null);

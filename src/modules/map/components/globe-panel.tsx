@@ -16,6 +16,8 @@ import {
   ZoomIn,
   ZoomOut,
   Map as MapIcon,
+  Link2,
+  MessageCircle,
 } from 'lucide-react';
 import {
   GLOBE_CLUSTERS,
@@ -61,6 +63,8 @@ export interface MapPoint {
   lat?: number;
   lng?: number;
   city?: string;
+  facebook_url?: string | null;
+  line_id?: string | null;
 }
 
 export interface GlobePanelProps {
@@ -891,6 +895,21 @@ function AlumniProfileModal({
           )}
         </div>
 
+        {(alumni.facebook_url || alumni.line_id) && (
+          <div className="flex items-center justify-center gap-2.5">
+            {alumni.facebook_url && (
+              <span className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100">
+                <Link2 className="h-3.5 w-3.5" /> Facebook: {alumni.facebook_url}
+              </span>
+            )}
+            {alumni.line_id && (
+              <span className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
+                <MessageCircle className="h-3.5 w-3.5" /> LINE: {alumni.line_id}
+              </span>
+            )}
+          </div>
+        )}
+
         <button
           onClick={onClose}
           className="w-full py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-sm shadow-md shadow-indigo-200 transition-all cursor-pointer"
@@ -1051,6 +1070,8 @@ export function GlobePanel({
             company: a.company,
             generation: a.generation,
             career_type: a.career_type,
+            facebook_url: a.facebook_url,
+            line_id: a.line_id,
             country_code: 'TH',
             country_name: 'ประเทศไทย',
             city: provName,
@@ -1089,6 +1110,8 @@ export function GlobePanel({
         company: p.company || 'องค์กรต่างประเทศ',
         generation: p.generation,
         career_type: p.career_type,
+        facebook_url: p.facebook_url,
+        line_id: p.line_id,
         country_code: p.country_code || cluster?.country_code || 'INTL',
         country_name: pCountryName,
         city: pCity,

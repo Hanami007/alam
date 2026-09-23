@@ -26,6 +26,9 @@ export interface UserProfileData {
   showWorkplaceOnMap: boolean;
   isAvailableForMentorship: boolean;
   birthDate: string | null;
+  facebookUrl: string | null;
+  lineId: string | null;
+  showContactOnMap: boolean;
   createdAt: string;
 }
 
@@ -48,6 +51,7 @@ export class UserDbService {
         u.total_points, u.avatar_url, u.company, u.position, u.bio,
         u.show_hometown_on_map, u.show_workplace_on_map, u.is_available_for_mentorship, u.birth_date, u.created_at,
         u.generation_option_id, u.province_option_id, u.work_province_id, u.career_option_id,
+        u.facebook_url, u.line_id, u.show_contact_on_map,
         gen.label as generation,
         prov.label as province,
         work_prov.label as work_province,
@@ -89,6 +93,9 @@ export class UserDbService {
       showWorkplaceOnMap: r.show_workplace_on_map,
       isAvailableForMentorship: Boolean(r.is_available_for_mentorship),
       birthDate: r.birth_date,
+      facebookUrl: r.facebook_url,
+      lineId: r.line_id,
+      showContactOnMap: Boolean(r.show_contact_on_map),
       createdAt: r.created_at,
     };
   }
@@ -128,14 +135,15 @@ export class UserDbService {
    */
   async updatePrivacySettings(
     userId: number,
-    settings: { showHometownOnMap: boolean; showWorkplaceOnMap: boolean }
+    settings: { showHometownOnMap: boolean; showWorkplaceOnMap: boolean; showContactOnMap: boolean }
   ) {
     await pool.query(`
       UPDATE users
       SET show_hometown_on_map = $1,
-          show_workplace_on_map = $2
-      WHERE id = $3
-    `, [settings.showHometownOnMap, settings.showWorkplaceOnMap, userId]);
+          show_workplace_on_map = $2,
+          show_contact_on_map = $3
+      WHERE id = $4
+    `, [settings.showHometownOnMap, settings.showWorkplaceOnMap, settings.showContactOnMap, userId]);
 
     return { success: true };
   }
@@ -159,6 +167,9 @@ export class UserDbService {
       careerOptionId?: number | string;
       isAvailableForMentorship?: boolean;
       birthDate?: string;
+      facebookUrl?: string;
+      lineId?: string;
+      showContactOnMap?: boolean;
     }
   ) {
     const updates: string[] = [];
@@ -192,6 +203,18 @@ export class UserDbService {
     if (data.birthDate !== undefined) {
       updates.push(`birth_date = $${idx++}`);
       values.push(data.birthDate || null);
+    }
+    if (data.facebookUrl !== undefined) {
+      updates.push(`facebook_url = $${idx++}`);
+      values.push(data.facebookUrl || null);
+    }
+    if (data.lineId !== undefined) {
+      updates.push(`line_id = $${idx++}`);
+      values.push(data.lineId || null);
+    }
+    if (data.showContactOnMap !== undefined) {
+      updates.push(`show_contact_on_map = $${idx++}`);
+      values.push(Boolean(data.showContactOnMap));
     }
     const mentorshipVal = data.isAvailableForMentorship !== undefined ? data.isAvailableForMentorship : (data as any).is_available_for_mentorship;
     if (mentorshipVal !== undefined) {

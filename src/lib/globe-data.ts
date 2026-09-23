@@ -14,6 +14,8 @@ export interface GlobeAlumni {
   company?: string;
   generation?: string;
   career_type?: string;
+  facebook_url?: string | null;
+  line_id?: string | null;
   country_code: string;
   country_name: string;
   city: string;

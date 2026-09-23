@@ -3,6 +3,18 @@ import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { pool } from './db';
 
+/** อายุ session ทั้ง cookie ฝั่ง browser และแถวใน DB ต้องตรงกันเสมอ (30 วัน) */
+export const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
+
+const LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 5;
+const LOGIN_RATE_LIMIT_WINDOW_TEXT = '15 minutes';
+
+// hash เปล่าไว้เทียบเวลาไม่มี user จริงตรงกับ identifier ที่กรอก (ป้องกัน timing attack
+// ที่เดาได้ว่ามีบัญชีนี้อยู่จริงไหมจากความเร็วตอบกลับ — ถ้าไม่เจอ user เลยจะ return ทันที
+// ไม่ผ่าน bcrypt.compare ซึ่งกินเวลาราว 70ms ต่างจากกรณีเจอ user แต่รหัสผ่านผิดอย่างชัดเจน)
+// คำนวณครั้งเดียวตอน module โหลด ไม่ใช่ทุก request
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('timing-attack-mitigation-dummy', 10);
+
 export interface UserSession {
   id: number;
   student_id: string | null;
@@ -38,7 +50,16 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash);
 }
 
-/** ตรวจสอบข้อมูลล็อกอิน (รับ student_id หรือ email) */
+/**
+ * ตรวจสอบข้อมูลล็อกอิน (รับ student_id หรือ email)
+ *
+ * - อีเมลเทียบแบบไม่สนตัวพิมพ์ใหญ่/เล็ก (LOWER ทั้งสองฝั่ง) เพราะตอนสมัครสมาชิกเก็บอีเมล
+ *   เป็นตัวพิมพ์เล็กเสมอ (ดู src/app/api/auth/register/route.ts) แต่เดิมจุดนี้เทียบตรงๆ
+ *   ทำให้คนพิมพ์อีเมลตัวใหญ่ปนหรือ Caps Lock ติด ล็อกอินไม่ได้ทั้งที่รหัสผ่านถูก
+ * - ทุก path ที่ authentication ล้มเหลว (ไม่เจอ user / ไม่มี password_hash / รหัสผ่านผิด)
+ *   ต้องผ่าน bcrypt.compare เสมอ (จริงหรือ dummy hash) เพื่อให้เวลาตอบกลับใกล้เคียงกัน
+ *   ป้องกัน timing attack ที่เดาได้ว่ามี identifier นี้อยู่จริงในระบบไหมจากความเร็วตอบกลับ
+ */
 export async function authenticateUser(identifier: string, password: string): Promise<UserSession | null> {
   const trimmed = identifier.trim();
   const { rows } = await pool.query(
@@ -47,18 +68,22 @@ export async function authenticateUser(identifier: string, password: string): Pr
      LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
      LEFT JOIN lookup_options prov ON prov.id = u.province_option_id
      LEFT JOIN lookup_options ct ON ct.id = u.career_option_id
-     WHERE u.student_id = $1 OR u.email = $1
+     WHERE u.student_id = $1 OR LOWER(u.email) = LOWER($1)
      LIMIT 1`,
     [trimmed]
   );
 
-  if (rows.length === 0) return null;
+  if (rows.length === 0) {
+    await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
+    return null;
+  }
   const user = rows[0];
 
   // บัญชีที่ยังไม่มี password_hash (เช่น รายการที่แอดมินสร้างผ่านหน้าเก็บข้อมูลรุ่น)
   // ล็อกอินไม่ได้จนกว่าจะมีการตั้งรหัสผ่านจริงให้ — ห้ามใส่รหัสผ่านเริ่มต้นสาธารณะ (เช่น '123456')
   // กลับเข้ามาอีก เพราะเป็นช่องโหว่ที่ทำให้ใครก็ล็อกอินเป็นบัญชีเหล่านี้ได้
   if (!user.password_hash) {
+    await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
     return null;
   }
 
@@ -68,15 +93,55 @@ export async function authenticateUser(identifier: string, password: string): Pr
   return user as UserSession;
 }
 
+/**
+ * เช็ก rate limit ก่อนอนุญาตให้ authenticateUser ทำงาน — ถ้า identifier นี้ล็อกอินผิด
+ * ครบจำนวนสูงสุดภายในช่วงเวลาที่กำหนดแล้ว ให้ปฏิเสธทันทีโดยไม่ต้องเช็ครหัสผ่านอีก
+ * (ป้องกัน brute-force เดารหัสผ่าน — เดิมไม่มีการจำกัดจำนวนครั้งเลย)
+ */
+export async function checkLoginRateLimit(identifier: string): Promise<void> {
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int AS failed_count
+     FROM login_attempts
+     WHERE identifier = $1 AND success = false
+       AND created_at > now() - interval '${LOGIN_RATE_LIMIT_WINDOW_TEXT}'`,
+    [identifier.trim().toLowerCase()]
+  );
+  if ((rows[0]?.failed_count ?? 0) >= LOGIN_RATE_LIMIT_MAX_ATTEMPTS) {
+    throw new Error('เข้าสู่ระบบผิดพลาดหลายครั้งเกินไป กรุณาลองใหม่อีกครั้งใน 15 นาที');
+  }
+}
+
+/** บันทึกผลการล็อกอินแต่ละครั้งไว้ใช้คำนวณ rate limit — ไม่ throw แม้บันทึกไม่สำเร็จ */
+export async function recordLoginAttempt(identifier: string, success: boolean): Promise<void> {
+  try {
+    await pool.query(
+      `INSERT INTO login_attempts (identifier, success) VALUES ($1, $2)`,
+      [identifier.trim().toLowerCase(), success]
+    );
+    // เก็บกวาดของเก่าแบบขี้เกียจ (opportunistic) ไม่ต้องมี cron แยกต่างหาก
+    await pool.query(`DELETE FROM login_attempts WHERE created_at < now() - interval '1 day'`);
+  } catch (err) {
+    console.error('[recordLoginAttempt] failed:', err);
+  }
+}
+
 /** สร้าง Session และเก็บลง DB */
 export async function createSession(userId: number): Promise<string> {
   const sessionId = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 วัน
+  const expiresAt = new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000);
 
   await pool.query(
     `INSERT INTO sessions (id, user_id, expires_at) VALUES ($1, $2, $3)`,
     [sessionId, userId, expiresAt]
   );
+
+  // เก็บกวาด session ที่หมดอายุแล้วแบบขี้เกียจ (opportunistic) ไม่ต้องมี cron แยกต่างหาก —
+  // ไม่มีตรงไหนในระบบเดิมลบแถวหมดอายุออกเลย ปล่อยไว้จะค้างสะสมในตารางไปเรื่อยๆ
+  try {
+    await pool.query(`DELETE FROM sessions WHERE expires_at < now()`);
+  } catch (err) {
+    console.error('[createSession] expired session cleanup failed:', err);
+  }
 
   return sessionId;
 }

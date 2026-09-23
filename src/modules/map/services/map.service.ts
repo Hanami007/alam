@@ -19,6 +19,8 @@ export interface MapPoint {
   lat?: number;
   lng?: number;
   city?: string;
+  facebook_url?: string | null;
+  line_id?: string | null;
 }
 
 export class MapDbService {
@@ -42,7 +44,9 @@ export class MapDbService {
           prov.extra->>'flag' as flag,
           (prov.extra->>'lat')::float as lat,
           (prov.extra->>'lng')::float as lng,
-          prov.extra->>'city' as city
+          prov.extra->>'city' as city,
+          CASE WHEN u.show_contact_on_map THEN u.facebook_url END as facebook_url,
+          CASE WHEN u.show_contact_on_map THEN u.line_id END as line_id
         FROM users u
         JOIN lookup_options prov ON prov.id = COALESCE(u.hometown_province_id, u.province_option_id)
         LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
@@ -77,7 +81,9 @@ export class MapDbService {
           prov.extra->>'flag' as flag,
           (prov.extra->>'lat')::float as lat,
           (prov.extra->>'lng')::float as lng,
-          prov.extra->>'city' as city
+          prov.extra->>'city' as city,
+          CASE WHEN u.show_contact_on_map THEN u.facebook_url END as facebook_url,
+          CASE WHEN u.show_contact_on_map THEN u.line_id END as line_id
         FROM users u
         JOIN lookup_options prov ON prov.id = COALESCE(u.work_province_id, u.province_option_id)
         LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id

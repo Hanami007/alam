@@ -13,10 +13,24 @@ import {
   EyeOff,
 } from 'lucide-react';
 
+/**
+ * รับแค่ path ภายในเว็บเดียวกันเท่านั้น (ต้องขึ้นต้นด้วย "/" ตัวเดียว ไม่ใช่ "//" ซึ่งเบราว์เซอร์
+ * ตีความเป็น protocol-relative URL ไปโดเมนอื่นได้ และห้ามมี "://" ปนอยู่) เดิมเอาค่า callbackUrl
+ * จาก query string ไปใส่ router.push() ตรงๆ — ใครก็ส่งลิงก์ /login?callbackUrl=https://evil.com
+ * ให้เหยื่อกดได้ พอล็อกอินสำเร็จจะโดนเด้งไปเว็บปลอมทันที (open redirect)
+ */
+function sanitizeCallbackUrl(value: string | null): string {
+  if (!value) return '/feed';
+  if (!value.startsWith('/') || value.startsWith('//') || value.includes('://')) {
+    return '/feed';
+  }
+  return value;
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/feed';
+  const callbackUrl = sanitizeCallbackUrl(searchParams.get('callbackUrl'));
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');

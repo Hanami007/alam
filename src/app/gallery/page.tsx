@@ -6,7 +6,6 @@ import { AppShell } from '@/components/layout/app-shell';
 import { api } from '@/lib/api-client';
 
 export default function GalleryPage() {
-  const [items, setItems] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<number>(2);
   const [currentUserRole, setCurrentUserRole] = useState<string | undefined>(undefined);
@@ -17,15 +16,11 @@ export default function GalleryPage() {
     async function loadGallery() {
       try {
         setLoading(true);
-        const [galleryRes, usersRes, meRes] = await Promise.allSettled([
-          api.gallery.getItems(),
+        const [usersRes, meRes] = await Promise.allSettled([
           api.alumni.getList(),
           api.auth.me(),
         ]);
 
-        if (galleryRes.status === 'fulfilled' && Array.isArray(galleryRes.value)) {
-          setItems(galleryRes.value);
-        }
         if (usersRes.status === 'fulfilled' && Array.isArray(usersRes.value)) {
           setAllUsers(usersRes.value);
         }
@@ -47,11 +42,6 @@ export default function GalleryPage() {
   return (
     <AppShell>
       <div className="space-y-6">
-        <div>
-          <p className="text-sm font-medium text-blue-600">Photo archive (apistudio + community tags)</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Archive and storytelling</h1>
-        </div>
-
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
             {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -60,7 +50,6 @@ export default function GalleryPage() {
           </div>
         ) : (
           <GalleryGrid
-            items={items}
             currentUserId={currentUserId}
             allUsers={allUsers}
             currentUserRole={currentUserRole}

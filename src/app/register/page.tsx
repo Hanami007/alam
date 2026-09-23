@@ -37,6 +37,8 @@ import {
   Camera,
   Upload,
   HeartHandshake,
+  Link2,
+  MessageCircle,
   Image as ImageIcon,
 } from 'lucide-react';
 
@@ -77,6 +79,8 @@ export default function RegisterPage() {
   const [careerOptionId, setCareerOptionId] = useState<string>('');
   const [workProvinceId, setWorkProvinceId] = useState<string>('');
   const [bio, setBio] = useState('');
+  const [facebookUrl, setFacebookUrl] = useState('');
+  const [lineId, setLineId] = useState('');
 
   // Profile & Mentorship (ข้อมูลจำเป็นสำหรับแสดงในหน้าเว็บ)
   const [avatarUrl, setAvatarUrl] = useState<string>(
@@ -286,6 +290,8 @@ export default function RegisterPage() {
           avatarUrl: avatarUrl.trim(),
           isAvailableForMentorship,
           birthDate: birthDate || undefined,
+          facebookUrl: facebookUrl.trim() || undefined,
+          lineId: lineId.trim() || undefined,
           // Consents (4 ตัวเลือกเดิมรวมเป็น 1 ตัวเลือก ส่งครบถ้วนเข้าสู่ระบบ)
           consentPdpa,
           consentTerms,
@@ -691,6 +697,34 @@ export default function RegisterPage() {
                       />
                     </div>
                   )}
+
+                  {/* ช่องทางติดต่อ (ไม่บังคับ) — แก้ไขได้ทีหลังในหน้าโปรไฟล์ และมี toggle เปิด/ปิดการแสดงบนแผนที่แยกต่างหาก */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                        <Link2 className="h-3.5 w-3.5 text-indigo-400" /> Facebook (ไม่บังคับ)
+                      </label>
+                      <input
+                        type="text"
+                        value={facebookUrl}
+                        onChange={(e) => setFacebookUrl(e.target.value)}
+                        placeholder="ลิงก์โปรไฟล์ หรือ ชื่อผู้ใช้ Facebook"
+                        className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-indigo-500 focus:bg-slate-950 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                        <MessageCircle className="h-3.5 w-3.5 text-emerald-400" /> LINE ID (ไม่บังคับ)
+                      </label>
+                      <input
+                        type="text"
+                        value={lineId}
+                        onChange={(e) => setLineId(e.target.value)}
+                        placeholder="LINE ID ของคุณ"
+                        className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-emerald-500 focus:bg-slate-950 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 transition-all"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* 3. Alumni Specific Details (แสดงเมื่อเป็นศิษย์เก่า) */}

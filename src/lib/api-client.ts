@@ -158,12 +158,15 @@ export const api = {
       careerOptionId?: number | string;
       isAvailableForMentorship?: boolean;
       birthDate?: string;
+      facebookUrl?: string;
+      lineId?: string;
+      showContactOnMap?: boolean;
     }) =>
       fetchJson<any>('/api/user/profile', {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    updatePrivacy: (settings: { showHometownOnMap: boolean; showWorkplaceOnMap: boolean }) =>
+    updatePrivacy: (settings: { showHometownOnMap: boolean; showWorkplaceOnMap: boolean; showContactOnMap: boolean }) =>
       fetchJson<any>('/api/user/privacy', {
         method: 'PUT',
         body: JSON.stringify(settings),
@@ -186,11 +189,6 @@ export const api = {
         body: JSON.stringify({ userId, decision, remark }),
       }),
     getPostRequests: () => fetchJson<any[]>('/api/admin/post-requests'),
-    decidePost: (postId: number, decision: 'approved' | 'rejected') =>
-      fetchJson<any>('/api/admin/post-requests/decide', {
-        method: 'POST',
-        body: JSON.stringify({ postId, decision }),
-      }),
     createAnnouncement: (data: { title: string; body: string; category?: string; pinned?: boolean }) =>
       fetchJson<any>('/api/admin/announcement', {
         method: 'POST',

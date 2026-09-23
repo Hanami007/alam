@@ -1,4 +1,4 @@
-import { authenticateUser, createSession } from '@/lib/auth';
+import { authenticateUser, createSession, checkLoginRateLimit, recordLoginAttempt, SESSION_MAX_AGE_SECONDS } from '@/lib/auth';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
@@ -15,13 +15,24 @@ export async function POST(req: Request) {
       );
     }
 
+    try {
+      await checkLoginRateLimit(identifier);
+    } catch (rateLimitErr: any) {
+      return NextResponse.json({ error: rateLimitErr.message }, { status: 429 });
+    }
+
     const user = await authenticateUser(identifier, password);
     if (!user) {
+      await recordLoginAttempt(identifier, false);
       return NextResponse.json(
         { error: 'รหัสนักศึกษา/อีเมล หรือรหัสผ่านไม่ถูกต้อง' },
         { status: 401 }
       );
     }
+
+    // รหัสผ่านถูกต้องแล้ว ณ จุดนี้ — ไม่นับเป็นความพยายามเดารหัสผ่านผิดแม้บัญชีจะยัง
+    // pending/rejected อยู่ก็ตาม (สถานะบัญชีเป็นคนละเรื่องกับความถูกต้องของรหัสผ่าน)
+    await recordLoginAttempt(identifier, true);
 
     if (user.status === 'pending') {
       return NextResponse.json(
@@ -53,7 +64,7 @@ export async function POST(req: Request) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: 30 * 24 * 60 * 60, // 30 วัน
+      maxAge: SESSION_MAX_AGE_SECONDS,
     });
 
     return NextResponse.json({

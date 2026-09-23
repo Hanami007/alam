@@ -18,11 +18,12 @@ async function handlePrivacyUpdate(req: Request) {
     }
     const body = await req.json();
     // ใช้ user.id จาก session เสมอ — ห้ามเชื่อ userId ที่ client ส่งมา (กันแก้ privacy ของคนอื่น)
-    const { showHometownOnMap = false, showWorkplaceOnMap = false } = body;
+    const { showHometownOnMap = false, showWorkplaceOnMap = false, showContactOnMap = false } = body;
 
     const result = await userDbService.updatePrivacySettings(user.id, {
       showHometownOnMap: Boolean(showHometownOnMap),
       showWorkplaceOnMap: Boolean(showWorkplaceOnMap),
+      showContactOnMap: Boolean(showContactOnMap),
     });
 
     return NextResponse.json({ success: true, result });

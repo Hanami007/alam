@@ -68,6 +68,9 @@ export default function ProfilePage() {
           is_available_for_mentorship: Boolean(u.isAvailableForMentorship ?? u.is_available_for_mentorship),
           show_hometown_on_map: Boolean(u.showHometownOnMap ?? u.show_hometown_on_map),
           show_workplace_on_map: Boolean(u.showWorkplaceOnMap ?? u.show_workplace_on_map),
+          facebook_url: u.facebookUrl ?? u.facebook_url ?? '',
+          line_id: u.lineId ?? u.line_id ?? '',
+          show_contact_on_map: Boolean(u.showContactOnMap ?? u.show_contact_on_map),
         });
       } else {
         router.replace('/login?callbackUrl=/profile');

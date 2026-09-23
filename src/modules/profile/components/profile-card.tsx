@@ -5,7 +5,7 @@ import {
   Mail, MapPin, BadgeCheck, Vote, MessageCircle, Star, Lock, Clock,
   X, Tag, UserMinus, AlertTriangle, CheckCircle2, Eye, Calendar, User as UserIcon,
   Shield, Globe, EyeOff, Edit3, Camera, Upload, Building2, Layers, HeartHandshake,
-  Loader2, Quote
+  Loader2, Quote, Link2
 } from 'lucide-react';
 import { LocationPicker } from '@/components/ui/location-picker';
 
@@ -55,6 +55,9 @@ interface EditProfileForm {
   workProvinceId: string;
   careerOptionId: string;
   isAvailableForMentorship: boolean;
+  facebookUrl: string;
+  lineId: string;
+  showContactOnMap: boolean;
 }
 
 const POINTS_PER_LEVEL = 20;
@@ -83,7 +86,7 @@ export function ProfileCard({
   const [editForm, setEditForm] = useState<EditProfileForm>({
     name: '', nickname: '', avatarUrl: '', position: '', company: '', bio: '',
     generationOptionId: '', provinceOptionId: '', workProvinceId: '', careerOptionId: '',
-    isAvailableForMentorship: false,
+    isAvailableForMentorship: false, facebookUrl: '', lineId: '', showContactOnMap: false,
   });
   const [isUntagging, setIsUntagging] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -106,6 +109,9 @@ export function ProfileCard({
   async function handleTogglePrivacy(key: 'showHometownOnMap' | 'showWorkplaceOnMap', value: boolean) {
     const nextHometown = key === 'showHometownOnMap' ? value : showHometownOnMap;
     const nextWorkplace = key === 'showWorkplaceOnMap' ? value : showWorkplaceOnMap;
+    // showContactOnMap แก้ในโมดัล "แก้ไขข้อมูล" (คู่กับช่อง Facebook/LINE โดยตรง) ไม่ใช่ที่นี่ —
+    // ต้องแนบค่าปัจจุบันไปด้วยเสมอ เพราะ /api/user/privacy เขียนทับทั้ง 3 ฟิลด์ทุกครั้ง
+    const currentContact = Boolean(user?.show_contact_on_map ?? user?.showContactOnMap);
 
     if (key === 'showHometownOnMap') setShowHometownOnMap(value);
     if (key === 'showWorkplaceOnMap') setShowWorkplaceOnMap(value);
@@ -119,6 +125,7 @@ export function ProfileCard({
           userId: user.id,
           showHometownOnMap: nextHometown,
           showWorkplaceOnMap: nextWorkplace,
+          showContactOnMap: currentContact,
         }),
       });
       const data = await res.json();
@@ -152,6 +159,9 @@ export function ProfileCard({
       workProvinceId: user.work_province_id ? String(user.work_province_id) : '',
       careerOptionId: user.career_option_id ? String(user.career_option_id) : '',
       isAvailableForMentorship: Boolean(user.is_available_for_mentorship),
+      facebookUrl: user.facebook_url || '',
+      lineId: user.line_id || '',
+      showContactOnMap: Boolean(user.show_contact_on_map),
     });
     setIsEditModalOpen(true);
   }
@@ -196,6 +206,9 @@ export function ProfileCard({
         workProvinceId: editForm.workProvinceId || undefined,
         careerOptionId: editForm.careerOptionId || undefined,
         isAvailableForMentorship: editForm.isAvailableForMentorship,
+        facebookUrl: editForm.facebookUrl.trim(),
+        lineId: editForm.lineId.trim(),
+        showContactOnMap: editForm.showContactOnMap,
       });
       setIsEditModalOpen(false);
       setToastMessage({ message: 'บันทึกข้อมูลส่วนตัวเรียบร้อยแล้ว ✨', type: 'success' });
@@ -445,6 +458,37 @@ export function ProfileCard({
                       </dd>
                     </div>
                   </div>
+                  {(user.facebook_url || user.line_id) && (
+                    <div className="py-3 flex items-start gap-3">
+                      <MessageCircle className="mt-0.5 h-4 w-4 shrink-0 text-purple-500" />
+                      <div className="min-w-0 flex-1">
+                        <dt className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                          <span>ช่องทางติดต่อ</span>
+                          {isOwner && (
+                            <span className={`normal-case text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                              Boolean(user.show_contact_on_map)
+                                ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                                : 'bg-slate-100 text-slate-400 border border-slate-200'
+                            }`}>
+                              {Boolean(user.show_contact_on_map) ? 'แสดงบนแผนที่' : 'ซ่อนจากแผนที่'}
+                            </span>
+                          )}
+                        </dt>
+                        <dd className="mt-1.5 flex flex-wrap items-center gap-2">
+                          {user.facebook_url && (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 border border-indigo-100">
+                              <Link2 className="h-3.5 w-3.5" /> Facebook: {user.facebook_url}
+                            </span>
+                          )}
+                          {user.line_id && (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 border border-emerald-100">
+                              <MessageCircle className="h-3.5 w-3.5" /> LINE: {user.line_id}
+                            </span>
+                          )}
+                        </dd>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </section>
@@ -599,6 +643,31 @@ export function ProfileCard({
                 </div>
               </div>
             </div>
+
+            {/* ช่องทางติดต่อ (Facebook/LINE) แก้ไขและเปิด/ปิดการแสดงผลรวมกันในโมดัล "แก้ไขข้อมูล" แทน
+                เพราะควบคู่กับการกรอกข้อมูลโดยตรง ไม่แยกเป็นอีกแท็บเพื่อไม่ให้พลาดตั้งค่า */}
+            {isOwner && onSaveProfile && (
+              <button
+                type="button"
+                onClick={openEditModal}
+                className="w-full rounded-2xl bg-emerald-50/90 p-4 border border-emerald-200/80 flex items-center justify-between gap-3 text-left hover:bg-emerald-100/70 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                    <MessageCircle className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">ช่องทางติดต่อ (Facebook / LINE)</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {user?.facebook_url || user?.line_id
+                        ? `กำลัง${Boolean(user?.show_contact_on_map ?? user?.showContactOnMap) ? 'แสดง' : 'ซ่อนจาก'}แผนที่ • แก้ไขได้ในปุ่ม "แก้ไขข้อมูล"`
+                        : 'ยังไม่ได้กรอก • เพิ่มได้ในปุ่ม "แก้ไขข้อมูล"'}
+                    </p>
+                  </div>
+                </div>
+                <Edit3 className="h-4 w-4 text-emerald-600 shrink-0" />
+              </button>
+            )}
 
             <div className="rounded-2xl bg-blue-50/80 p-4 border border-blue-100 flex items-start gap-3">
               <Shield className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
@@ -1169,6 +1238,68 @@ export function ProfileCard({
                 placeholder="แนะนำตัวสั้นๆ หรือคติประจำใจ..."
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100 transition-all resize-none"
               />
+            </div>
+
+            {/* Facebook & LINE + toggle แสดงบนแผนที่ รวมอยู่การ์ดเดียวกัน เพื่อไม่ให้พลาดเปิดการแสดงผล */}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 space-y-3.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <MessageCircle className="h-4 w-4 text-indigo-500" />
+                  <span>ช่องทางติดต่อ (Facebook / LINE)</span>
+                </label>
+                <span className="text-[11px] text-slate-400">ไม่บังคับ</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">
+                    <Link2 className="h-3.5 w-3.5 text-indigo-500" /> Facebook
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.facebookUrl}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, facebookUrl: e.target.value }))}
+                    placeholder="ลิงก์โปรไฟล์ หรือ ชื่อผู้ใช้ Facebook"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">
+                    <MessageCircle className="h-3.5 w-3.5 text-emerald-500" /> LINE ID
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.lineId}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, lineId: e.target.value }))}
+                    placeholder="LINE ID ของคุณ"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Toggle แสดงบนแผนที่ — อยู่ติดกับช่องกรอกโดยตรง กันพลาดกรอกแล้วลืมเปิด */}
+              <div
+                onClick={() => setEditForm((prev) => ({ ...prev, showContactOnMap: !prev.showContactOnMap }))}
+                className={`flex items-center justify-between gap-3 rounded-xl border p-3 cursor-pointer select-none transition-all ${
+                  editForm.showContactOnMap ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${editForm.showContactOnMap ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                    {editForm.showContactOnMap ? <Globe className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                  </div>
+                  <p className="text-xs font-bold text-slate-700 truncate">
+                    แสดงช่องทางนี้บนแผนที่เมื่อคนอื่นดูโปรไฟล์คุณ
+                  </p>
+                </div>
+                <div className={`relative inline-flex h-5.5 w-10 shrink-0 rounded-full transition-colors ${editForm.showContactOnMap ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                  <span
+                    className={`pointer-events-none absolute top-0.5 left-0.5 inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow-md transition-transform ${
+                      editForm.showContactOnMap ? 'translate-x-4.5' : 'translate-x-0'
+                    }`}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Mentorship toggle */}

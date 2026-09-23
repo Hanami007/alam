@@ -169,6 +169,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       .then((res) => {
         if (!res.ok) {
           setCurrentUser(null);
+          if (res.status === 401) {
+            // Session ไม่ valid (หมดอายุ/ถูกลบไปแล้ว) ระหว่างที่ค้างอยู่บนหน้านี้ —
+            // เตะออกไปหน้า login ทันที ไม่ปล่อยให้นั่งดูเนื้อหาที่โหลดค้างไว้ต่อ
+            router.replace(`/login?callbackUrl=${encodeURIComponent(pathname)}`);
+          }
           return null;
         }
         return res.json();
@@ -197,7 +202,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       .finally(() => {
         setAuthLoading(false);
       });
-  }, []);
+  }, [router, pathname]);
 
   useEffect(() => {
     // Fetch logged in user profile data from DB on mount

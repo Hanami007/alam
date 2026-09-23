@@ -312,20 +312,39 @@ export class FeedDbService {
     if (pollRows.length === 0) return { success: false, error: 'ไม่พบโพลหรือโพลปิดแล้ว' };
 
     const points = (pollRows[0].points_per_vote ?? 5) as number;
-    await pool.query(
-      `INSERT INTO poll_votes (poll_id, option_id, user_id, points_awarded)
-       VALUES ($1, $2, $3, $4)`,
-      [pollId, optionId, userId, points]
-    );
+
+    // บันทึกโหวต + ให้แต้มอยู่ใน transaction เดียวกัน — เดิมเป็น pool.query แยก 2 คำสั่ง
+    // ไม่มี BEGIN/COMMIT ครอบ ถ้า UPDATE total_points พังกลางทาง (เช่น connection หลุด)
+    // จะเหลือแค่แถวโหวตถูกบันทึกแต่แต้มไม่เข้า ข้อมูลไม่ตรงกันถาวร
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO poll_votes (poll_id, option_id, user_id, points_awarded)
+         VALUES ($1, $2, $3, $4)`,
+        [pollId, optionId, userId, points]
+      );
+      if (points > 0) {
+        await client.query(`UPDATE users SET total_points = total_points + $1 WHERE id = $2`, [points, userId]);
+      }
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
+    }
+
     if (points > 0) {
-      await pool.query(`UPDATE users SET total_points = total_points + $1 WHERE id = $2`, [points, userId]);
       try {
         await pool.query(
           `INSERT INTO point_transactions (user_id, points, reason, reference_id)
            VALUES ($1, $2, 'poll_vote', $3)`,
           [userId, points, String(pollId)]
         );
-      } catch {}
+      } catch (logErr) {
+        console.error('[votePoll] point_transactions insert failed:', logErr);
+      }
     }
     return { success: true, pointsAwarded: points };
   }
@@ -369,18 +388,42 @@ export class FeedDbService {
   ) {
     await this.assertNotRateLimited(requestedBy);
 
-    let validUserId = requestedBy;
+    // จำกัดความยาวฝั่ง server ให้ตรงกับ maxLength ของฟอร์มจริง (feed-list.tsx: title/question
+    // 100 ตัวอักษร, เนื้อหา 1000, ตัวเลือกโพล 60) — เดิมมีแค่ maxLength ฝั่ง client เท่านั้น
+    // ยิง API ตรงๆ ข้าม UI ใส่ข้อความยาวเท่าไหร่ก็ได้ ไม่มีอะไรกันเลย
+    if (!title || title.trim().length === 0) {
+      throw new Error('กรุณาระบุหัวข้อโพสต์');
+    }
+    if (title.trim().length > 100) {
+      throw new Error('หัวข้อโพสต์ต้องไม่เกิน 100 ตัวอักษร');
+    }
+    if (content && content.trim().length > 1000) {
+      throw new Error('เนื้อหาโพสต์ต้องไม่เกิน 1000 ตัวอักษร');
+    }
+    if (postType === 'poll' && pollData) {
+      if (pollData.question && pollData.question.trim().length > 100) {
+        throw new Error('คำถามโพลต้องไม่เกิน 100 ตัวอักษร');
+      }
+      for (const opt of pollData.options || []) {
+        if (opt && opt.trim().length > 60) {
+          throw new Error('ตัวเลือกโพลแต่ละข้อต้องไม่เกิน 60 ตัวอักษร');
+        }
+      }
+    }
+
+    // ผู้ใช้ที่ authenticated แล้ว (getCurrentUser ตรวจแล้วก่อนเรียกฟังก์ชันนี้) ต้องมีอยู่จริง
+    // ใน DB เสมอ — เดิมถ้าไม่เจอ (เช่น user ถูกลบไปกลางที่ session ยังไม่หมดอายุ) จะเงียบๆ
+    // สวมรอยเป็นโพสต์ของ user คนแรกในตารางแทน (ระบุตัวคนโพสต์ผิดคน) ควรปฏิเสธคำขอแทน
     const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [requestedBy]);
     if (userCheck.rows.length === 0) {
-      const fallbackUser = await pool.query('SELECT id FROM users ORDER BY id ASC LIMIT 1');
-      validUserId = fallbackUser.rows[0]?.id || 1;
+      throw new Error('ไม่พบบัญชีผู้ใช้ กรุณาเข้าสู่ระบบใหม่อีกครั้ง');
     }
 
     const { rows } = await pool.query(
       `insert into posts (requested_by, category, title, content, post_type, status, published_at)
        values ($1, $2, $3, $4, $5, 'published', now())
        returning *`,
-      [validUserId, category, title, content, postType]
+      [requestedBy, category, title, content, postType]
     );
     const newPost = rows[0];
 
