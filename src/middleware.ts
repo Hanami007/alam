@@ -29,9 +29,11 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // ถ้าเข้า root / ให้พาไป /feed
+  // ถ้าเข้า root / — ยังไม่ล็อกอินให้ไปหน้า login ก่อนเสมอ (หน้าเริ่มต้นของเว็บคือ login)
+  // ล็อกอินแล้วค่อยพาไป /feed (เดิม redirect ไป /feed ตรงๆ แล้วค่อยเด้งไป /login อีกที
+  // ทำให้เสีย request 2 รอบโดยไม่จำเป็นสำหรับคนที่ยังไม่ได้ล็อกอิน)
   if (pathname === '/') {
-    return NextResponse.redirect(new URL('/feed', req.url));
+    return NextResponse.redirect(new URL(sessionId ? '/feed' : '/login', req.url));
   }
 
   // เส้นทางที่ต้องการล็อกอิน
