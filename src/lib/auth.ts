@@ -123,7 +123,10 @@ export async function getCurrentUser(): Promise<UserSession | null> {
     const sessionId = cookieStore.get('session_id')?.value;
     if (!sessionId) return null;
     return await getSessionUser(sessionId);
-  } catch {
+  } catch (err) {
+    // เดิม catch เงียบไม่ log อะไรเลย ทำให้ debug ปัญหา session/DB จริงไม่ได้ (เห็นแค่ 401/403
+    // ปลายทางโดยไม่รู้สาเหตุ) — log ไว้เพื่อให้เห็นใน `docker compose logs app` เสมอ
+    console.error('[getCurrentUser] session lookup failed:', err);
     return null;
   }
 }
