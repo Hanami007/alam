@@ -144,7 +144,21 @@ export const api = {
   // User Profile & Settings API
   user: {
     getProfile: () => fetchJson<any>('/api/user/profile'),
-    updateProfile: (data: { name?: string; position?: string; company?: string; bio?: string; avatarUrl?: string; generation?: string; isAvailableForMentorship?: boolean; birthDate?: string }) =>
+    updateProfile: (data: {
+      name?: string;
+      nickname?: string;
+      position?: string;
+      company?: string;
+      bio?: string;
+      avatarUrl?: string;
+      generation?: string;
+      generationOptionId?: number | string;
+      provinceOptionId?: number | string;
+      workProvinceId?: number | string;
+      careerOptionId?: number | string;
+      isAvailableForMentorship?: boolean;
+      birthDate?: string;
+    }) =>
       fetchJson<any>('/api/user/profile', {
         method: 'PUT',
         body: JSON.stringify(data),

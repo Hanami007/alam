@@ -5,6 +5,7 @@ export interface UserProfileData {
   studentId: string | null;
   email: string;
   name: string;
+  nickname: string | null;
   role: string;
   status: string;
   studentStatus: string;
@@ -14,9 +15,13 @@ export interface UserProfileData {
   position: string | null;
   bio: string | null;
   generation: string | null;
+  generationOptionId: number | null;
   province: string | null;
+  provinceOptionId: number | null;
   workProvince: string | null;
+  workProvinceId: number | null;
   careerType: string | null;
+  careerOptionId: number | null;
   showHometownOnMap: boolean;
   showWorkplaceOnMap: boolean;
   isAvailableForMentorship: boolean;
@@ -38,10 +43,11 @@ export class UserDbService {
    */
   async getUserProfile(userId: number): Promise<UserProfileData | null> {
     const { rows } = await pool.query(`
-      SELECT 
-        u.id, u.student_id, u.email, u.name, u.role, u.status, u.student_status,
+      SELECT
+        u.id, u.student_id, u.email, u.name, u.nickname, u.role, u.status, u.student_status,
         u.total_points, u.avatar_url, u.company, u.position, u.bio,
         u.show_hometown_on_map, u.show_workplace_on_map, u.is_available_for_mentorship, u.birth_date, u.created_at,
+        u.generation_option_id, u.province_option_id, u.work_province_id, u.career_option_id,
         gen.label as generation,
         prov.label as province,
         work_prov.label as work_province,
@@ -62,6 +68,7 @@ export class UserDbService {
       studentId: r.student_id,
       email: r.email,
       name: r.name,
+      nickname: r.nickname,
       role: r.role,
       status: r.status,
       studentStatus: r.student_status,
@@ -71,9 +78,13 @@ export class UserDbService {
       position: r.position,
       bio: r.bio,
       generation: r.generation,
+      generationOptionId: r.generation_option_id,
       province: r.province,
+      provinceOptionId: r.province_option_id,
       workProvince: r.work_province,
+      workProvinceId: r.work_province_id,
       careerType: r.career_type,
+      careerOptionId: r.career_option_id,
       showHometownOnMap: r.show_hometown_on_map,
       showWorkplaceOnMap: r.show_workplace_on_map,
       isAvailableForMentorship: Boolean(r.is_available_for_mentorship),
@@ -136,11 +147,16 @@ export class UserDbService {
     userId: number,
     data: {
       name?: string;
+      nickname?: string;
       position?: string;
       company?: string;
       bio?: string;
       avatarUrl?: string;
       generation?: string;
+      generationOptionId?: number | string;
+      provinceOptionId?: number | string;
+      workProvinceId?: number | string;
+      careerOptionId?: number | string;
       isAvailableForMentorship?: boolean;
       birthDate?: string;
     }
@@ -152,6 +168,10 @@ export class UserDbService {
     if (data.name !== undefined) {
       updates.push(`name = $${idx++}`);
       values.push(data.name);
+    }
+    if (data.nickname !== undefined) {
+      updates.push(`nickname = $${idx++}`);
+      values.push(data.nickname);
     }
     if (data.position !== undefined) {
       updates.push(`position = $${idx++}`);
@@ -178,7 +198,10 @@ export class UserDbService {
       updates.push(`is_available_for_mentorship = $${idx++}`);
       values.push(Boolean(mentorshipVal));
     }
-    if (data.generation !== undefined) {
+    if (data.generationOptionId !== undefined) {
+      updates.push(`generation_option_id = $${idx++}`);
+      values.push(Number(data.generationOptionId));
+    } else if (data.generation !== undefined) {
       const genRes = await pool.query(
         `SELECT id FROM lookup_options WHERE category = 'generation' AND label = $1 LIMIT 1`,
         [data.generation]
@@ -187,6 +210,23 @@ export class UserDbService {
         updates.push(`generation_option_id = $${idx++}`);
         values.push(genRes.rows[0].id);
       }
+    }
+    if (data.provinceOptionId !== undefined) {
+      // จังหวัดภูมิลำเนา: อัปเดตทั้ง province_option_id และ hometown_province_id
+      // ให้ตรงกัน ตามรูปแบบเดียวกับตอนสมัครสมาชิก (src/app/api/auth/register/route.ts)
+      const provinceId = Number(data.provinceOptionId);
+      updates.push(`province_option_id = $${idx++}`);
+      values.push(provinceId);
+      updates.push(`hometown_province_id = $${idx++}`);
+      values.push(provinceId);
+    }
+    if (data.workProvinceId !== undefined) {
+      updates.push(`work_province_id = $${idx++}`);
+      values.push(Number(data.workProvinceId));
+    }
+    if (data.careerOptionId !== undefined) {
+      updates.push(`career_option_id = $${idx++}`);
+      values.push(Number(data.careerOptionId));
     }
 
     if (updates.length === 0) return { success: true };

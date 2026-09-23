@@ -329,9 +329,9 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
         </div>
       </div>
 
-      {!isVotingOpen ? (
+      {mergedInitial.length === 0 ? (
         /* ╔══════════════════════════════════════════╗
-            ║  ยังไม่เปิดโหวต — สถานะว่าง             ║
+            ║  ยังไม่มีข้อมูลเลย — สถานะว่างจริงๆ       ║
             ╚══════════════════════════════════════════╝ */
         <div className="bg-white rounded-[32px] border border-slate-100 p-12 sm:p-16 text-center shadow-xs">
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-violet-50 text-violet-500 mb-4">
@@ -346,9 +346,24 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
       ) : (
       <>
       {/* ╔══════════════════════════════════════════╗
+          ║  ปิดโหวตแล้ว แต่ยังมีผู้ได้รับการเสนอชื่ออยู่   ║
+          ║  → แสดงผลลัพธ์ล่าสุดแบบอ่านอย่างเดียว          ║
+          ╚══════════════════════════════════════════╝ */}
+      {!isVotingOpen && (
+        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:px-5 sm:py-3.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-200/70 text-slate-500">
+            <CalendarClock className="h-4.5 w-4.5" />
+          </div>
+          <p className="text-xs sm:text-sm font-bold text-slate-600">
+            ขณะนี้ปิดรับโหวตแล้ว — รายชื่อด้านล่างคือผลการโหวตล่าสุด
+          </p>
+        </div>
+      )}
+
+      {/* ╔══════════════════════════════════════════╗
           ║  popup วิธีการโหวต — โผล่ครั้งเดียวตอนเข้าหน้านี้  ║
           ╚══════════════════════════════════════════╝ */}
-      {showHowToVote && (
+      {isVotingOpen && showHowToVote && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm"
           onClick={() => setShowHowToVote(false)}
@@ -436,6 +451,7 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
               onSelect={() => setSelectedCandidate(top2)}
               theme="silver"
               className="order-1"
+              showVoteButton={isVotingOpen}
             />
 
             {/* 🥇 Rank 1 (Center / Floating Pastel Gold - Center Stage) */}
@@ -451,6 +467,7 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
               theme="gold"
               isChampion
               className="order-2 -translate-y-2 z-10"
+              showVoteButton={isVotingOpen}
             />
 
             {/* 🥉 Rank 3 (Right / Floating Pastel Peach-Rose) */}
@@ -465,6 +482,7 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
               onSelect={() => setSelectedCandidate(top3)}
               theme="bronze"
               className="order-3"
+              showVoteButton={isVotingOpen}
             />
           </div>
         </section>
@@ -686,14 +704,16 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
                     </div>
 
                     {/* Mobile Vote button (Top Right on Mobile) */}
-                    <div className="md:hidden">
-                      <VoteButton
-                        voted={voted}
-                        isVoting={isVoting}
-                        animating={animating}
-                        onVote={(e) => handleVote(e, c.id)}
-                      />
-                    </div>
+                    {isVotingOpen && (
+                      <div className="md:hidden">
+                        <VoteButton
+                          voted={voted}
+                          isVoting={isVoting}
+                          animating={animating}
+                          onVote={(e) => handleVote(e, c.id)}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* Alumni Info with Circular Avatar */}
@@ -740,15 +760,17 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
                     </div>
 
                     {/* Desktop Vote Button */}
-                    <div className="hidden md:block shrink-0">
-                      <VoteButton
-                        iconOnly
-                        voted={voted}
-                        isVoting={isVoting}
-                        animating={animating}
-                        onVote={(e) => handleVote(e, c.id)}
-                      />
-                    </div>
+                    {isVotingOpen && (
+                      <div className="hidden md:block shrink-0">
+                        <VoteButton
+                          iconOnly
+                          voted={voted}
+                          isVoting={isVoting}
+                          animating={animating}
+                          onVote={(e) => handleVote(e, c.id)}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -804,12 +826,14 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
                     <span className="text-[10px] text-slate-400 font-medium">คะแนนโหวต</span>
                     <p className="text-sm font-black text-slate-800">{c.votes || 0}</p>
                   </div>
-                  <VoteButton
-                    voted={voted}
-                    isVoting={isVoting}
-                    animating={animating}
-                    onVote={(e) => handleVote(e, c.id)}
-                  />
+                  {isVotingOpen && (
+                    <VoteButton
+                      voted={voted}
+                      isVoting={isVoting}
+                      animating={animating}
+                      onVote={(e) => handleVote(e, c.id)}
+                    />
+                  )}
                 </div>
               </div>
             );
@@ -932,13 +956,15 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
                 </p>
               </div>
 
-              <VoteButton
-                size="lg"
-                voted={votedIds[selectedCandidate.id]}
-                isVoting={votingId === selectedCandidate.id}
-                animating={voteAnimId === selectedCandidate.id}
-                onVote={(e) => handleVote(e, selectedCandidate.id)}
-              />
+              {isVotingOpen && (
+                <VoteButton
+                  size="lg"
+                  voted={votedIds[selectedCandidate.id]}
+                  isVoting={votingId === selectedCandidate.id}
+                  animating={voteAnimId === selectedCandidate.id}
+                  onVote={(e) => handleVote(e, selectedCandidate.id)}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -1016,6 +1042,7 @@ interface FloatingTopCardProps {
   theme: 'gold' | 'silver' | 'bronze';
   isChampion?: boolean;
   className?: string;
+  showVoteButton?: boolean;
 }
 
 function FloatingTopCard({
@@ -1030,6 +1057,7 @@ function FloatingTopCard({
   theme,
   isChampion = false,
   className = '',
+  showVoteButton = true,
 }: FloatingTopCardProps) {
   const THEME_CONFIG = {
     gold: {
@@ -1146,14 +1174,16 @@ function FloatingTopCard({
             {candidate.votes || 0} <span className="text-[0.55em] font-medium text-slate-400">โหวต</span>
           </p>
 
-          <VoteButton
-            size={isChampion ? 'lg' : 'sm'}
-            iconOnly
-            voted={voted}
-            isVoting={isVoting}
-            animating={animating}
-            onVote={onVote}
-          />
+          {showVoteButton && (
+            <VoteButton
+              size={isChampion ? 'lg' : 'sm'}
+              iconOnly
+              voted={voted}
+              isVoting={isVoting}
+              animating={animating}
+              onVote={onVote}
+            />
+          )}
         </div>
       </div>
     </div>

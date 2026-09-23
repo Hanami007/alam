@@ -4,8 +4,19 @@ import {
   Briefcase, GraduationCap, ImageIcon, MessageSquareText, Sparkles,
   Mail, MapPin, BadgeCheck, Vote, MessageCircle, Star, Lock, Clock,
   X, Tag, UserMinus, AlertTriangle, CheckCircle2, Eye, Calendar, User as UserIcon,
-  Shield, Globe, EyeOff
+  Shield, Globe, EyeOff, Edit3, Camera, Upload, Building2, Layers, HeartHandshake,
+  Loader2, Quote
 } from 'lucide-react';
+import { LocationPicker } from '@/components/ui/location-picker';
+
+const PRESET_AVATARS = [
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop&q=80',
+];
 
 interface Photo {
   id: number;
@@ -28,6 +39,22 @@ interface ProfileCardProps {
   unlockedPhotos: Photo[];
   activityLog: ActivityItem[];
   isOwner?: boolean;
+  lookupOptions?: { generations: any[]; provinces: any[]; careerTypes: any[] };
+  onSaveProfile?: (data: Record<string, any>) => Promise<void>;
+}
+
+interface EditProfileForm {
+  name: string;
+  nickname: string;
+  avatarUrl: string;
+  position: string;
+  company: string;
+  bio: string;
+  generationOptionId: string;
+  provinceOptionId: string;
+  workProvinceId: string;
+  careerOptionId: string;
+  isAvailableForMentorship: boolean;
 }
 
 const POINTS_PER_LEVEL = 20;
@@ -42,12 +69,22 @@ function activityIcon(description: string) {
 
 export type ProfileTab = 'overview' | 'privacy' | 'gallery' | 'activity';
 
-export function ProfileCard({ user, taggedPhotos = [], unlockedPhotos = [], activityLog = [] }: ProfileCardProps) {
+export function ProfileCard({
+  user, taggedPhotos = [], unlockedPhotos = [], activityLog = [], isOwner = false,
+  lookupOptions, onSaveProfile,
+}: ProfileCardProps) {
   const [activeTab, setActiveTab] = useState<ProfileTab>('overview');
   const [activeAlbum, setActiveAlbum] = useState<'tagged' | 'unlocked'>('tagged');
   const [taggedPhotosList, setTaggedPhotosList] = useState<Photo[]>(taggedPhotos);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [photoToUntag, setPhotoToUntag] = useState<Photo | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
+  const [isSavingProfile, setIsSavingProfile] = useState<boolean>(false);
+  const [editForm, setEditForm] = useState<EditProfileForm>({
+    name: '', nickname: '', avatarUrl: '', position: '', company: '', bio: '',
+    generationOptionId: '', provinceOptionId: '', workProvinceId: '', careerOptionId: '',
+    isAvailableForMentorship: false,
+  });
   const [isUntagging, setIsUntagging] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -98,6 +135,76 @@ export function ProfileCard({ user, taggedPhotos = [], unlockedPhotos = [], acti
       setTimeout(() => setToastMessage(null), 3500);
     } finally {
       setIsSavingPrivacy(false);
+    }
+  }
+
+  function openEditModal() {
+    if (!user) return;
+    setEditForm({
+      name: user.name || '',
+      nickname: user.nickname || '',
+      avatarUrl: user.avatar_url || '',
+      position: user.position || '',
+      company: user.company || '',
+      bio: user.bio || '',
+      generationOptionId: user.generation_option_id ? String(user.generation_option_id) : '',
+      provinceOptionId: user.province_option_id ? String(user.province_option_id) : '',
+      workProvinceId: user.work_province_id ? String(user.work_province_id) : '',
+      careerOptionId: user.career_option_id ? String(user.career_option_id) : '',
+      isAvailableForMentorship: Boolean(user.is_available_for_mentorship),
+    });
+    setIsEditModalOpen(true);
+  }
+
+  function handleAvatarFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setToastMessage({ message: 'ขนาดรูปภาพต้องไม่เกิน 2MB', type: 'error' });
+      setTimeout(() => setToastMessage(null), 3500);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setEditForm((prev) => ({ ...prev, avatarUrl: event.target!.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function handleSaveProfileSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!onSaveProfile) return;
+    if (!editForm.name.trim()) {
+      setToastMessage({ message: 'กรุณากรอกชื่อ-นามสกุล', type: 'error' });
+      setTimeout(() => setToastMessage(null), 3500);
+      return;
+    }
+
+    setIsSavingProfile(true);
+    try {
+      await onSaveProfile({
+        name: editForm.name.trim(),
+        nickname: editForm.nickname.trim(),
+        avatarUrl: editForm.avatarUrl,
+        position: editForm.position.trim(),
+        company: editForm.company.trim(),
+        bio: editForm.bio.trim(),
+        generationOptionId: editForm.generationOptionId || undefined,
+        provinceOptionId: editForm.provinceOptionId || undefined,
+        workProvinceId: editForm.workProvinceId || undefined,
+        careerOptionId: editForm.careerOptionId || undefined,
+        isAvailableForMentorship: editForm.isAvailableForMentorship,
+      });
+      setIsEditModalOpen(false);
+      setToastMessage({ message: 'บันทึกข้อมูลส่วนตัวเรียบร้อยแล้ว ✨', type: 'success' });
+      setTimeout(() => setToastMessage(null), 3000);
+    } catch (err: any) {
+      setToastMessage({ message: err.message || 'บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', type: 'error' });
+      setTimeout(() => setToastMessage(null), 3500);
+    } finally {
+      setIsSavingProfile(false);
     }
   }
 
@@ -160,11 +267,21 @@ export function ProfileCard({ user, taggedPhotos = [], unlockedPhotos = [], acti
       )}
 
       {/* ─── 1. PAGE HEADER ─── */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">โปรไฟล์ของฉัน</h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">จัดการข้อมูลส่วนตัว ความเป็นส่วนตัวบนแผนที่ และคลังภาพความทรงจำ</p>
         </div>
+        {isOwner && onSaveProfile && (
+          <button
+            type="button"
+            onClick={openEditModal}
+            className="inline-flex items-center gap-1.5 shrink-0 rounded-2xl bg-indigo-600 px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm hover:bg-indigo-700 transition-colors cursor-pointer"
+          >
+            <Edit3 className="h-4 w-4" />
+            <span className="hidden sm:inline">แก้ไขข้อมูล</span>
+          </button>
+        )}
       </div>
 
       {/* ─── 2. TAB NAVIGATION BAR ─── */}
@@ -846,6 +963,263 @@ export function ProfileCard({ user, taggedPhotos = [], unlockedPhotos = [], acti
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ===== EDIT PROFILE MODAL ===== */}
+      {isEditModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in"
+          onClick={() => !isSavingProfile && setIsEditModalOpen(false)}
+        >
+          <form
+            onSubmit={handleSaveProfileSubmit}
+            className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-slate-100 animate-scale-up space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
+                  <Edit3 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">แก้ไขข้อมูลส่วนตัว</h3>
+                  <p className="text-xs text-slate-400">ข้อมูลนี้จะแสดงบนหน้าโปรไฟล์ วอลล์ และหนังสือรุ่น</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isSavingProfile}
+                onClick={() => setIsEditModalOpen(false)}
+                className="h-8 w-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Avatar */}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
+              <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                <Camera className="h-3.5 w-3.5 text-indigo-500" /> รูปโปรไฟล์
+              </label>
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <img
+                  src={editForm.avatarUrl || PRESET_AVATARS[0]}
+                  alt="ตัวอย่างรูปโปรไฟล์"
+                  className="h-16 w-16 rounded-2xl object-cover border-2 border-indigo-200 shadow-xs shrink-0 bg-slate-200"
+                />
+                <div className="flex-1 w-full space-y-2.5">
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                    {PRESET_AVATARS.map((url, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setEditForm((prev) => ({ ...prev, avatarUrl: url }))}
+                        className={`relative rounded-xl overflow-hidden h-9 w-9 border-2 transition-all cursor-pointer shrink-0 ${
+                          editForm.avatarUrl === url
+                            ? 'border-indigo-500 ring-2 ring-indigo-300 scale-105'
+                            : 'border-slate-200 opacity-70 hover:opacity-100'
+                        }`}
+                      >
+                        <img src={url} alt={`ตัวเลือก ${idx + 1}`} className="h-full w-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-xs text-slate-600 cursor-pointer transition-all">
+                      <Upload className="h-3.5 w-3.5 text-indigo-500" />
+                      <span>อัปโหลดจากเครื่อง</span>
+                      <input type="file" accept="image/*" onChange={handleAvatarFileUpload} className="hidden" />
+                    </label>
+                    <div className="flex-1 min-w-[180px]">
+                      <input
+                        type="url"
+                        value={editForm.avatarUrl.startsWith('data:') ? '' : editForm.avatarUrl}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, avatarUrl: e.target.value }))}
+                        placeholder="หรือวาง URL รูปภาพ..."
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Name & Nickname */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-600">ชื่อ-นามสกุล *</label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.name}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-600">ชื่อเล่น</label>
+                <input
+                  type="text"
+                  value={editForm.nickname}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, nickname: e.target.value }))}
+                  placeholder="เช่น เอ, บอย, พลอย..."
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Generation & Hometown Province */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                  <GraduationCap className="h-3.5 w-3.5 text-indigo-500" /> รุ่นการศึกษา
+                </label>
+                <select
+                  value={editForm.generationOptionId}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, generationOptionId: e.target.value }))}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                >
+                  <option value="">ไม่ระบุ</option>
+                  {(lookupOptions?.generations || []).map((g) => (
+                    <option key={g.id} value={g.id}>{g.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-indigo-500" /> จังหวัดภูมิลำเนา
+                </label>
+                <LocationPicker
+                  value={editForm.provinceOptionId}
+                  onChange={(val) => setEditForm((prev) => ({ ...prev, provinceOptionId: val }))}
+                  options={lookupOptions?.provinces || []}
+                  accentColor="indigo"
+                  placeholder="เลือกจังหวัด หรือ ประเทศภูมิลำเนา"
+                />
+              </div>
+            </div>
+
+            {/* Company & Position */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                  <Building2 className="h-3.5 w-3.5 text-purple-500" /> บริษัท / สถานที่ทำงาน
+                </label>
+                <input
+                  type="text"
+                  value={editForm.company}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, company: e.target.value }))}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100 transition-all"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                  <Briefcase className="h-3.5 w-3.5 text-purple-500" /> ตำแหน่งงาน
+                </label>
+                <input
+                  type="text"
+                  value={editForm.position}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, position: e.target.value }))}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100 transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Career type & Work province */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                  <Layers className="h-3.5 w-3.5 text-purple-500" /> ประเภทสายงาน
+                </label>
+                <select
+                  value={editForm.careerOptionId}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, careerOptionId: e.target.value }))}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100 transition-all"
+                >
+                  <option value="">ไม่ระบุ</option>
+                  {(lookupOptions?.careerTypes || []).map((ct) => (
+                    <option key={ct.id} value={ct.id}>{ct.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-purple-500" /> จังหวัดที่ทำงาน
+                </label>
+                <LocationPicker
+                  value={editForm.workProvinceId}
+                  onChange={(val) => setEditForm((prev) => ({ ...prev, workProvinceId: val }))}
+                  options={lookupOptions?.provinces || []}
+                  accentColor="amber"
+                  placeholder="เลือกจังหวัด หรือ ประเทศที่ทำงาน"
+                />
+              </div>
+            </div>
+
+            {/* Bio */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                <Quote className="h-3.5 w-3.5 text-slate-500" /> เกี่ยวกับฉัน
+              </label>
+              <textarea
+                rows={3}
+                value={editForm.bio}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, bio: e.target.value }))}
+                placeholder="แนะนำตัวสั้นๆ หรือคติประจำใจ..."
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100 transition-all resize-none"
+              />
+            </div>
+
+            {/* Mentorship toggle */}
+            <div
+              onClick={() => setEditForm((prev) => ({ ...prev, isAvailableForMentorship: !prev.isAvailableForMentorship }))}
+              className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex items-center justify-between gap-3 ${
+                editForm.isAvailableForMentorship ? 'bg-purple-50 border-purple-200' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`p-2.5 rounded-xl ${editForm.isAvailableForMentorship ? 'bg-purple-100 text-purple-600' : 'bg-white text-slate-400'}`}>
+                  <HeartHandshake className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-800">ยินดีให้คำแนะนำรุ่นน้อง</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">แสดงป้าย &ldquo;ยินดีให้คำแนะนำ&rdquo; บนโปรไฟล์และโพสต์ของคุณ</p>
+                </div>
+              </div>
+              <div className={`h-6 w-11 rounded-full p-0.5 transition-colors shrink-0 ${editForm.isAvailableForMentorship ? 'bg-purple-500' : 'bg-slate-300'}`}>
+                <div className={`h-5 w-5 rounded-full bg-white transition-transform ${editForm.isAvailableForMentorship ? 'translate-x-5' : 'translate-x-0'}`} />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={isSavingProfile}
+                onClick={() => setIsEditModalOpen(false)}
+                className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="submit"
+                disabled={isSavingProfile}
+                className="flex items-center gap-1.5 rounded-full bg-indigo-600 hover:bg-indigo-700 px-6 py-2.5 text-xs font-bold text-white shadow-xs transition-all active:scale-95 disabled:opacity-50"
+              >
+                {isSavingProfile ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>กำลังบันทึก...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <span>บันทึกข้อมูล</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>
