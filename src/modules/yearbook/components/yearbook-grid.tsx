@@ -25,6 +25,7 @@ import {
   Image as ImageIcon,
   Building2,
   MessageCircle,
+  CalendarDays,
 } from 'lucide-react';
 import { api } from '@/lib/api-client';
 
@@ -106,6 +107,7 @@ export function YearbookGrid() {
     generation: 'รุ่น 43',
     quote: '',
     isAvailableForMentorship: false,
+    birthDate: '',
   });
 
   useEffect(() => {
@@ -202,6 +204,8 @@ export function YearbookGrid() {
         currentUser?.is_available_for_mentorship ??
         currentUser?.isAvailableForMentorship
     );
+    const rawBirthDate = currentUser?.birth_date || currentUser?.birthDate || '';
+    const birthDateValue = rawBirthDate ? String(rawBirthDate).slice(0, 10) : '';
     if (myExistingEntry) {
       setMyEntryForm({
         name: myExistingEntry.name || currentUser?.name || '',
@@ -210,6 +214,7 @@ export function YearbookGrid() {
         generation: myExistingEntry.generation || 'รุ่น 43',
         quote: myExistingEntry.quote || '',
         isAvailableForMentorship: isMentor,
+        birthDate: birthDateValue,
       });
     } else {
       setMyEntryForm({
@@ -219,6 +224,7 @@ export function YearbookGrid() {
         generation: currentUser?.generation || 'รุ่น 43',
         quote: currentUser?.bio || '',
         isAvailableForMentorship: isMentor,
+        birthDate: birthDateValue,
       });
     }
     setStatusAlert(null);
@@ -248,6 +254,7 @@ export function YearbookGrid() {
         avatarUrl: myEntryForm.avatarUrl.trim(),
         generation: myEntryForm.generation,
         isAvailableForMentorship: myEntryForm.isAvailableForMentorship,
+        birthDate: myEntryForm.birthDate || undefined,
       }).catch((err) => {
         console.error('Error updating profile to Database:', err);
       });
@@ -259,6 +266,7 @@ export function YearbookGrid() {
         avatar_url: myEntryForm.avatarUrl.trim(),
         generation: myEntryForm.generation,
         is_available_for_mentorship: myEntryForm.isAvailableForMentorship,
+        birth_date: myEntryForm.birthDate || null,
       }));
 
       const genNum = parseInt(myEntryForm.generation.replace(/\D/g, '')) || 43;
@@ -822,6 +830,22 @@ export function YearbookGrid() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* วันเกิด (ใช้แสดงในวิดเจ็ต "สุขสันต์วันเกิด" หน้าฟีดเมื่อถึงวันจริง) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
+                  <CalendarDays className="h-3.5 w-3.5 text-pink-500" /> วันเกิด
+                </label>
+                <input
+                  type="date"
+                  value={myEntryForm.birthDate}
+                  onChange={(e) => setMyEntryForm({ ...myEntryForm, birthDate: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] text-slate-400">
+                  ระบบจะแสดงคุณในวิดเจ็ต &ldquo;สุขสันต์วันเกิด&rdquo; หน้าฟีดเมื่อถึงวันเกิดจริงของคุณ
+                </p>
               </div>
 
               {/* อัปโหลดรูปภาพประจำตัว */}

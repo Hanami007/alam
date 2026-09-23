@@ -1,8 +1,12 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
-import Link from 'next/link';
 import { notifyPointsUpdated, notifyNewNotification } from '@/lib/events';
+import { FortuneWidget } from './widgets/fortune-widget';
+import { StatsWidget } from './widgets/stats-widget';
+import { GalleryWidget } from './widgets/gallery-widget';
+import { BirthdayWidget } from './widgets/birthday-widget';
+import { LeaderboardWidget } from './widgets/leaderboard-widget';
 
 function formatPostDateTime(dateStr: string) {
   if (!dateStr) return '';
@@ -28,7 +32,6 @@ import {
   Send,
   Pin,
   Sparkles,
-  Image as ImageIcon,
   Globe,
   MoreHorizontal,
   CheckCircle2,
@@ -38,13 +41,10 @@ import {
   FileText,
   Smile,
   Zap,
-  Trophy,
   Crown,
   Gift,
-  PartyPopper,
   Medal,
   Award,
-  Dices,
   Sparkle,
   Flame,
   Volume2,
@@ -105,41 +105,42 @@ interface Post {
 }
 
 
+interface WallFortune {
+  id: number;
+  message: string;
+}
+
+interface WallBirthday {
+  id: number;
+  name: string;
+  generation: string | null;
+  birthLabel: string;
+  avatar: string | null;
+}
+
+interface WallLeaderboardEntry {
+  id: number;
+  name: string;
+  generation: string | null;
+  points: number;
+  avatar: string | null;
+}
+
 interface FeedListProps {
   posts: Post[];
   stats: any;
   latestPhotos?: any[];
   featuredAlumni?: any[];
+  fortunes?: WallFortune[];
+  birthdays?: WallBirthday[];
+  leaderboard?: WallLeaderboardEntry[];
   currentUserId: number;
   currentUserRole?: string;
   currentUserName?: string;
   currentUserMentorship?: boolean;
 }
 
-
-// Sample Birthday Data for this month
-const BIRTHDAY_ALUMNI = [
-  { id: 101, name: 'พี่ณัฐพล ชัยชนะ', gen: 'รุ่น 38', date: '15 ส.ค.', avatar: 'ณพ' },
-  { id: 102, name: 'น้องศิรินทร์ วงศ์คำ', gen: 'รุ่น 44', date: '22 ส.ค.', avatar: 'ศร' },
-  { id: 103, name: 'พี่กิตติศักดิ์ สุขใจ', gen: 'รุ่น 40', date: '28 ส.ค.', avatar: 'กต' },
-];
-
-// Sample Leaderboard Top 3 Active Members
-const TOP_LEADERBOARD = [
-  { rank: 1, name: 'ดร.สมเกียรติ มั่นคง', gen: 'รุ่น 35', points: 1420, avatar: 'สม', badge: '🥇' },
-  { rank: 2, name: 'คุณนลินี สุวรรณ', gen: 'รุ่น 41', points: 980, avatar: 'นล', badge: '🥈' },
-  { rank: 3, name: 'คุณธีรยุทธ ก้องเกียรติ', gen: 'รุ่น 42', points: 750, avatar: 'ธี', badge: '🥉' },
-];
-
-// Fun Alumni Fortunes & Quotes
-const ALUMNI_FORTUNES = [
-  "🔮 สัปดาห์นี้จะมีรุ่นพี่สาย IT ทักมาแจกโอกาสดีๆ!",
-  "✨ วันนี้วันมงคล เขียนโค้ดรันครั้งเดียวผ่านไร้ Bug 100%!",
-  "🎉 คุณมีเกณฑ์ได้พอยท์กิจกรรมพิเศษ +50 คะแนนในเร็วๆ นี้",
-  "💼 ทักษะความขยันของคุณกำลังไปเตะตารุ่นพี่แอดมินอยู่นะ!",
-  "🌸 การได้กลับมาคุยกับเพื่อนเก่า จะนำพาโชคดีและแรงบันดาลใจมาให้",
-];
-
+const DEFAULT_FORTUNE = '🔮 ยังไม่มีข้อความเซียมซีในระบบ ให้แอดมินเพิ่มได้ที่หน้าจัดการระบบ';
 
 const EMOJI_REACTIONS = [
   { emoji: '💖', label: 'ส่งหัวใจ' },
@@ -167,6 +168,9 @@ export function FeedList({
   stats,
   latestPhotos = [],
   featuredAlumni = [],
+  fortunes = [],
+  birthdays = [],
+  leaderboard = [],
   currentUserId,
   currentUserRole = 'alumni',
   currentUserName = 'สมชาย ใจดี',
@@ -174,6 +178,15 @@ export function FeedList({
 }: FeedListProps) {
   // Current Role (from authenticated session)
   const activeRole: 'admin' | 'alumni' = (currentUserRole as 'admin' | 'alumni') || 'alumni';
+
+  const fortuneMessages = fortunes.length > 0 ? fortunes.map((f) => f.message) : [DEFAULT_FORTUNE];
+  const birthdayAlumni = birthdays.map((b) => ({
+    id: b.id,
+    name: b.name,
+    gen: b.generation || 'ไม่ระบุรุ่น',
+    date: b.birthLabel,
+    avatar: b.avatar || b.name.slice(0, 2),
+  }));
 
   // Feed State
   const [feedPosts, setFeedPosts] = useState<Post[]>(posts);
@@ -469,9 +482,10 @@ export function FeedList({
 
   // Spin Fortune Wheel
   function handleSpinFortune() {
+    if (fortuneMessages.length <= 1) return;
     setIsSpinningFortune(true);
     setTimeout(() => {
-      setFortuneIndex((prev) => (prev + 1) % ALUMNI_FORTUNES.length);
+      setFortuneIndex((prev) => (prev + 1) % fortuneMessages.length);
       setIsSpinningFortune(false);
     }, 400);
   }
@@ -496,7 +510,7 @@ export function FeedList({
       body: JSON.stringify({ pointsAdded: 1, userId: currentUserId }),
     }).catch(() => {});
 
-    const target = BIRTHDAY_ALUMNI.find((a) => a.id === id);
+    const target = birthdayAlumni.find((a) => a.id === id);
     const targetName = target ? target.name : 'เพื่อนศิษย์เก่า';
     const targetGen = target ? target.gen : 'CSMJU';
 
@@ -1531,157 +1545,18 @@ export function FeedList({
 
       {/* ===== RIGHT SIDEBAR: INDEPENDENTLY SCROLLABLE WITH MOUSE ===== */}
       <aside className="space-y-4 sticky top-[80px] max-h-[calc(100vh-100px)] overflow-y-auto pr-1 hover:pr-0.5 transition-all">
-
-        {/* 🔮 FUN WIDGET: DAILY ALUMNI FORTUNE / QUOTE WHEEL */}
-        <div className="rounded-[26px] border border-purple-200/70 bg-gradient-to-br from-purple-50/70 via-white to-pink-50/40 p-4.5 shadow-card transition-all duration-200">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
-              <Sparkles className="h-4 w-4 text-purple-500" />
-              <span>เซียมซีศิษย์เก่าประจำวัน 🔮</span>
-            </h3>
-            <button
-              onClick={handleSpinFortune}
-              disabled={isSpinningFortune}
-              className="rounded-full bg-purple-100 px-2.5 py-1 text-xs font-bold text-purple-700 hover:bg-purple-200 transition-colors flex items-center gap-1 active:scale-95"
-            >
-              <Dices className={`h-3 w-3 ${isSpinningFortune ? 'animate-spin' : ''}`} />
-              <span>สุ่มดวง</span>
-            </button>
-          </div>
-
-          <div className="mt-3 rounded-2xl border border-purple-100/70 bg-white p-3.5 text-center shadow-2xs">
-            <p className="text-xs font-semibold text-purple-800 leading-relaxed transition-all">
-              {ALUMNI_FORTUNES[fortuneIndex]}
-            </p>
-          </div>
-        </div>
-
-
-        {/* 1. Stats Widget */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-card transition-all duration-200 text-center">
-            <p className="text-xs font-medium text-slate-400">ศิษย์เก่าในระบบ</p>
-            <p className="mt-0.5 text-lg font-extrabold text-slate-800">{stats?.totalAlumni ?? stats?.approvedUsers ?? 0}</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-card transition-all duration-200 text-center">
-            <p className="text-xs font-medium text-slate-400">ศิษย์เก่าดีเด่น</p>
-            <p className="mt-0.5 text-lg font-extrabold text-pink-500">{stats?.outstandingAlumni ?? 0}</p>
-          </div>
-        </div>
-
-        {/* 2. Gallery Widget */}
-        <div className="rounded-[26px] border border-purple-200/70 bg-white p-4.5 shadow-card transition-all duration-200">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <ImageIcon className="h-4 w-4 text-purple-400" />
-              <span>คลังภาพกิจกรรม</span>
-            </h3>
-            <Link href="/gallery" className="text-xs font-medium text-pink-500 hover:underline">
-              ดูทั้งหมด
-            </Link>
-          </div>
-          <div className="mt-2.5 space-y-2">
-            {latestPhotos.length === 0 ? (
-              <p className="text-xs text-slate-400 py-2 text-center">ไม่มีรูปภาพล่าสุด</p>
-            ) : (
-              latestPhotos.slice(0, 2).map((item) => (
-                <div key={item.id} className="flex items-center gap-3 rounded-2xl bg-purple-50/30 border border-purple-50 p-2 hover:bg-purple-50 transition-colors">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-600">
-                    <ImageIcon className="h-3.5 w-3.5" />
-                  </div>
-                  <div className="overflow-hidden">
-                    <p className="text-xs font-semibold text-slate-700 truncate">{item.title || 'รูปกิจกรรม'}</p>
-                    <p className="text-xs text-slate-400">{item.caption || 'คลังภาพศิษย์เก่า'}</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* 4. 🎂 CUTE BIRTHDAY WALL WIDGET */}
-        <div className="rounded-[26px] border border-pink-200/70 bg-gradient-to-b from-pink-50/60 via-white to-white p-4.5 shadow-card transition-all duration-200">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <PartyPopper className="h-4 w-4 text-pink-500" />
-              <span>สุขสันต์วันเกิดเดือนนี้ 🎉</span>
-            </h3>
-            <span className="rounded-full bg-pink-100 px-2 py-0.5 text-xs font-bold text-pink-600">
-              ส.ค. 2026
-            </span>
-          </div>
-
-          <div className="mt-2.5 space-y-2">
-            {BIRTHDAY_ALUMNI.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between rounded-2xl border border-pink-100/60 bg-white p-2 shadow-2xs hover:border-pink-200 transition-all"
-              >
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-pink-400 to-rose-400 font-bold text-white text-xs shadow-2xs">
-                    {item.avatar}
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-800">{item.name}</p>
-                    <p className="text-xs text-slate-400">{item.gen} • 🎂 {item.date}</p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={(e) => handleSendWish(item.id, e)}
-                  disabled={wishedIds[item.id]}
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold transition-all ${wishedIds[item.id]
-                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                      : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-2xs hover:opacity-90 active:scale-95'
-                    }`}
-                >
-                  {wishedIds[item.id] ? 'ส่งแล้ว ✨' : '🎉 อวยพร'}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 5. 🏆 TOP ACTIVE MEMBERS LEADERBOARD WIDGET */}
-        <div className="rounded-[26px] border border-amber-200/70 bg-gradient-to-b from-amber-50/50 via-white to-white p-4.5 shadow-card transition-all duration-200">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <Trophy className="h-4 w-4 text-amber-500" />
-              <span>อันดับกิจกรรมประจำเดือน 🏆</span>
-            </h3>
-            <span className="text-xs font-medium text-slate-400">Top 3</span>
-          </div>
-
-          <div className="mt-2.5 space-y-2">
-            {TOP_LEADERBOARD.map((item) => (
-              <div
-                key={item.rank}
-                className={`flex items-center justify-between rounded-2xl p-2 border transition-all ${item.rank === 1
-                    ? 'bg-gradient-to-r from-amber-50/80 to-amber-100/40 border-amber-200 shadow-2xs'
-                    : item.rank === 2
-                      ? 'bg-slate-50/80 border-slate-200'
-                      : 'bg-orange-50/40 border-orange-100'
-                  }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-sm shrink-0">{item.badge}</span>
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-800 font-bold text-white text-xs">
-                    {item.avatar}
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-800">{item.name}</p>
-                    <p className="text-xs text-slate-400">{item.gen}</p>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <p className="text-xs font-extrabold text-amber-600">{item.points}</p>
-                  <p className="text-xs text-slate-400">พอยท์</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <FortuneWidget
+          fortuneText={fortuneMessages[fortuneIndex % fortuneMessages.length]}
+          isSpinning={isSpinningFortune}
+          onSpin={handleSpinFortune}
+        />
+        <StatsWidget
+          totalAlumni={stats?.totalAlumni ?? stats?.approvedUsers ?? 0}
+          outstandingAlumni={stats?.outstandingAlumni ?? 0}
+        />
+        <GalleryWidget latestPhotos={latestPhotos} />
+        <BirthdayWidget alumni={birthdayAlumni} wishedIds={wishedIds} onSendWish={handleSendWish} />
+        <LeaderboardWidget entries={leaderboard} />
       </aside>
 
       {/* ===== CUTE FLOATING TOAST NOTIFICATION ===== */}

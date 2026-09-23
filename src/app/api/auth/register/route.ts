@@ -29,6 +29,7 @@ export async function POST(req: Request) {
       consentVerification,
       consentYearbook = true,
       consentCommunications = true,
+      birthDate,
     } = body;
 
     // ตรวจสอบความยินยอมที่จำเป็น
@@ -128,6 +129,7 @@ export async function POST(req: Request) {
     const parsedWorkProvinceId = workProvinceId ? parseInt(String(workProvinceId), 10) : parseInt(provinceOptionId, 10);
     const cleanBio = bio ? String(bio).trim() : null;
     const cleanAvatarUrl = body.avatarUrl || body.avatar_url || null;
+    const cleanBirthDate = birthDate ? String(birthDate).trim() : null;
     const isMentorship = Boolean(body.isAvailableForMentorship || body.is_available_for_mentorship);
     const showHometown = body.showHometownOnMap !== undefined ? Boolean(body.showHometownOnMap) : true;
     const showWorkplace = body.showWorkplaceOnMap !== undefined ? Boolean(body.showWorkplaceOnMap) : true;
@@ -154,9 +156,10 @@ export async function POST(req: Request) {
         show_workplace_on_map,
         bio,
         is_available_for_mentorship,
+        birth_date,
         role,
         status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'alumni', 'approved')
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, 'alumni', 'approved')
       RETURNING id, student_id, name, email, student_status, generation_option_id, province_option_id, status`,
       [
         trimmedStudentId,
@@ -177,6 +180,7 @@ export async function POST(req: Request) {
         showWorkplace,
         cleanBio,
         isMentorship,
+        cleanBirthDate,
       ]
     );
 
