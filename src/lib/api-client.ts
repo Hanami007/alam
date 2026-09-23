@@ -91,7 +91,10 @@ export const api = {
 
   // Hall of Fame API
   hof: {
-    getCandidates: () => fetchJson<any[]>('/api/hof'),
+    // /api/hof คืน { candidates, campaignStatus, campaignTitle } ไม่ใช่ array เปล่าๆ แล้ว
+    // (ต้องรู้สถานะแคมเปญเพื่อโชว์ popup วิธีโหวต / สถานะยังไม่เปิดโหวตที่หน้า Hall of Fame)
+    getCandidates: () =>
+      fetchJson<{ candidates: any[]; campaignStatus: 'open' | 'closed'; campaignTitle: string | null }>('/api/hof'),
     search: (q: string) => fetchJson<any[]>(`/api/hof/search?q=${encodeURIComponent(q)}`),
     vote: (candidateId: number) =>
       fetchJson<any>('/api/hof/vote', {
@@ -178,6 +181,13 @@ export const api = {
       fetchJson<any>('/api/admin/announcement', {
         method: 'POST',
         body: JSON.stringify(data),
+      }),
+    // Hall of Fame campaign (เปิด/ปิดการโหวต)
+    getHofCampaign: () => fetchJson<any>('/api/admin/hof-campaign'),
+    toggleHofCampaign: (status: 'open' | 'closed') =>
+      fetchJson<any>('/api/admin/hof-campaign', {
+        method: 'POST',
+        body: JSON.stringify({ status }),
       }),
     // Yearbook Data Management
     getYearbookList: () => fetchJson<any[]>('/api/admin/yearbook'),

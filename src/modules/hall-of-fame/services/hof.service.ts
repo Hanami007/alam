@@ -18,6 +18,38 @@ export interface HofCandidateRecord {
 
 export class HofDbService {
   /**
+   * ดึงสถานะแคมเปญ Hall of Fame ปัจจุบัน (ใช้แคมเปญแรกที่มีอยู่ในระบบ)
+   * คืนค่า null ถ้ายังไม่มีแคมเปญเลยในระบบ
+   */
+  async getCampaignStatus(): Promise<{ id: number; status: 'open' | 'closed'; title: string } | null> {
+    try {
+      const { rows } = await pool.query(
+        `SELECT id, status, title FROM hof_campaigns ORDER BY id ASC LIMIT 1`
+      );
+      return rows[0] ?? null;
+    } catch (err) {
+      console.error('[HofDbService] getCampaignStatus error:', err);
+      return null;
+    }
+  }
+
+  /**
+   * เปิด/ปิดการโหวต Hall of Fame — ใช้กับแคมเปญที่มีอยู่แล้วในระบบเท่านั้น (ไม่สร้างใหม่)
+   */
+  async setCampaignStatus(status: 'open' | 'closed'): Promise<{ id: number; status: string; title: string }> {
+    const { rows } = await pool.query(
+      `UPDATE hof_campaigns SET status = $1
+       WHERE id = (SELECT id FROM hof_campaigns ORDER BY id ASC LIMIT 1)
+       RETURNING id, status, title`,
+      [status]
+    );
+    if (rows.length === 0) {
+      throw new Error('ไม่พบแคมเปญ Hall of Fame ในระบบ');
+    }
+    return rows[0];
+  }
+
+  /**
    * ดึงรายชื่อผู้ได้รับการเสนอชื่อ Hall of Fame พร้อมคะแนนโหวตสะสม
    */
   async getCandidates(): Promise<HofCandidateRecord[]> {

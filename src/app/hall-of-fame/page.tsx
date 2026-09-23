@@ -7,13 +7,18 @@ import { api } from '@/lib/api-client';
 
 export default function HallOfFamePage() {
   const [candidates, setCandidates] = useState<any[]>([]);
+  const [campaignStatus, setCampaignStatus] = useState<'open' | 'closed'>('closed');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadCandidates() {
       try {
         setLoading(true);
-        const data = await api.hof.getCandidates();
+        const res = await api.hof.getCandidates();
+        // /api/hof เดิมคืน array ตรงๆ ตอนนี้เปลี่ยนเป็น { candidates, campaignStatus } เพื่อให้
+        // หน้านี้รู้ว่าตอนนี้เปิดโหวตอยู่ไหม — เผื่อ response เก่าที่ยังเป็น array (เช่น cache ค้าง) ไว้ด้วย
+        const data = Array.isArray(res) ? res : res?.candidates;
+        setCampaignStatus(!Array.isArray(res) && res?.campaignStatus === 'open' ? 'open' : 'closed');
         if (Array.isArray(data)) {
           const formatted = data.map((p: any) => {
             const genLabel: string = p.generation || p.generation_label || '';
@@ -58,7 +63,7 @@ export default function HallOfFamePage() {
           </div>
         </div>
       ) : (
-        <HallOfFameGrid initialCandidates={candidates} />
+        <HallOfFameGrid initialCandidates={candidates} campaignStatus={campaignStatus} />
       )}
     </AppShell>
   );

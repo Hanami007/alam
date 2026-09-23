@@ -25,6 +25,9 @@ import {
   Flame,
   MapPin,
   Quote,
+  Info,
+  CalendarClock,
+  HelpCircle,
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════
@@ -46,12 +49,15 @@ export interface Candidate {
 
 interface HallOfFameGridProps {
   initialCandidates: Candidate[];
+  /** สถานะแคมเปญ Hall of Fame ปัจจุบัน — ควบคุมโดยแอดมิน (เปิด/ปิดการโหวต) */
+  campaignStatus?: 'open' | 'closed';
 }
 
 /* ═══════════════════════════════════════════════
    MAIN COMPONENT
 ═══════════════════════════════════════════════ */
-export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) {
+export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'closed' }: HallOfFameGridProps) {
+  const isVotingOpen = campaignStatus === 'open';
   /* ── Merged initial data: ข้อมูลจาก DB จริงเท่านั้น (dedupe + ใส่ default คะแนน) ── */
   const mergedInitial = useMemo<Candidate[]>(() => {
     const fromApi = (initialCandidates || []).map((c) => ({
@@ -82,6 +88,15 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
   const voteErrorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* ── popup "วิธีการโหวต" — โผล่ครั้งเดียวตอนเข้าหน้านี้ขณะเปิดโหวตอยู่ ── */
+  const [showHowToVote, setShowHowToVote] = useState(isVotingOpen);
+  useEffect(() => {
+    if (isVotingOpen) setShowHowToVote(true);
+  }, [isVotingOpen]);
+
+  /* ── ตัวกรองรุ่น: กรองเฉพาะลิสต์อันดับ 4+ / ผลค้นหา (Top 3 ยังคงเป็นอันดับรวมทุกรุ่นเสมอ) ── */
+  const [selectedGeneration, setSelectedGeneration] = useState<string>('all');
 
   useEffect(() => {
     return () => {
@@ -178,9 +193,24 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
   const top3 = sortedCandidates[2];
   const maxVotes = top1?.votes || 1;
 
+  // รายชื่อรุ่นทั้งหมดที่มีอยู่จริงในข้อมูล (เรียงตามเลขรุ่นมาก→น้อย) สำหรับแท็บตัวกรอง
+  const availableGenerations = useMemo(() => {
+    const labels = new Map<string, number>();
+    for (const c of sortedCandidates) {
+      if (c.generation_label && !labels.has(c.generation_label)) {
+        labels.set(c.generation_label, c.generationNumber ?? 0);
+      }
+    }
+    return Array.from(labels.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([label]) => label);
+  }, [sortedCandidates]);
+
+  const isGenerationFilterActive = selectedGeneration !== 'all';
+
   // List candidates for table:
-  // - ค้นหา: ค้นหาจากรายชื่อทั้งหมด
-  // - กรองรุ่น: กรองตามรุ่นที่เลือก
+  // - ค้นหา: ค้นหาจากรายชื่อทั้งหมด (ไม่กรองรุ่นซ้อน เพื่อให้ค้นข้ามรุ่นได้เสมอ)
+  // - กรองรุ่น: กรองตามรุ่นที่เลือก (ตัดโควตาอันดับ 4-10 ออก แสดงทุกคนในรุ่นนั้น)
   // - ปกติ: โชว์ถึงอันดับ 10 (อันดับ 4 ถึง 10)
   const remainingCandidates = useMemo(() => {
     if (isSearchActive) {
@@ -195,9 +225,12 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
           c.description?.toLowerCase().includes(q)
       );
     }
+    if (isGenerationFilterActive) {
+      return sortedCandidates.filter((c) => c.generation_label === selectedGeneration);
+    }
     // ในตารางโชว์ถึงอันดับ 10 (index 3 ถึง 10 คืออันดับ 4 - 10)
     return sortedCandidates.slice(3, 10);
-  }, [sortedCandidates, isSearchActive, query]);
+  }, [sortedCandidates, isSearchActive, query, isGenerationFilterActive, selectedGeneration]);
 
   const totalVotesCount = useMemo(() => {
     return sortedCandidates.reduce((sum, c) => sum + (c.votes || 0), 0);
@@ -279,6 +312,73 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
           </div>
         </div>
       </div>
+
+      {!isVotingOpen ? (
+        /* ╔══════════════════════════════════════════╗
+            ║  ยังไม่เปิดโหวต — สถานะว่าง             ║
+            ╚══════════════════════════════════════════╝ */
+        <div className="bg-white rounded-[32px] border border-slate-100 p-12 sm:p-16 text-center shadow-xs">
+          <div className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-violet-50 text-violet-500 mb-4">
+            <CalendarClock className="h-8 w-8" />
+          </div>
+          <h3 className="text-lg sm:text-xl font-black text-slate-800">ยังไม่เปิดโหวตในขณะนี้</h3>
+          <p className="text-sm text-slate-500 mt-2 max-w-sm mx-auto leading-relaxed">
+            รอแอดมินประกาศเปิดโหวตศิษย์เก่าดีเด่นประจำปีนี้ก่อนนะครับ
+            เมื่อเปิดโหวตแล้วรายชื่อผู้ได้รับการเสนอชื่อจะขึ้นแสดงที่หน้านี้ทันที
+          </p>
+        </div>
+      ) : (
+      <>
+      {/* ╔══════════════════════════════════════════╗
+          ║  popup วิธีการโหวต — โผล่ครั้งเดียวตอนเข้าหน้านี้  ║
+          ╚══════════════════════════════════════════╝ */}
+      {showHowToVote && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm"
+          onClick={() => setShowHowToVote(false)}
+        >
+          <div
+            className="relative w-full max-w-sm bg-white rounded-[32px] p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowHowToVote(false)}
+              className="absolute top-4 right-4 h-8 w-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="text-center space-y-1.5">
+              <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 mb-1">
+                <HelpCircle className="h-6 w-6" />
+              </div>
+              <h3 className="text-lg font-black text-slate-800">วิธีการโหวต 💖</h3>
+            </div>
+
+            <ul className="space-y-2.5 text-sm text-slate-600">
+              <li className="flex items-start gap-2.5">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700 text-xs font-bold mt-0.5">1</span>
+                <span>ทุกคนมีสิทธิ์โหวต <b>2 ครั้ง</b> ต่อรอบ — โหวตให้ศิษย์เก่า<b>ในรุ่นตัวเอง</b>ได้ 1 ครั้ง และ<b>นอกรุ่น</b>อีก 1 ครั้ง</span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700 text-xs font-bold mt-0.5">2</span>
+                <span>กดปุ่ม <b>โหวต 💖</b> ที่การ์ดของศิษย์เก่าที่ต้องการสนับสนุน โหวตแล้วแก้ไขไม่ได้</span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700 text-xs font-bold mt-0.5">3</span>
+                <span>ทุกโหวตที่คุณส่งจะได้รับ <b>+10 แต้มสะสม</b> ทันที</span>
+              </li>
+            </ul>
+
+            <button
+              onClick={() => setShowHowToVote(false)}
+              className="w-full rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 py-3 text-sm font-bold text-white shadow-md hover:opacity-95 transition-all cursor-pointer"
+            >
+              เข้าใจแล้ว เริ่มโหวตเลย ✨
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ╔══════════════════════════════════════════╗
           ║  2+4. TOP 3 (ซ้าย) วางข้างลิสต์อันดับ 4-10 (ขวา)  ║
@@ -369,6 +469,10 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
                 <span className="shrink-0 text-xs font-bold text-pink-700 bg-pink-50 border border-pink-200/70 px-2.5 py-0.5 rounded-full">
                   ผลการค้นหา ({remainingCandidates.length})
                 </span>
+              ) : isGenerationFilterActive ? (
+                <span className="shrink-0 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2.5 py-0.5 rounded-full">
+                  {selectedGeneration} ({remainingCandidates.length} คน)
+                </span>
               ) : (
                 <span className="shrink-0 text-xs font-bold text-violet-700 bg-violet-50 border border-violet-200/70 px-2.5 py-0.5 rounded-full">
                   อันดับ 4 - 10
@@ -431,6 +535,36 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
               </button>
             </div>
           </div>
+
+          {/* Generation Filter Chips — แสดงข้อมูลศิษย์เก่าแยกตามรุ่น */}
+          {availableGenerations.length > 0 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-1 border-t border-slate-100">
+              <span className="shrink-0 text-xs font-bold text-slate-400 mr-0.5">รุ่น:</span>
+              <button
+                onClick={() => setSelectedGeneration('all')}
+                className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
+                  selectedGeneration === 'all'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                ทุกรุ่น
+              </button>
+              {availableGenerations.map((gen) => (
+                <button
+                  key={gen}
+                  onClick={() => setSelectedGeneration((prev) => (prev === gen ? 'all' : gen))}
+                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
+                    selectedGeneration === gen
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {gen}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -442,15 +576,24 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
           <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-500 mb-3">
             <Trophy className="h-7 w-7" />
           </div>
-          <h3 className="text-base font-bold text-slate-800">ไม่พบรายชื่อที่ตรงกับการค้นหา</h3>
+          <h3 className="text-base font-bold text-slate-800">
+            {isSearchActive
+              ? 'ไม่พบรายชื่อที่ตรงกับการค้นหา'
+              : isGenerationFilterActive
+              ? `ยังไม่มีผู้ได้รับการเสนอชื่อจาก ${selectedGeneration}`
+              : 'ไม่พบรายชื่อ'}
+          </h3>
           <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
             {isSearchActive
               ? `ไม่พบข้อมูลจากคำค้นหา "${query}" ลองค้นหาด้วยชื่ออื่น`
+              : isGenerationFilterActive
+              ? 'ลองเลือกดูรุ่นอื่น หรือกลับไปดูทุกรุ่น'
               : `ยังไม่มีข้อมูลเพิ่มเติมในหมวดหมู่นี้`}
           </p>
           <button
             onClick={() => {
               setQuery('');
+              setSelectedGeneration('all');
             }}
             className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-full hover:bg-slate-800 transition-colors cursor-pointer shadow-xs"
           >
@@ -762,6 +905,8 @@ export function HallOfFameGrid({ initialCandidates = [] }: HallOfFameGridProps) 
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

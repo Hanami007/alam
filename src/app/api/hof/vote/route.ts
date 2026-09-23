@@ -18,11 +18,20 @@ export async function POST(req: Request) {
     // ใช้ currentUser.id จาก session เสมอ — ห้ามเชื่อ voterId ที่ client ส่งมา (กันโหวตแทนคนอื่น)
     const voterId = currentUser.id;
 
-    // Check if user has an active campaign
+    // ตรวจสอบว่ามีแคมเปญที่เปิดโหวตอยู่หรือไม่ — เดิมเช็ค status = 'active' ซึ่งไม่มีค่านี้ใน DB จริง
+    // (DB constraint อนุญาตแค่ 'open'/'closed') ทำให้เงื่อนไขนี้ไม่เคยเป็นจริง และ fallback ไป
+    // campaignId = 1 เสมอ กลายเป็นว่าปิดโหวตแล้วก็ยังโหวตผ่านได้อยู่ดี แก้ให้เช็คค่าที่ถูกต้อง
+    // และปฏิเสธการโหวตจริงๆ เมื่อไม่มีแคมเปญที่เปิดอยู่
     const { rows: campaigns } = await pool.query(
-      `SELECT id FROM hof_campaigns WHERE status = 'active' LIMIT 1`
+      `SELECT id FROM hof_campaigns WHERE status = 'open' LIMIT 1`
     );
-    const campaignId = campaigns[0]?.id ?? 1;
+    if (campaigns.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'ขณะนี้ยังไม่เปิดโหวต Hall of Fame' },
+        { status: 403 }
+      );
+    }
+    const campaignId = campaigns[0].id;
 
     // ห้ามโหวตซ้ำผู้เข้าชิงคนเดิม
     const { rows: existingForCandidate } = await pool.query(
