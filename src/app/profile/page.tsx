@@ -14,6 +14,26 @@ export default function ProfilePage() {
   const [unlockedPhotos, setUnlockedPhotos] = useState<any[]>([]);
   const [activityLog, setActivityLog] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lookupOptions, setLookupOptions] = useState<{ generations: any[]; provinces: any[]; careerTypes: any[] }>({
+    generations: [],
+    provinces: [],
+    careerTypes: [],
+  });
+
+  useEffect(() => {
+    fetch('/api/lookup/register-data')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && !data.error) {
+          setLookupOptions({
+            generations: data.generations || [],
+            provinces: data.provinces || [],
+            careerTypes: data.careerTypes || [],
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const loadProfile = useCallback(async (isSilent = false) => {
     try {
@@ -29,12 +49,17 @@ export default function ProfilePage() {
         setUser({
           id: u.id,
           name: u.name,
+          nickname: u.nickname || '',
           student_id: u.studentId || u.student_id || '',
           email: u.email || '',
           generation: u.generation || '',
+          generation_option_id: u.generationOptionId ?? u.generation_option_id ?? null,
           province: u.province || '',
+          province_option_id: u.provinceOptionId ?? u.province_option_id ?? null,
           work_province: u.workProvince || u.work_province || '',
+          work_province_id: u.workProvinceId ?? u.work_province_id ?? null,
           career_type: u.careerType || u.career_type || '',
+          career_option_id: u.careerOptionId ?? u.career_option_id ?? null,
           company: u.company || '',
           position: u.position || '',
           bio: u.bio || '',
@@ -104,6 +129,11 @@ export default function ProfilePage() {
     return () => window.removeEventListener(USER_POINTS_UPDATED_EVENT, handlePointsUpdated);
   }, [loadProfile]);
 
+  const handleSaveProfile = useCallback(async (data: Record<string, any>) => {
+    await api.user.updateProfile(data);
+    await loadProfile(true);
+  }, [loadProfile]);
+
   return (
     <AppShell>
       {loading ? (
@@ -117,6 +147,9 @@ export default function ProfilePage() {
           taggedPhotos={taggedPhotos}
           unlockedPhotos={unlockedPhotos}
           activityLog={activityLog}
+          isOwner
+          lookupOptions={lookupOptions}
+          onSaveProfile={handleSaveProfile}
         />
       )}
     </AppShell>
