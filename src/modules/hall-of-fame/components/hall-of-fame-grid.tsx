@@ -28,6 +28,8 @@ import {
   Info,
   CalendarClock,
   HelpCircle,
+  ChevronDown,
+  GraduationCap,
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════
@@ -97,6 +99,20 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
 
   /* ── ตัวกรองรุ่น: กรองเฉพาะลิสต์อันดับ 4+ / ผลค้นหา (Top 3 ยังคงเป็นอันดับรวมทุกรุ่นเสมอ) ── */
   const [selectedGeneration, setSelectedGeneration] = useState<string>('all');
+  const [isGenDropdownOpen, setIsGenDropdownOpen] = useState(false);
+  const genDropdownRef = useRef<HTMLDivElement>(null);
+
+  // ปิดดรอปดาวน์เลือกรุ่นเมื่อคลิกนอกกรอบ
+  useEffect(() => {
+    if (!isGenDropdownOpen) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (genDropdownRef.current && !genDropdownRef.current.contains(event.target as Node)) {
+        setIsGenDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isGenDropdownOpen]);
 
   useEffect(() => {
     return () => {
@@ -383,13 +399,13 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
       {/* ╔══════════════════════════════════════════╗
           ║  2+4. TOP 3 (ซ้าย) วางข้างลิสต์อันดับ 4-10 (ขวา)  ║
           ╚══════════════════════════════════════════╝ */}
-      <div className="grid grid-cols-1 lg:grid-cols-[560px_1fr] gap-6 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_365px] gap-6 items-start">
 
       {/* ╔══════════════════════════════════════════╗
           ║  2. TOP 3 - FLOATING CIRCULAR AVATARS    ║
           ╚══════════════════════════════════════════╝ */}
       {top1 && top2 && top3 && (
-        <section className="relative rounded-[36px] border border-violet-100 bg-gradient-to-b from-white via-violet-50/30 to-pink-50/20 p-6 sm:p-7 shadow-xs overflow-hidden">
+        <section className="relative rounded-[36px] border border-violet-100 bg-gradient-to-b from-white via-violet-50/30 to-pink-50/20 p-8 sm:p-10 shadow-xs overflow-hidden">
           {/* Subtle background pastel glow aura */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-72 w-96 rounded-full bg-gradient-to-r from-amber-100/60 via-pink-100/50 to-violet-100/60 blur-3xl pointer-events-none" />
 
@@ -399,14 +415,14 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
               <Sparkles className="h-3.5 w-3.5 text-amber-500 fill-amber-400" />
               <span>TOP 3 LEADERBOARD</span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-800 flex items-center justify-center gap-1.5">
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-800 flex items-center justify-center gap-1.5">
               <span>ผู้นำคะแนนโหวต</span>
               <span>🏆</span>
             </h2>
           </div>
 
           {/* Floating Circular Top 3 Cards (2nd | 1st | 3rd) */}
-          <div className="relative z-10 grid grid-cols-3 gap-4 sm:gap-5 items-end">
+          <div className="relative z-10 grid grid-cols-3 gap-6 sm:gap-7 items-end">
             
             {/* 🥈 Rank 2 (Left / Floating Pastel Sky-Lavender) */}
             <FloatingTopCard
@@ -459,7 +475,7 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
       {/* ╔══════════════════════════════════════════╗
           ║  3. SEARCH & FILTER TOOLBAR              ║
           ╚══════════════════════════════════════════╝ */}
-      <section className="bg-white rounded-3xl border border-slate-200/70 shadow-xs p-4 sm:p-5 md:max-w-[540px] md:ml-auto">
+      <section className="bg-white rounded-3xl border border-slate-200/70 shadow-xs p-4 sm:p-5 md:max-w-[365px] md:ml-auto xl:max-w-none xl:ml-0 xl:w-full">
         <div className="flex flex-col gap-3">
           <div>
             <h3 className="text-sm sm:text-base font-extrabold text-slate-800 flex items-center gap-2 flex-wrap">
@@ -479,9 +495,6 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
                 </span>
               )}
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              ค้นหาตามชื่อ หรือรหัสนักศึกษา
-            </p>
           </div>
 
           <div className="flex items-center gap-2.5">
@@ -536,33 +549,57 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
             </div>
           </div>
 
-          {/* Generation Filter Chips — แสดงข้อมูลศิษย์เก่าแยกตามรุ่น */}
+          {/* Generation Filter Dropdown — แสดงข้อมูลศิษย์เก่าแยกตามรุ่น */}
           {availableGenerations.length > 0 && (
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-1 border-t border-slate-100">
-              <span className="shrink-0 text-xs font-bold text-slate-400 mr-0.5">รุ่น:</span>
+            <div className="relative pt-1 border-t border-slate-100" ref={genDropdownRef}>
               <button
-                onClick={() => setSelectedGeneration('all')}
-                className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
-                  selectedGeneration === 'all'
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'
+                onClick={() => setIsGenDropdownOpen((prev) => !prev)}
+                className={`w-full flex items-center justify-between gap-2 rounded-2xl border px-3.5 py-2 text-xs font-bold transition-all cursor-pointer ${
+                  isGenerationFilterActive
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                 }`}
               >
-                ทุกรุ่น
+                <span className="flex items-center gap-1.5">
+                  <GraduationCap className="h-3.5 w-3.5" />
+                  รุ่น: {selectedGeneration === 'all' ? 'ทุกรุ่น' : selectedGeneration}
+                </span>
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isGenDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
-              {availableGenerations.map((gen) => (
-                <button
-                  key={gen}
-                  onClick={() => setSelectedGeneration((prev) => (prev === gen ? 'all' : gen))}
-                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
-                    selectedGeneration === gen
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  {gen}
-                </button>
-              ))}
+
+              {isGenDropdownOpen && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 z-20 rounded-2xl border border-slate-200 bg-white shadow-md py-1.5 max-h-64 overflow-y-auto">
+                  <button
+                    onClick={() => {
+                      setSelectedGeneration('all');
+                      setIsGenDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
+                      selectedGeneration === 'all'
+                        ? 'bg-slate-900 text-white'
+                        : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    ทุกรุ่น
+                  </button>
+                  {availableGenerations.map((gen) => (
+                    <button
+                      key={gen}
+                      onClick={() => {
+                        setSelectedGeneration(gen);
+                        setIsGenDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
+                        selectedGeneration === gen
+                          ? 'bg-emerald-600 text-white'
+                          : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {gen}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -572,7 +609,7 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
           ║  4. LEADERBOARD TABLE / LIST (RANK 4+)   ║
           ╚══════════════════════════════════════════╝ */}
       {remainingCandidates.length === 0 && !isSearchLoading ? (
-        <div className="bg-white rounded-3xl border border-slate-100 p-12 text-center shadow-xs md:max-w-[540px] md:ml-auto">
+        <div className="bg-white rounded-3xl border border-slate-100 p-12 text-center shadow-xs md:max-w-[365px] md:ml-auto xl:max-w-none xl:ml-0 xl:w-full">
           <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-500 mb-3">
             <Trophy className="h-7 w-7" />
           </div>
@@ -603,12 +640,12 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
         </div>
       ) : viewMode === 'table' ? (
         /* ── TABLE / ROW LIST VIEW (Minimal & Clean) ── */
-        <div className="bg-white rounded-[28px] border border-slate-200/80 shadow-xs overflow-hidden md:max-w-[540px] md:ml-auto">
+        <div className="bg-white rounded-[28px] border border-slate-200/80 shadow-xs overflow-hidden md:max-w-[365px] md:ml-auto xl:max-w-none xl:ml-0 xl:w-full">
           {/* Desktop Table Header */}
-          <div className="hidden md:flex items-center gap-3 px-5 py-3 bg-slate-50/90 border-b border-slate-200/70 text-xs font-extrabold text-slate-500 uppercase tracking-wider">
-            <div className="w-9 shrink-0 text-center">อันดับ</div>
-            <div className="md:max-w-[260px] flex-1 min-w-0">ศิษย์เก่า</div>
-            <div className="md:ml-auto w-[95px] shrink-0 text-right pr-2 whitespace-nowrap">คะแนนโหวต</div>
+          <div className="hidden md:flex items-center gap-2 px-3.5 py-2.5 bg-slate-50/90 border-b border-slate-200/70 text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+            <div className="w-8 shrink-0 text-center whitespace-nowrap">อันดับ</div>
+            <div className="w-[185px] shrink-0 min-w-0">ศิษย์เก่า</div>
+            <div className="w-[80px] shrink-0 text-right pr-1 whitespace-nowrap">คะแนนโหวต</div>
           </div>
 
           {/* List Rows */}
@@ -626,10 +663,10 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
                   key={c.id}
                   id={`hof-row-${c.id}`}
                   onClick={() => setSelectedCandidate(c)}
-                  className="group p-3.5 sm:px-5 sm:py-3 transition-colors duration-150 hover:bg-violet-50/40 cursor-pointer flex flex-col md:flex-row gap-3 md:gap-3 md:items-center"
+                  className="group p-3 sm:px-3.5 sm:py-2.5 transition-colors duration-150 hover:bg-violet-50/40 cursor-pointer flex flex-col md:flex-row gap-2.5 md:gap-2 md:items-center"
                 >
                   {/* Rank (Mobile & Desktop) */}
-                  <div className="flex items-center justify-between md:justify-center md:w-9 md:shrink-0">
+                  <div className="flex items-center justify-between md:justify-center md:w-8 md:shrink-0">
                     <div className="flex items-center gap-2">
                       <span
                         className={`inline-flex items-center justify-center font-black rounded-lg text-xs ${
@@ -660,7 +697,7 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
                   </div>
 
                   {/* Alumni Info with Circular Avatar */}
-                  <div className="flex items-center gap-3 min-w-0 md:flex-1 md:max-w-[260px]">
+                  <div className="flex items-center gap-2.5 min-w-0 md:w-[185px] md:shrink-0">
                     <div className="relative shrink-0">
                       <img
                         src={c.avatar_url}
@@ -674,7 +711,7 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
                       )}
                     </div>
 
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="font-extrabold text-slate-800 text-sm leading-snug group-hover:text-violet-700 transition-colors truncate">
                           {c.name}
@@ -693,7 +730,7 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
                   </div>
 
                   {/* Vote Count & Action (Desktop & Mobile) */}
-                  <div className="flex items-center justify-between gap-2 self-start md:self-auto md:ml-auto md:justify-end md:w-[95px] md:shrink-0">
+                  <div className="flex items-center justify-between gap-2 self-start md:self-auto md:w-[80px] md:shrink-0">
                     {/* Vote Count */}
                     <div className="text-left md:text-right">
                       <span className="text-[11px] text-slate-400 font-medium md:hidden">คะแนน</span>
@@ -720,7 +757,7 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
         </div>
       ) : (
         /* ── CARD GRID VIEW (Optional switch) ── */
-        <div className="grid gap-4 sm:grid-cols-2 md:max-w-[540px] md:ml-auto">
+        <div className="grid gap-4 sm:grid-cols-2 md:max-w-[460px] md:ml-auto">
           {remainingCandidates.map((c, index) => {
             const rankInFull = sortedCandidates.findIndex((x) => x.id === c.id) + 1;
             const displayRank = rankInFull > 0 ? rankInFull : index + 1;
@@ -996,7 +1033,7 @@ function FloatingTopCard({
 }: FloatingTopCardProps) {
   const THEME_CONFIG = {
     gold: {
-      avatarSize: 'h-28 w-28 sm:h-32 sm:w-32',
+      avatarSize: 'w-[68%] sm:w-[60%] aspect-square',
       glowBg: 'bg-amber-300/40',
       ringColor: 'ring-2 ring-amber-300 ring-offset-2 ring-offset-amber-50/60',
       cardBg: 'bg-white/95 hover:bg-white',
@@ -1009,7 +1046,7 @@ function FloatingTopCard({
       rankTitle: 'อันดับ 1',
     },
     silver: {
-      avatarSize: 'h-22 w-22 sm:h-26 sm:w-26',
+      avatarSize: 'w-[58%] sm:w-[50%] aspect-square',
       glowBg: 'bg-sky-200/40',
       ringColor: 'ring-2 ring-sky-300 ring-offset-2 ring-offset-sky-50/60',
       cardBg: 'bg-white/90 hover:bg-white',
@@ -1022,7 +1059,7 @@ function FloatingTopCard({
       rankTitle: 'อันดับ 2',
     },
     bronze: {
-      avatarSize: 'h-22 w-22 sm:h-26 sm:w-26',
+      avatarSize: 'w-[58%] sm:w-[50%] aspect-square',
       glowBg: 'bg-rose-200/40',
       ringColor: 'ring-2 ring-rose-300 ring-offset-2 ring-offset-rose-50/60',
       cardBg: 'bg-white/90 hover:bg-white',
@@ -1041,33 +1078,33 @@ function FloatingTopCard({
   return (
     <div className={`flex flex-col items-center group ${className}`}>
       {/* ─── 1. FLOATING CIRCULAR AVATAR WITH GLOW & BADGE ─── */}
-      <div className="relative mb-2.5 flex flex-col items-center">
-        {/* Floating Halo Glow Circle */}
-        <div
-          className={`absolute -inset-2 rounded-full ${THEME_CONFIG.glowBg} blur-lg group-hover:scale-110 transition-transform duration-300 pointer-events-none`}
-        />
-
+      <div className="relative mb-2.5 flex w-full flex-col items-center">
         {/* Floating Crown above Avatar for Rank 1 */}
         {isChampion && (
           <div className="mb-1 -mt-2.5 flex items-center gap-1 animate-bounce duration-1000">
-            <Crown className="h-7 w-7 fill-amber-400 text-amber-500" />
+            <Crown className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10 fill-amber-400 text-amber-500" />
           </div>
         )}
 
-        {/* Circular Avatar Container */}
+        {/* Circular Avatar Container — ขนาดเป็น % ของความกว้างการ์ด ปรับตามพื้นที่จริงเสมอ (กันแตกที่จอแคบ/การ์ดแคบ) */}
         <div
           onClick={onSelect}
-          className="relative cursor-pointer transition-transform duration-300 group-hover:-translate-y-1"
+          className={`relative cursor-pointer transition-transform duration-300 group-hover:-translate-y-1 ${THEME_CONFIG.avatarSize}`}
         >
+          {/* Floating Halo Glow Circle */}
+          <div
+            className={`absolute -inset-2 rounded-full ${THEME_CONFIG.glowBg} blur-lg group-hover:scale-110 transition-transform duration-300 pointer-events-none`}
+          />
+
           <img
             src={candidate.avatar_url}
             alt={candidate.name}
-            className={`${THEME_CONFIG.avatarSize} rounded-full object-cover shadow-lg ${THEME_CONFIG.ringColor} transition-transform duration-300 group-hover:scale-105`}
+            className={`relative h-full w-full rounded-full object-cover shadow-lg ${THEME_CONFIG.ringColor} transition-transform duration-300 group-hover:scale-105`}
           />
 
           {/* Floating Circular Medal Badge */}
           <div
-            className={`absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full ${THEME_CONFIG.badgeBg} border-2 border-white font-black text-base shadow-md`}
+            className={`absolute -bottom-1 -right-1 flex h-[28%] w-[28%] min-h-6 min-w-6 max-h-11 max-w-11 items-center justify-center rounded-full ${THEME_CONFIG.badgeBg} border-2 border-white font-black text-xs sm:text-lg shadow-md`}
           >
             {THEME_CONFIG.medalIcon}
           </div>
@@ -1077,25 +1114,25 @@ function FloatingTopCard({
       {/* ─── 2. SOFT PASTEL CARD CONTENT ─── */}
       <div
         onClick={onSelect}
-        className={`w-full rounded-2xl border ${THEME_CONFIG.cardBg} ${THEME_CONFIG.cardBorder} px-4 py-4 text-center transition-all duration-200 hover:-translate-y-1 hover:shadow-lg cursor-pointer backdrop-blur-xs`}
+        className={`w-full rounded-2xl border ${THEME_CONFIG.cardBg} ${THEME_CONFIG.cardBorder} px-3 py-3.5 sm:px-5 sm:py-5 text-center transition-all duration-200 hover:-translate-y-1 hover:shadow-lg cursor-pointer backdrop-blur-xs`}
       >
         {/* Name */}
         <h3
           className={`font-black text-slate-800 leading-tight truncate group-hover:text-violet-700 transition-colors ${
-            isChampion ? 'text-lg sm:text-xl' : 'text-base sm:text-lg'
+            isChampion ? 'text-base sm:text-xl' : 'text-sm sm:text-lg'
           }`}
           title={candidate.name}
         >
           {candidate.name}
         </h3>
 
-        <p className="text-sm text-slate-500 font-medium mt-0.5 truncate" title={candidate.position}>
+        <p className="text-xs sm:text-base text-slate-500 font-medium mt-0.5 truncate" title={candidate.position}>
           {candidate.position}
         </p>
 
         {/* Progress Bar */}
-        <div className="mt-3">
-          <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+        <div className="mt-2.5 sm:mt-4">
+          <div className="h-2 sm:h-3.5 bg-slate-100 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full bg-gradient-to-r ${THEME_CONFIG.voteBar} transition-all duration-700`}
               style={{ width: `${votePercent}%` }}
@@ -1104,9 +1141,9 @@ function FloatingTopCard({
         </div>
 
         {/* Vote Footer */}
-        <div className="mt-3 flex items-center justify-between gap-1.5">
-          <p className={`font-black ${isChampion ? 'text-2xl' : 'text-xl'} ${THEME_CONFIG.voteCountColor}`}>
-            {candidate.votes || 0} <span className="text-sm font-medium text-slate-400">โหวต</span>
+        <div className="mt-2.5 sm:mt-4 flex items-center justify-between gap-1">
+          <p className={`font-black whitespace-nowrap ${isChampion ? 'text-lg sm:text-3xl' : 'text-base sm:text-2xl'} ${THEME_CONFIG.voteCountColor}`}>
+            {candidate.votes || 0} <span className="text-[0.55em] font-medium text-slate-400">โหวต</span>
           </p>
 
           <VoteButton
