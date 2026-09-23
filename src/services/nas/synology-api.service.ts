@@ -1,8 +1,13 @@
 /**
  * Synology DSM WebAPI Client สำหรับเชื่อมต่อกับ nas.csmju.com
  */
+import sharp from 'sharp';
 
 const NAS_HOST = process.env.NAS_BASE_URL || 'https://nas.csmju.com';
+// ไฟล์ต้นฉบับบน NAS เป็นรูปถ่ายจริงความละเอียดสูง (พบว่าบางไฟล์ ~6000x4000px, ~5MB)
+// ย่อขนาดก่อนส่งให้เว็บเสมอ (ทั้ง grid และ lightbox) ลดเวลาโหลดได้มาก โดยยังคมชัดพอสำหรับจอทั่วไป
+const DISPLAY_MAX_WIDTH = 1200;
+const DISPLAY_JPEG_QUALITY = 80;
 let cachedSid = process.env.NAS_SYNOLOGY_SID || '';
 let sidExpiresAt = 0;
 let loginPromise: Promise<string | null> | null = null;
@@ -45,8 +50,10 @@ export class SynologyApiService {
           sidExpiresAt = Date.now() + 1000 * 60 * 60 * 2; // แคชไว้ 2 ชั่วโมง
           return cachedSid;
         }
-      } catch (err: any) {
-        console.warn('[SynologyApiService] Login failed:', err.message);
+      } catch {
+        // ไม่ log err.message ตรงๆ เพราะข้อความ error บางกรณี (เช่น URL parse ผิด) จะมี
+        // NAS_PASSWORD ฝังอยู่ใน loginUrl ทำให้รหัสผ่านหลุดไปอยู่ใน log แบบ plaintext
+        console.warn('[SynologyApiService] Login failed (network or auth error)');
       } finally {
         loginPromise = null;
       }
@@ -93,8 +100,8 @@ export class SynologyApiService {
         const contentType = res.headers.get('content-type') || '';
         
         if (res.ok && contentType.startsWith('image/')) {
-          const buffer = await res.arrayBuffer();
-          const result = { buffer, contentType };
+          const originalBuffer = await res.arrayBuffer();
+          const result = await this.toDisplaySize(originalBuffer, contentType);
           imageBufferCache.set(cacheKey, result);
           return result;
         }
@@ -107,6 +114,32 @@ export class SynologyApiService {
     }
 
     return null;
+  }
+
+  /**
+   * ย่อขนาดรูปให้เหมาะกับการแสดงบนเว็บ (ไฟล์ต้นฉบับบน NAS มักเป็นรูปความละเอียดสูง
+   * ระดับกล้อง DSLR เช่น 6000x4000px ~5MB ต่อไฟล์ ซึ่งใหญ่เกินไปมากสำหรับ grid/lightbox)
+   * ถ้า resize พลาดด้วยเหตุใดก็ตาม ส่งต้นฉบับกลับไปแทน ไม่ทำให้รูปหายไปเลย
+   */
+  private async toDisplaySize(
+    originalBuffer: ArrayBuffer,
+    contentType: string
+  ): Promise<{ buffer: ArrayBuffer; contentType: string }> {
+    try {
+      const resized = await sharp(Buffer.from(originalBuffer))
+        .rotate() // หมุนตาม EXIF orientation ก่อน resize
+        .resize({ width: DISPLAY_MAX_WIDTH, withoutEnlargement: true })
+        .jpeg({ quality: DISPLAY_JPEG_QUALITY })
+        .toBuffer();
+      // Buffer ของ Node อาจใช้ shared memory pool ภายใน ทำให้ resized.buffer เป็น
+      // SharedArrayBuffer ซึ่ง NextResponse ส่งเป็น body ไม่ได้ถูกต้อง (จะได้ "[object SharedArrayBuffer]"
+      // เป็น body แทนรูปจริง) — Uint8Array.from() คัดลอกไปยัง ArrayBuffer ใหม่ที่ไม่ใช่ shared pool เสมอ
+      const freshArrayBuffer = Uint8Array.from(resized).buffer;
+      return { buffer: freshArrayBuffer, contentType: 'image/jpeg' };
+    } catch (err) {
+      console.warn('[SynologyApiService] resize failed, serving original:', (err as Error).message);
+      return { buffer: originalBuffer, contentType };
+    }
   }
 
   /**

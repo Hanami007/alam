@@ -6,12 +6,18 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { pollId, optionId } = body;
+    // ใช้ user.id จาก session เสมอ — ห้ามเชื่อ userId ที่ client ส่งมา (กันโหวตแทนคนอื่น)
     const sessionUser = await getCurrentUser();
-    const effectiveUserId = sessionUser?.id || (body.userId ? Number(body.userId) : null);
 
-    if (!pollId || !optionId || !effectiveUserId) {
+    if (!sessionUser) {
       return NextResponse.json(
-        { success: false, error: 'ข้อมูลไม่ครบถ้วน กรุณาเข้าสู่ระบบก่อนโหวต' },
+        { success: false, error: 'กรุณาเข้าสู่ระบบก่อนโหวต' },
+        { status: 401 }
+      );
+    }
+    if (!pollId || !optionId) {
+      return NextResponse.json(
+        { success: false, error: 'ข้อมูลไม่ครบถ้วน' },
         { status: 400 }
       );
     }
@@ -19,7 +25,7 @@ export async function POST(req: Request) {
     const result = await feedDbService.votePoll(
       Number(pollId),
       Number(optionId),
-      Number(effectiveUserId)
+      sessionUser.id
     );
 
     if (!result.success) {

@@ -20,6 +20,8 @@ import {
 import { PostRequestQueue } from './post-request-queue';
 import { AdminAnnouncementForm } from './admin-announcement-form';
 import { KeywordFilterManager } from './keyword-filter-manager';
+import { MemberList, type AdminMember } from './member-list';
+import { WallWidgetManager } from './wall-widget-manager';
 import { api } from '@/lib/api-client';
 
 interface AdminDashboardProps {
@@ -27,7 +29,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'posts' | 'announcement' | 'users' | 'keywords'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'announcement' | 'users' | 'members' | 'widgets' | 'keywords'>('posts');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>({
     totalAlumni: 0,
@@ -38,15 +40,20 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
   });
   const [pendingUsers, setPendingUsers] = useState<any[]>([]);
   const [postRequests, setPostRequests] = useState<any[]>([]);
+  const [members, setMembers] = useState<AdminMember[]>([]);
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
+  const [hofCampaign, setHofCampaign] = useState<{ id: number; status: 'open' | 'closed'; title: string } | null>(null);
+  const [hofToggling, setHofToggling] = useState(false);
 
   async function loadAdminData(showLoading = false) {
     if (showLoading) setLoading(true);
     try {
-      const [statsRes, usersRes, postsRes] = await Promise.allSettled([
+      const [statsRes, usersRes, postsRes, membersRes, hofRes] = await Promise.allSettled([
         api.admin.getOverview(),
         api.admin.getVerifications(),
         api.admin.getPostRequests(),
+        api.admin.getAllUsers(),
+        api.admin.getHofCampaign(),
       ]);
 
       if (statsRes.status === 'fulfilled' && statsRes.value) {
@@ -67,6 +74,12 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
           poll: p.poll,
         })));
       }
+      if (membersRes.status === 'fulfilled' && Array.isArray(membersRes.value)) {
+        setMembers(membersRes.value);
+      }
+      if (hofRes.status === 'fulfilled' && hofRes.value?.campaign) {
+        setHofCampaign(hofRes.value.campaign);
+      }
     } catch (err) {
       console.error('[AdminDashboard] Error loading data:', err);
     } finally {
@@ -80,7 +93,9 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
       api.admin.getOverview(),
       api.admin.getVerifications(),
       api.admin.getPostRequests(),
-    ]).then(([statsRes, usersRes, postsRes]) => {
+      api.admin.getAllUsers(),
+      api.admin.getHofCampaign(),
+    ]).then(([statsRes, usersRes, postsRes, membersRes, hofRes]) => {
       if (!isMounted) return;
       if (statsRes.status === 'fulfilled' && statsRes.value) {
         setStats(statsRes.value);
@@ -100,6 +115,12 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
           poll: p.poll,
         })));
       }
+      if (membersRes.status === 'fulfilled' && Array.isArray(membersRes.value)) {
+        setMembers(membersRes.value);
+      }
+      if (hofRes.status === 'fulfilled' && hofRes.value?.campaign) {
+        setHofCampaign(hofRes.value.campaign);
+      }
       setLoading(false);
     });
 
@@ -107,6 +128,11 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
       isMounted = false;
     };
   }, []);
+
+  async function handleDeleteMember(userId: number) {
+    await api.admin.deleteUser(userId);
+    setMembers((prev) => prev.filter((m) => m.id !== userId));
+  }
 
   async function handleUserVerification(userId: number, decision: 'approved' | 'rejected') {
     setActionLoadingId(userId);
@@ -122,6 +148,20 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
       alert(err.message || 'เกิดข้อผิดพลาดในการดำเนินการ');
     } finally {
       setActionLoadingId(null);
+    }
+  }
+
+  async function handleToggleHofCampaign() {
+    if (!hofCampaign || hofToggling) return;
+    const nextStatus = hofCampaign.status === 'open' ? 'closed' : 'open';
+    setHofToggling(true);
+    try {
+      const res = await api.admin.toggleHofCampaign(nextStatus);
+      if (res?.campaign) setHofCampaign(res.campaign);
+    } catch (err: any) {
+      alert(err.message || 'เกิดข้อผิดพลาดในการเปลี่ยนสถานะโหวต');
+    } finally {
+      setHofToggling(false);
     }
   }
 
@@ -161,6 +201,44 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
         ))}
       </section>
 
+      {/* เปิด/ปิดการโหวต Hall of Fame */}
+      {hofCampaign && (
+        <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+              hofCampaign.status === 'open' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'
+            }`}>
+              <Vote className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-extrabold text-slate-800">โหวตศิษย์เก่าดีเด่น: {hofCampaign.title}</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                สถานะปัจจุบัน:{' '}
+                <span className={`font-bold ${hofCampaign.status === 'open' ? 'text-emerald-600' : 'text-slate-500'}`}>
+                  {hofCampaign.status === 'open' ? 'เปิดโหวตอยู่' : 'ปิดโหวตอยู่'}
+                </span>
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleToggleHofCampaign}
+            disabled={hofToggling}
+            className={`shrink-0 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-extrabold transition-all cursor-pointer disabled:opacity-50 ${
+              hofCampaign.status === 'open'
+                ? 'bg-slate-900 text-white hover:bg-slate-800'
+                : 'bg-emerald-600 text-white hover:bg-emerald-700'
+            }`}
+          >
+            {hofToggling ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <Vote className="h-4 w-4" />
+            )}
+            <span>{hofCampaign.status === 'open' ? 'ปิดการโหวต' : 'เปิดการโหวต'}</span>
+          </button>
+        </section>
+      )}
+
       {/* Admin Function Tabs */}
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
         <button
@@ -199,6 +277,28 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
           <span>อนุมัติสมาชิกศิษย์เก่า ({pendingUsers.length})</span>
         </button>
         <button
+          onClick={() => setActiveTab('members')}
+          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
+            activeTab === 'members'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <Users className="h-4 w-4" />
+          <span>รายชื่อสมาชิกทั้งหมด ({members.length})</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('widgets')}
+          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
+            activeTab === 'widgets'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <Sparkles className="h-4 w-4" />
+          <span>จัดการวิดเจ็ตหน้าวอลล์</span>
+        </button>
+        <button
           onClick={() => setActiveTab('keywords')}
           className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
             activeTab === 'keywords'
@@ -222,6 +322,14 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
 
       {activeTab === 'keywords' && (
         <KeywordFilterManager />
+      )}
+
+      {activeTab === 'members' && (
+        <MemberList members={members} onDelete={handleDeleteMember} />
+      )}
+
+      {activeTab === 'widgets' && (
+        <WallWidgetManager />
       )}
 
       {activeTab === 'users' && (

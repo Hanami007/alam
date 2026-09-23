@@ -91,7 +91,10 @@ export const api = {
 
   // Hall of Fame API
   hof: {
-    getCandidates: () => fetchJson<any[]>('/api/hof'),
+    // /api/hof คืน { candidates, campaignStatus, campaignTitle } ไม่ใช่ array เปล่าๆ แล้ว
+    // (ต้องรู้สถานะแคมเปญเพื่อโชว์ popup วิธีโหวต / สถานะยังไม่เปิดโหวตที่หน้า Hall of Fame)
+    getCandidates: () =>
+      fetchJson<{ candidates: any[]; campaignStatus: 'open' | 'closed'; campaignTitle: string | null }>('/api/hof'),
     search: (q: string) => fetchJson<any[]>(`/api/hof/search?q=${encodeURIComponent(q)}`),
     vote: (candidateId: number) =>
       fetchJson<any>('/api/hof/vote', {
@@ -154,6 +157,7 @@ export const api = {
       workProvinceId?: number | string;
       careerOptionId?: number | string;
       isAvailableForMentorship?: boolean;
+      birthDate?: string;
     }) =>
       fetchJson<any>('/api/user/profile', {
         method: 'PUT',
@@ -171,6 +175,11 @@ export const api = {
   admin: {
     getOverview: () => fetchJson<any>('/api/admin/overview'),
     getVerifications: () => fetchJson<any[]>('/api/admin/verifications'),
+    getAllUsers: () => fetchJson<any[]>('/api/admin/users'),
+    deleteUser: (userId: number) =>
+      fetchJson<any>(`/api/admin/users?id=${encodeURIComponent(String(userId))}`, {
+        method: 'DELETE',
+      }),
     verifyUser: (userId: number, decision: 'approved' | 'rejected', remark?: string) =>
       fetchJson<any>('/api/admin/verify', {
         method: 'POST',
@@ -186,6 +195,13 @@ export const api = {
       fetchJson<any>('/api/admin/announcement', {
         method: 'POST',
         body: JSON.stringify(data),
+      }),
+    // Hall of Fame campaign (เปิด/ปิดการโหวต)
+    getHofCampaign: () => fetchJson<any>('/api/admin/hof-campaign'),
+    toggleHofCampaign: (status: 'open' | 'closed') =>
+      fetchJson<any>('/api/admin/hof-campaign', {
+        method: 'POST',
+        body: JSON.stringify({ status }),
       }),
     // Yearbook Data Management
     getYearbookList: () => fetchJson<any[]>('/api/admin/yearbook'),
@@ -214,5 +230,21 @@ export const api = {
       fetchJson<any>(`/api/admin/keywords?id=${id}`, {
         method: 'DELETE',
       }),
+    // Wall Widgets Management (เซียมซี — วันเกิดดึงจาก birth_date จริง, อันดับกิจกรรมดึงจาก Top 3 Hall of Fame จริง ไม่ได้จัดการที่นี่)
+    getWallWidgets: () =>
+      fetchJson<{ fortunes: any[] }>('/api/admin/wall-widgets'),
+    addWallFortune: (message: string) =>
+      fetchJson<any>('/api/admin/wall-widgets', {
+        method: 'POST',
+        body: JSON.stringify({ type: 'fortune', message }),
+      }),
+    removeWallFortune: (id: number) =>
+      fetchJson<any>(`/api/admin/wall-widgets?type=fortune&id=${id}`, { method: 'DELETE' }),
+  },
+
+  // Public Wall Widgets (หน้าฟีด/วอลล์)
+  wall: {
+    getWidgets: () =>
+      fetchJson<{ fortunes: any[]; birthdays: any[]; leaderboard: any[] }>('/api/wall-widgets'),
   },
 };

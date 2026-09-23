@@ -19,6 +19,24 @@ export interface PendingUserVerification {
   createdAt: string;
 }
 
+export interface AdminMemberSummary {
+  id: number;
+  studentId: string | null;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  studentStatus: string | null;
+  generation: string | null;
+  province: string | null;
+  careerType: string | null;
+  company: string | null;
+  position: string | null;
+  avatarUrl: string | null;
+  totalPoints: number;
+  createdAt: string;
+}
+
 export interface PendingPostRequest {
   id: number;
   authorId: number;
@@ -109,6 +127,105 @@ export class AdminDbService {
     } catch (err) {
       console.error('[AdminDbService] getPendingVerifications error:', err);
       return [];
+    }
+  }
+
+  /**
+   * ดึงรายชื่อสมาชิกทั้งหมดในระบบ (ทุกสถานะ) สำหรับหน้าจัดการระบบของแอดมิน
+   */
+  async getAllUsers(): Promise<AdminMemberSummary[]> {
+    try {
+      const { rows } = await pool.query(`
+        SELECT
+          u.id, u.student_id, u.name, u.email, u.role, u.status, u.student_status,
+          u.company, u.position, u.avatar_url, u.total_points, u.created_at,
+          gen.label as generation, prov.label as province, ct.label as career_type
+        FROM users u
+        LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
+        LEFT JOIN lookup_options prov ON prov.id = u.province_option_id
+        LEFT JOIN lookup_options ct ON ct.id = u.career_option_id
+        ORDER BY u.created_at DESC
+      `);
+
+      return rows.map((r) => ({
+        id: r.id,
+        studentId: r.student_id,
+        name: r.name,
+        email: r.email,
+        role: r.role,
+        status: r.status,
+        studentStatus: r.student_status,
+        generation: r.generation,
+        province: r.province,
+        careerType: r.career_type,
+        company: r.company,
+        position: r.position,
+        avatarUrl: r.avatar_url,
+        totalPoints: r.total_points,
+        createdAt: r.created_at,
+      }));
+    } catch (err) {
+      console.error('[AdminDbService] getAllUsers error:', err);
+      return [];
+    }
+  }
+
+  /**
+   * ลบสมาชิกออกจากระบบ พร้อมล้างข้อมูลทั้งหมดที่ผูกกับสมาชิกคนนั้น
+   * (โพสต์ที่ขอลง, คอมเมนต์/ปฏิกิริยา, โหวตโพล, การเป็นผู้สมัคร/โหวต HOF,
+   *  รูปที่อัปโหลด, การถูกแท็ก/แท็กผู้อื่นในรูป, ประวัติปลดล็อกรูป)
+   * ส่วนข้อมูลของ "คนอื่น" ที่แค่มีสมาชิกคนนี้เป็นแอดมินผู้อนุมัติ จะแค่ล้างอ้างอิง (set null)
+   * ไม่ลบข้อมูลของคนอื่นทิ้งไปด้วย
+   */
+  async deleteUser(userId: number): Promise<{ success: boolean; error?: string }> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // ล้างอ้างอิงที่สมาชิกคนนี้เป็นเพียง "ผู้ดำเนินการ" ให้คนอื่น — ไม่ลบข้อมูลของคนอื่น
+      await client.query(`UPDATE posts SET admin_id = NULL WHERE admin_id = $1`, [userId]);
+      await client.query(`UPDATE user_verifications SET admin_id = NULL WHERE admin_id = $1`, [userId]);
+
+      // ลบโพสต์ที่สมาชิกคนนี้ร้องขอเอง (ลบโพลของโพสต์ก่อน เพราะไม่มี cascade จาก posts)
+      await client.query(
+        `DELETE FROM polls WHERE post_id IN (SELECT id FROM posts WHERE requested_by = $1)`,
+        [userId]
+      );
+      await client.query(`DELETE FROM posts WHERE requested_by = $1`, [userId]);
+
+      // ลบกิจกรรมของสมาชิกคนนี้บนโพสต์/โพลของคนอื่น
+      await client.query(`DELETE FROM post_interactions WHERE user_id = $1`, [userId]);
+      await client.query(`DELETE FROM poll_votes WHERE user_id = $1`, [userId]);
+      await client.query(`DELETE FROM hof_votes WHERE voter_id = $1`, [userId]);
+
+      // ลบการเป็นผู้สมัคร HOF ของสมาชิกคนนี้ (cascade ลบโหวตที่ตนเองได้รับไปด้วย)
+      await client.query(`DELETE FROM hof_candidates WHERE user_id = $1`, [userId]);
+
+      // ลบรูปที่อัปโหลด (cascade ลบแท็ก/ประวัติปลดล็อกของรูปนั้นไปด้วย) และแท็กที่เกี่ยวข้องกับตัวเอง
+      await client.query(`DELETE FROM media_assets WHERE uploaded_by = $1`, [userId]);
+      await client.query(
+        `DELETE FROM photo_tags WHERE tagged_user_id = $1 OR tagged_by = $1`,
+        [userId]
+      );
+      await client.query(`DELETE FROM photo_view_verifications WHERE user_id = $1`, [userId]);
+
+      // ลบประวัติการยืนยันตัวตนของสมาชิกคนนี้เอง
+      await client.query(`DELETE FROM user_verifications WHERE user_id = $1`, [userId]);
+
+      const { rowCount } = await client.query(`DELETE FROM users WHERE id = $1`, [userId]);
+      if (!rowCount) {
+        await client.query('ROLLBACK');
+        return { success: false, error: 'ไม่พบสมาชิกที่ต้องการลบ' };
+      }
+
+      await client.query('COMMIT');
+      return { success: true };
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      console.error('[AdminDbService] deleteUser error:', err);
+      return { success: false, error: 'เกิดข้อผิดพลาดในการลบสมาชิก' };
+    } finally {
+      client.release();
     }
   }
 
@@ -314,6 +431,75 @@ export class AdminDbService {
     const keywords: string[] = rows.map((r: any) => r.keyword as string);
     const combined = texts.join(' ').toLowerCase();
     return keywords.filter((kw) => combined.includes(kw));
+  }
+
+  // ---------------------------------------------------------------
+  // Wall Widgets (เซียมซี / วันเกิดประจำเดือน / อันดับกิจกรรม)
+  // ใช้จริงใน /api/admin/wall-widgets (แอดมินจัดการ) และ /api/wall-widgets (หน้าวอลล์ดึงไปแสดง)
+  // หมายเหตุ: วันเกิด ดึงจาก users.birth_date จริง, อันดับกิจกรรม ดึงจาก Top 3 Hall of Fame จริง
+  // เหลือแค่ "เซียมซี" ที่ยังเป็นข้อความจัดการมือ เพราะไม่มีข้อมูลจริงในระบบให้ดึงมาแทน
+  // ---------------------------------------------------------------
+
+  /** สร้างตารางวิดเจ็ตหน้าวอลล์หากยังไม่มี (auto-migrate) */
+  private async ensureWallWidgetsTables() {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS wall_fortunes (
+        id         SERIAL PRIMARY KEY,
+        message    TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT now()
+      );
+    `);
+  }
+
+  /** ดึงข้อความเซียมซีทั้งหมด */
+  async getWallFortunes() {
+    await this.ensureWallWidgetsTables();
+    const { rows } = await pool.query(
+      `SELECT id, message, created_at FROM wall_fortunes ORDER BY created_at DESC`
+    );
+    return rows;
+  }
+
+  /** เพิ่มข้อความเซียมซีใหม่ */
+  async addWallFortune(message: string) {
+    await this.ensureWallWidgetsTables();
+    const { rows } = await pool.query(
+      `INSERT INTO wall_fortunes (message) VALUES ($1) RETURNING *`,
+      [message.trim()]
+    );
+    return rows[0];
+  }
+
+  /** ลบข้อความเซียมซี */
+  async removeWallFortune(id: number) {
+    await this.ensureWallWidgetsTables();
+    const { rows } = await pool.query(`DELETE FROM wall_fortunes WHERE id = $1 RETURNING *`, [id]);
+    return rows[0] ?? null;
+  }
+
+  /**
+   * ดึงรายชื่อสมาชิกที่วันนี้ตรงกับวันเกิดจริง (เดือน+วันของ birth_date ตรงกับวันนี้)
+   * มาจากข้อมูลที่สมาชิกกรอกตอนสมัคร หรือแก้ไขย้อนหลังในหน้าทำเนียบรุ่น — ไม่ใช่ข้อมูลจำลอง
+   */
+  async getTodaysBirthdays() {
+    const { rows } = await pool.query(`
+      SELECT u.id, u.name, u.birth_date, gen.label as generation
+      FROM users u
+      LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
+      WHERE u.status = 'approved'
+        AND u.birth_date IS NOT NULL
+        AND EXTRACT(MONTH FROM u.birth_date) = EXTRACT(MONTH FROM CURRENT_DATE)
+        AND EXTRACT(DAY FROM u.birth_date) = EXTRACT(DAY FROM CURRENT_DATE)
+      ORDER BY u.name
+    `);
+
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      generation: r.generation,
+      birthLabel: new Date(r.birth_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }),
+      avatar: r.name ? String(r.name).trim().slice(0, 2) : null,
+    }));
   }
 
   // ---------------------------------------------------------------
