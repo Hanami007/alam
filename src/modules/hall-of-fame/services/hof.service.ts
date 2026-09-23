@@ -50,10 +50,33 @@ export class HofDbService {
   }
 
   /**
+   * เมื่อแคมเปญเปิดโหวตอยู่ ให้ศิษย์เก่าที่ได้รับอนุมัติทุกคนเป็นผู้ถูกเสนอชื่อได้ทันที
+   * (เดิมมีแค่รายชื่อที่ seed ไว้ล่วงหน้าไม่กี่คน) — เติมแถว hof_candidates ให้ครบ
+   * เฉพาะคนที่ยังไม่มีในแคมเปญนี้ ไม่แตะแถวเดิมที่มีอยู่แล้ว (คำอธิบายผลงานเดิมไม่หาย)
+   */
+  private async ensureAllAlumniAreCandidates(campaignId: number): Promise<void> {
+    await pool.query(
+      `INSERT INTO hof_candidates (campaign_id, user_id, description)
+       SELECT $1, u.id, ''
+       FROM users u
+       WHERE u.status = 'approved' AND u.student_status = 'alumni'
+         AND NOT EXISTS (
+           SELECT 1 FROM hof_candidates hc WHERE hc.campaign_id = $1 AND hc.user_id = u.id
+         )`,
+      [campaignId]
+    );
+  }
+
+  /**
    * ดึงรายชื่อผู้ได้รับการเสนอชื่อ Hall of Fame พร้อมคะแนนโหวตสะสม
    */
   async getCandidates(): Promise<HofCandidateRecord[]> {
     try {
+      const campaign = await this.getCampaignStatus();
+      if (campaign && campaign.status === 'open') {
+        await this.ensureAllAlumniAreCandidates(campaign.id);
+      }
+
       const { rows } = await pool.query(`
         SELECT
           hc.id,
