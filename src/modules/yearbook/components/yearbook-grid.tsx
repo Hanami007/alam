@@ -72,6 +72,12 @@ export function YearbookGrid() {
 
   const [selectedAlumnus, setSelectedAlumnus] = useState<YearbookAlumnus | null>(null);
   const [alumniList, setAlumniList] = useState<YearbookAlumnus[]>([]);
+  // รุ่นที่มีข้อมูลจริงในระบบเท่านั้น (ดึงจาก lookup_options) ใช้เป็นตัวเลือกในฟอร์มแก้ไขของฉัน
+  // — เลือกได้แค่รุ่นที่มีอยู่จริง กันปัญหาเลือกรุ่นที่ไม่มีในระบบแล้วบันทึกไม่ติด
+  const [realGenerationOptions, setRealGenerationOptions] = useState<string[]>([]);
+  // รุ่นที่มีโฟลเดอร์จริงอยู่บน NAS เท่านั้น (ไม่รวมรุ่นสาธิต/ทดสอบใน lookup_options ที่ไม่มีโฟลเดอร์จริง)
+  // ใช้เป็นตัวเลือกในดรอปดาวน์กรองของหน้าหนังสือรุ่นโดยเฉพาะ ตามที่ผู้ใช้ระบุให้อิงตามข้อมูลจริงจาก NAS
+  const [nasGenerationNumbers, setNasGenerationNumbers] = useState<number[]>([]);
 
   // Generation Dropdown Selector State
   const [isGenModalOpen, setIsGenModalOpen] = useState(false);
@@ -139,8 +145,8 @@ export function YearbookGrid() {
               careerType: item.careerType || 'Software & Technology',
               province: item.province || 'เชียงใหม่',
               avatarUrl: item.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80',
-              quote: item.bio && item.bio.length > 3 ? item.bio : fallbackQuote,
-              bio: item.bio || 'ศิษย์เก่าภาควิชาวิทยาการคอมพิวเตอร์ มหาวิทยาลัยแม่โจ้',
+              quote: item.quote && item.quote.length > 3 ? item.quote : fallbackQuote,
+              bio: item.quote || 'ศิษย์เก่าภาควิชาวิทยาการคอมพิวเตอร์ มหาวิทยาลัยแม่โจ้',
               skills: ['CS MJU'],
               likesCount: 15 + idx * 3,
               laughsCount: 20 + idx * 5,
@@ -148,6 +154,22 @@ export function YearbookGrid() {
             };
           });
           setAlumniList(formatted);
+        }
+
+        // ดึงรายชื่อรุ่นที่มีข้อมูลจริงในระบบ (แหล่งเดียวกับหน้าสมัครสมาชิก) มาใช้เป็นตัวเลือก
+        // ในฟอร์มแก้ไขข้อมูลของฉัน แทนเลข 1-48 ที่ตั้งไว้ตายตัว
+        const lookupRes = await fetch('/api/lookup/register-data').then((r) => r.json()).catch(() => null);
+        if (lookupRes?.generations && Array.isArray(lookupRes.generations)) {
+          const labels: string[] = Array.from(
+            new Set<string>(lookupRes.generations.map((g: any) => String(g.label)))
+          );
+          setRealGenerationOptions(labels);
+        }
+
+        // ดึงเลขรุ่นจริงที่มีโฟลเดอร์อยู่บน NAS มาใช้เป็นตัวเลือกในดรอปดาวน์กรองของหน้านี้โดยเฉพาะ
+        const nasRes = await fetch('/api/nas/generations').then((r) => r.json()).catch(() => null);
+        if (nasRes?.generations && Array.isArray(nasRes.generations)) {
+          setNasGenerationNumbers(nasRes.generations);
         }
       } catch (err) {
         console.error('Error fetching yearbook data:', err);
@@ -255,6 +277,7 @@ export function YearbookGrid() {
         generation: myEntryForm.generation,
         isAvailableForMentorship: myEntryForm.isAvailableForMentorship,
         birthDate: myEntryForm.birthDate || undefined,
+        yearbookPublished: true,
       }).catch((err) => {
         console.error('Error updating profile to Database:', err);
       });
@@ -326,15 +349,11 @@ export function YearbookGrid() {
     }
   };
 
-  // รุ่นปัจจุบัน คำนวณจากปีที่เข้าเรียนจริงของรุ่น 43/46/48 ในฐานข้อมูล (ปีที่เข้า = ค.ศ. 1968 + เลขรุ่น)
-  // ทำให้เลื่อนรุ่นสูงสุดขึ้นเองอัตโนมัติทุกปีโดยไม่ต้องแก้โค้ด
-  const GENERATION_BASE_YEAR = 1968;
-  const currentGenerationNumber = new Date().getFullYear() - GENERATION_BASE_YEAR;
-
-  // แสดงทุกรุ่นตั้งแต่รุ่น 1 ถึงรุ่นปัจจุบัน (ไม่ใช่แค่รุ่นที่มีคนลงทะเบียนแล้ว)
+  // แสดงเฉพาะรุ่นที่มีโฟลเดอร์จริงอยู่บน NAS เท่านั้น (ไม่รวมรุ่นสาธิต/ทดสอบใน lookup_options ที่ไม่มี
+  // โฟลเดอร์จริงรองรับ) เรียงจากรุ่นน้อยไปมากตามที่ผู้ใช้ระบุ
   const availableGenerations = useMemo(() => {
-    return Array.from({ length: Math.max(currentGenerationNumber, 0) }, (_, i) => i + 1);
-  }, [currentGenerationNumber]);
+    return Array.from(new Set(nasGenerationNumbers)).sort((a, b) => a - b);
+  }, [nasGenerationNumbers]);
 
   const generations = useMemo(() => {
     return [
@@ -445,18 +464,6 @@ export function YearbookGrid() {
               รวมเรื่องราว คำคมสุดจำ และทำเนียบศิษย์เก่าภาควิชาวิทยาการคอมพิวเตอร์
             </p>
           </div>
-
-          {/* Stats pills */}
-          <div className="flex sm:flex-col gap-2 shrink-0">
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl px-4 py-2 border border-violet-200/50 text-center shadow-xs">
-              <p className="text-xs font-bold text-violet-600 tracking-wide">ศิษย์เก่าทั้งหมด</p>
-              <p className="text-lg font-black text-slate-800">{alumniList.length} คน</p>
-            </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl px-4 py-2 border border-pink-200/50 text-center shadow-xs">
-              <p className="text-xs font-bold text-pink-600 tracking-wide">แสดงอยู่</p>
-              <p className="text-lg font-black text-slate-800">{filteredAlumni.length} คน</p>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -485,7 +492,7 @@ export function YearbookGrid() {
               <div className="border-b border-slate-100 pb-3 shrink-0">
                 <h2 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
                   <GraduationCap className="h-4 w-4 text-indigo-600" />
-                  <span>เลือกรุ่นศิษย์เก่า (รุ่น 1 - รุ่น {currentGenerationNumber})</span>
+                  <span>เลือกรุ่นศิษย์เก่า ({availableGenerations.length} รุ่น)</span>
                 </h2>
               </div>
 
@@ -520,7 +527,7 @@ export function YearbookGrid() {
                 </button>
               </div>
 
-              {/* Generations List ตั้งแต่รุ่น 1 ถึงรุ่นปัจจุบัน เรียงลงมาตามลำดับ */}
+              {/* รายการรุ่นที่มีโฟลเดอร์จริงบน NAS เรียงจากรุ่นน้อยไปมาก */}
               <div className="overflow-y-auto p-1 flex flex-col gap-1.5 flex-1 mt-3 scrollbar-hide">
                 {availableGenerations.length === 0 && (
                   <p className="text-xs text-slate-400 text-center py-4">ยังไม่มีข้อมูลรุ่นในระบบ</p>
@@ -824,7 +831,7 @@ export function YearbookGrid() {
                   onChange={(e) => setMyEntryForm({ ...myEntryForm, generation: e.target.value })}
                   className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-none cursor-pointer"
                 >
-                  {Array.from({ length: 48 }, (_, i) => `รุ่น ${i + 1}`).map((gen) => (
+                  {realGenerationOptions.map((gen) => (
                     <option key={gen} value={gen}>
                       {gen}
                     </option>

@@ -159,6 +159,7 @@ export class UserDbService {
       careerOptionId?: number | string;
       isAvailableForMentorship?: boolean;
       birthDate?: string;
+      yearbookPublished?: boolean;
     }
   ) {
     const updates: string[] = [];
@@ -193,6 +194,10 @@ export class UserDbService {
       updates.push(`birth_date = $${idx++}`);
       values.push(data.birthDate || null);
     }
+    if (data.yearbookPublished !== undefined) {
+      updates.push(`yearbook_published = $${idx++}`);
+      values.push(Boolean(data.yearbookPublished));
+    }
     const mentorshipVal = data.isAvailableForMentorship !== undefined ? data.isAvailableForMentorship : (data as any).is_available_for_mentorship;
     if (mentorshipVal !== undefined) {
       updates.push(`is_available_for_mentorship = $${idx++}`);
@@ -202,6 +207,8 @@ export class UserDbService {
       updates.push(`generation_option_id = $${idx++}`);
       values.push(Number(data.generationOptionId));
     } else if (data.generation !== undefined) {
+      // เลือกได้เฉพาะรุ่นที่มีข้อมูลจริงใน lookup_options เท่านั้น (ฝั่ง frontend ดึงตัวเลือก
+      // จากที่นี่โดยตรงแล้ว) ถ้าไม่เจอแปลว่าไม่มีรุ่นนั้นจริงในระบบ ก็ไม่ต้องอัปเดต
       const genRes = await pool.query(
         `SELECT id FROM lookup_options WHERE category = 'generation' AND label = $1 LIMIT 1`,
         [data.generation]

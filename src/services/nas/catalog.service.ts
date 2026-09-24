@@ -210,7 +210,28 @@ export class NasCatalogService {
   }
 
   /**
+   * ดึงเฉพาะเลขรุ่นที่มีโฟลเดอร์จริงอยู่บน NAS (ไม่ดึงโฟลเดอร์ย่อย/รูปภาพ) สำหรับใช้เป็น
+   * ตัวเลือกในดรอปดาวน์ต่างๆ โดยไม่ต้องยิง listFiles ซ้ำต่อรุ่นแบบ getGenerationsSummary
+   */
+  async getGenerationNumbers(): Promise<number[]> {
+    const rootItems = await synologyApi.listFiles('');
+    const genNumbers = rootItems
+      .filter((i) => i.isdir)
+      .map((i) => {
+        const match = i.name.match(/^รุ่น\s*(\d+)$/);
+        return match ? parseInt(match[1], 10) : null;
+      })
+      .filter((n): n is number => n !== null)
+      .sort((a, b) => a - b);
+
+    await this.syncGenerationsToDatabase(genNumbers);
+    return genNumbers;
+  }
+
+  /**
    * ดึงโครงสร้างโฟลเดอร์รุ่นและโฟลเดอร์ย่อยทั้งหมดแบบ Real-time จาก Synology NAS
+   * ค้นหาโฟลเดอร์รุ่นจริงที่มีอยู่บน NAS เอง (ไม่ hardcode ช่วงรุ่นตายตัวแล้ว) — ถ้า NAS
+   * มีการสร้างโฟลเดอร์รุ่นใหม่เพิ่มเข้ามา ระบบจะเจอและซิงค์เข้า lookup_options ให้อัตโนมัติ
    */
   async getGenerationsSummary(): Promise<GenerationSummary[]> {
     const summaries: GenerationSummary[] = [];
@@ -231,7 +252,21 @@ export class NasCatalogService {
       32: 'อาจารย์ที่ปรึกษาของรุ่น 32 คือใคร?',
     };
 
-    for (let gen = 20; gen <= 32; gen++) {
+    // ค้นหาโฟลเดอร์รุ่นจริงทั้งหมดที่มีอยู่บนรากของ NAS (เช่น "รุ่น 20", "รุ่น32")
+    const rootItems = await synologyApi.listFiles('');
+    const genNumbers = rootItems
+      .filter((i) => i.isdir)
+      .map((i) => {
+        const match = i.name.match(/^รุ่น\s*(\d+)$/);
+        return match ? parseInt(match[1], 10) : null;
+      })
+      .filter((n): n is number => n !== null)
+      .sort((a, b) => a - b);
+
+    // ซิงค์รุ่นที่เจอจริงเข้า lookup_options ให้ครบ (สร้างเฉพาะรุ่นที่ยังไม่มี ไม่แตะรุ่นเดิม)
+    await this.syncGenerationsToDatabase(genNumbers);
+
+    for (const gen of genNumbers) {
       const genName = gen === 32 ? 'รุ่น32' : `รุ่น ${gen}`;
       const year = gen + 37;
 
@@ -251,6 +286,29 @@ export class NasCatalogService {
     }
 
     return summaries;
+  }
+
+  /**
+   * สร้างรายการรุ่นใน lookup_options ให้ครบตามโฟลเดอร์จริงบน NAS
+   * (ใช้ WHERE NOT EXISTS แทน ON CONFLICT เพราะตาราง lookup_options ไม่มี unique
+   * constraint บน (category, code) ในบาง environment)
+   */
+  private async syncGenerationsToDatabase(genNumbers: number[]): Promise<void> {
+    if (genNumbers.length === 0) return;
+    for (const gen of genNumbers) {
+      try {
+        await pool.query(
+          `INSERT INTO lookup_options (category, code, label)
+           SELECT 'generation', $1, $2
+           WHERE NOT EXISTS (
+             SELECT 1 FROM lookup_options WHERE category = 'generation' AND label = $2
+           )`,
+          [`gen-${gen}`, `รุ่น ${gen}`]
+        );
+      } catch (err) {
+        console.error(`[NasCatalogService] syncGenerationsToDatabase error for gen ${gen}:`, err);
+      }
+    }
   }
 }
 

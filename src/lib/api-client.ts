@@ -158,6 +158,7 @@ export const api = {
       careerOptionId?: number | string;
       isAvailableForMentorship?: boolean;
       birthDate?: string;
+      yearbookPublished?: boolean;
     }) =>
       fetchJson<any>('/api/user/profile', {
         method: 'PUT',

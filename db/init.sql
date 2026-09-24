@@ -28,6 +28,7 @@ create table users (
   bio                 text,
   avatar_url          text,
   birth_date          date,
+  yearbook_published  boolean not null default false,
   role                text not null default 'alumni',   -- alumni | admin
   status              text not null default 'pending',  -- pending | approved | rejected
   total_points        int not null default 0,

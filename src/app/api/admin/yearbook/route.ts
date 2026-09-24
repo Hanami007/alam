@@ -23,6 +23,7 @@ export async function GET(req: Request) {
       LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
       LEFT JOIN lookup_options prov ON prov.id = u.province_option_id
       LEFT JOIN lookup_options ct ON ct.id = u.career_option_id
+      WHERE u.yearbook_published = true
       ORDER BY u.id DESC
     `);
 
