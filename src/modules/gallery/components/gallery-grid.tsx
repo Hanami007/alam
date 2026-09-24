@@ -23,24 +23,7 @@ import {
 } from 'lucide-react';
 import { ParsedNasPhoto, GenerationSummary } from '@/services/nas/catalog.service';
 
-interface GalleryItem {
-  id: number | string;
-  title: string;
-  generation: string;
-  year?: number;
-  image: string;
-  original_image?: string;
-  originalImage?: string;
-  locked: boolean;
-  unlock_question?: string;
-  unlockQuestion?: string;
-  points_for_unlock?: number;
-  pointsForUnlock?: number;
-  tags: string[];
-}
-
 interface GalleryGridProps {
-  items: GalleryItem[];
   currentUserId: number;
   allUsers: {
     id: number;
@@ -56,20 +39,15 @@ interface GalleryGridProps {
   currentUserGeneration?: string;
 }
 
-type GalleryViewMode = 'nas_yearbook' | 'activities';
 type FilterType = 'generation' | 'year';
 
 export function GalleryGrid({
-  items: initialItems = [],
   currentUserId,
   allUsers = [],
   currentUserRole,
   currentUserGeneration,
 }: GalleryGridProps) {
   const isAdmin = currentUserRole === 'admin';
-
-  const [items, setItems] = useState(initialItems);
-  const [activeTab, setActiveTab] = useState<GalleryViewMode>('nas_yearbook');
 
   // Dynamic NAS Catalog states
   const [catalogPhotos, setCatalogPhotos] = useState<ParsedNasPhoto[]>([]);
@@ -305,38 +283,13 @@ export function GalleryGrid({
               สแกนภาพอัตโนมัติจาก NAS สกัด <span className="font-bold text-amber-300">2 ตัวหน้า (ปีการศึกษา)</span> และ <span className="font-bold text-amber-300">3 ตัวท้าย (รหัสบุคคล 301..N)</span> พร้อมระบบตอบคำถามปลดล็อก
             </p>
           </div>
-
-          <div className="flex items-center gap-1.5 rounded-2xl bg-white/10 p-1.5 backdrop-blur-md border border-white/15 shrink-0">
-            <button
-              onClick={() => setActiveTab('nas_yearbook')}
-              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                activeTab === 'nas_yearbook'
-                  ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/30'
-                  : 'text-slate-300 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <FolderTree className="h-4 w-4" />
-              <span>ทำเนียบรุ่น NAS (ปี 57-69)</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('activities')}
-              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                activeTab === 'activities'
-                  ? 'bg-gradient-to-r from-teal-500 to-emerald-600 text-white shadow-md shadow-teal-500/30'
-                  : 'text-slate-300 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <ImageIcon className="h-4 w-4" />
-              <span>ภาพกิจกรรมชมรม</span>
-            </button>
-          </div>
         </div>
       </section>
 
       {/* ───────────────────────────────────────────────────────────────── */}
-      {/* ─── TAB 1: DYNAMIC PARSER & YEARBOOK GRID WITH LOCK QUIZ ──────── */}
+      {/* ─── ทำเนียบรุ่น: DYNAMIC PARSER & YEARBOOK GRID WITH LOCK QUIZ ── */}
       {/* ───────────────────────────────────────────────────────────────── */}
-      {activeTab === 'nas_yearbook' && (
+      {(
         <div className="grid gap-6 lg:grid-cols-[290px_1fr]">
           {/* ─── LEFT: Synology FileStation Folder Tree Sidebar ───────────── */}
           <div className="rounded-[28px] border border-slate-200/90 bg-white p-4 shadow-card h-fit space-y-3">
@@ -771,58 +724,6 @@ export function GalleryGrid({
               </>
             )}
           </div>
-        </div>
-      )}
-
-      {/* ───────────────────────────────────────────────────────────────── */}
-      {/* ─── TAB 2: ACTIVITY PHOTOS & STORYTELLING ─────────────────────── */}
-      {/* ───────────────────────────────────────────────────────────────── */}
-      {activeTab === 'activities' && (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 animate-fade-in">
-          {items.length === 0 && (
-            <div className="col-span-full rounded-[28px] border border-slate-100 bg-white p-16 text-center">
-              <ImageIcon className="mx-auto h-10 w-10 text-slate-300" />
-              <p className="mt-3 text-sm font-medium text-slate-400">ยังไม่มีรูปภาพกิจกรรม</p>
-            </div>
-          )}
-
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="rounded-[28px] border border-slate-200/90 bg-white shadow-card overflow-hidden transition-all duration-200 hover:shadow-md"
-            >
-              <div
-                className="relative aspect-[4/3] overflow-hidden bg-slate-100 cursor-zoom-in"
-                onClick={() =>
-                  setLightbox({
-                    title: item.title,
-                    subtitle: item.generation,
-                    image: item.original_image || item.originalImage || item.image,
-                    tags: item.tags,
-                  })
-                }
-              >
-                <img src={item.image} alt={item.title} className="h-full w-full object-cover hover:scale-105 transition-transform" />
-                <div className="absolute bottom-2.5 left-2.5">
-                  <span className="rounded-full bg-black/50 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
-                    {item.generation}
-                  </span>
-                </div>
-              </div>
-              <div className="p-4">
-                <p className="font-semibold text-slate-900 truncate">{item.title || 'รูปกิจกรรม'}</p>
-                {item.tags && item.tags.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {item.tags.map((t, idx) => (
-                      <span key={idx} className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-600 border border-indigo-100">
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
         </div>
       )}
     </div>

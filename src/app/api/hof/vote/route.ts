@@ -71,19 +71,41 @@ export async function POST(req: Request) {
     }
 
     // ผู้ถูกโหวตได้ 1 คะแนนเสมอต่อโหวต (ไม่แบ่ง 5/10 ตามรุ่นแล้ว — รุ่นมีผลแค่กับโควตาสิทธิ์โหวต)
-    await pool.query(
-      `INSERT INTO hof_votes (campaign_id, voter_id, candidate_id, vote_category, points)
-       VALUES ($1, $2, $3, $4, 1)`,
-      [campaignId, voterId, candidateId, voteCategory]
-    );
-
-    // Add 10 points to voter for participation
+    // บันทึกโหวต + ให้แต้มผู้โหวตอยู่ใน transaction เดียวกัน — เดิมการให้แต้มห่อด้วย
+    // catch {} เงียบๆ แยกจากการบันทึกโหวต ถ้าการให้แต้มพัง โหวตจะถูกบันทึกไปแล้วแต่
+    // response ยัง success:true พร้อม pointsAwarded:10 เหมือนเดิมทุกครั้ง (โกหก client)
+    // ใช้ transaction ให้ถ้าขั้นไหนพัง ทั้งคู่ rollback กลับเป็นเหมือนไม่เคยโหวต แทน
+    const client = await pool.connect();
     try {
-      await pool.query(
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO hof_votes (campaign_id, voter_id, candidate_id, vote_category, points)
+         VALUES ($1, $2, $3, $4, 1)`,
+        [campaignId, voterId, candidateId, voteCategory]
+      );
+      await client.query(
         `UPDATE users SET total_points = total_points + 10 WHERE id = $1`,
         [voterId]
       );
-    } catch {}
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
+    }
+
+    try {
+      await pool.query(
+        `INSERT INTO point_transactions (user_id, points, reason, reference_id)
+         VALUES ($1, 10, 'hof_vote', $2)`,
+        [voterId, String(candidateId)]
+      );
+    } catch (logErr) {
+      // ตารางบันทึกประวัติแต้ม ไม่ใช่ผลลัพธ์หลักของการโหวต พังแล้วไม่ต้อง rollback การโหวต
+      // แต่ต้อง log ไว้เห็นใน server logs (เดิม catch เงียบสนิทไม่ log อะไรเลย)
+      console.error('[HOF vote] point_transactions insert failed:', logErr);
+    }
 
     return NextResponse.json({ success: true, pointsAwarded: 10, voteCategory });
   } catch (err: any) {

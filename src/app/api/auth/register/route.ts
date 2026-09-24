@@ -1,7 +1,7 @@
 import { pool } from '@/lib/db';
 import { notificationDbService } from '@/modules/notifications/services/notification.service';
 import { userDbService } from '@/modules/profile/services/user.service';
-import { hashPassword, createSession } from '@/lib/auth';
+import { hashPassword, createSession, SESSION_MAX_AGE_SECONDS } from '@/lib/auth';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
@@ -130,6 +130,8 @@ export async function POST(req: Request) {
     const cleanBio = bio ? String(bio).trim() : null;
     const cleanAvatarUrl = body.avatarUrl || body.avatar_url || null;
     const cleanBirthDate = birthDate ? String(birthDate).trim() : null;
+    const cleanFacebookUrl = body.facebookUrl ? String(body.facebookUrl).trim() : null;
+    const cleanLineId = body.lineId ? String(body.lineId).trim() : null;
     const isMentorship = Boolean(body.isAvailableForMentorship || body.is_available_for_mentorship);
     const showHometown = body.showHometownOnMap !== undefined ? Boolean(body.showHometownOnMap) : true;
     const showWorkplace = body.showWorkplaceOnMap !== undefined ? Boolean(body.showWorkplaceOnMap) : true;
@@ -157,9 +159,11 @@ export async function POST(req: Request) {
         bio,
         is_available_for_mentorship,
         birth_date,
+        facebook_url,
+        line_id,
         role,
         status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, 'alumni', 'approved')
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, 'alumni', 'approved')
       RETURNING id, student_id, name, email, student_status, generation_option_id, province_option_id, status`,
       [
         trimmedStudentId,
@@ -181,6 +185,8 @@ export async function POST(req: Request) {
         cleanBio,
         isMentorship,
         cleanBirthDate,
+        cleanFacebookUrl,
+        cleanLineId,
       ]
     );
 
@@ -253,7 +259,7 @@ export async function POST(req: Request) {
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
-        maxAge: 60 * 60 * 24 * 7, // 7 days
+        maxAge: SESSION_MAX_AGE_SECONDS, // ต้องตรงกับอายุ session จริงใน DB (createSession) และกับ /api/auth/login — เดิมตั้งไว้ 7 วันทั้งที่ DB คำนวณ 30 วันเสมอ ทำให้ cookie หลุดก่อน session จริงหมดอายุ
       });
     } catch (sessionErr) {
       console.error('[Register] Error setting auto-session cookie:', sessionErr);
