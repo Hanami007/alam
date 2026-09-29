@@ -15,7 +15,13 @@ export async function GET(req: Request) {
     }
 
     const profile = await userDbService.getUserProfile(targetUserId);
-    const unified = await alumniAggregator.getUnifiedProfileById(targetUserId);
+    let unified = null;
+    try {
+      unified = await alumniAggregator.getUnifiedProfileById(targetUserId);
+    } catch (err) {
+      // ข้อมูลจากระบบมหาวิทยาลัยเป็นข้อมูลเสริม ไม่ควรทำให้โปรไฟล์ local ล่มทั้งชุด
+      console.error('[API /api/user/profile] Alumni aggregator unavailable:', err);
+    }
     const isOwner = user ? user.id === targetUserId : false;
 
     return NextResponse.json({
