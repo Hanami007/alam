@@ -12,6 +12,10 @@ export async function POST(req: Request) {
     if (!postId || !content?.trim()) {
       return NextResponse.json({ error: 'ข้อมูลไม่ครบถ้วน' }, { status: 400 });
     }
+    // เดิมไม่มีการจำกัดความยาวคอมเมนต์เลยทั้ง client/server ยิง API ตรงใส่ยาวเท่าไหร่ก็ได้
+    if (content.trim().length > 500) {
+      return NextResponse.json({ error: 'ความคิดเห็นต้องไม่เกิน 500 ตัวอักษร' }, { status: 400 });
+    }
     // ใช้ user.id จาก session เสมอ — ห้ามเชื่อ userId ที่ client ส่งมา (กันคอมเมนต์แทนคนอื่น)
     const comment = await feedDbService.addComment(Number(postId), user.id, content.trim());
     return NextResponse.json({ success: true, comment, pointsAwarded: 1 });

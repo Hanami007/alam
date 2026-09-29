@@ -159,27 +159,54 @@ export default function RegisterPage() {
         setStudentStatus('studying');
       }
 
-      if (generations.length > 0 && calculatedGenNumber >= 1) {
-        const matched = generations.find(
-          (g: any) =>
-            g.extra?.gen_number === calculatedGenNumber ||
-            g.code === `gen-${calculatedGenNumber}` ||
-            g.label === `รุ่น ${calculatedGenNumber}`
-        );
-        if (matched) {
-          setGenerationOptionId(String(matched.id));
+      if (calculatedGenNumber >= 1) {
+        if (generations.length > 0) {
+          const matched = generations.find(
+            (g: any) =>
+              g.extra?.gen_number === calculatedGenNumber ||
+              g.code === `gen-${calculatedGenNumber}` ||
+              g.label === `รุ่น ${calculatedGenNumber}`
+          );
+          if (matched) {
+            setGenerationOptionId(String(matched.id));
+            setAutoMatchedGen({
+              genNumber: calculatedGenNumber,
+              label: matched.label,
+              yearBE,
+              prefix,
+              isNew: false,
+            });
+            return;
+          }
+
+          // ยังไม่มีตัวเลือกรุ่นนี้ในระบบ (รุ่นใหม่ที่ยังไม่เคยมีใครสมัครมาก่อน) — เซิร์ฟเวอร์จะสร้าง
+          // ตัวเลือกรุ่นนี้ให้อัตโนมัติตอนบันทึกอยู่แล้ว (ดู /api/auth/register) ไม่ต้องรอแอดมิน/โปรแกรมเมอร์
+          // มาเพิ่มให้ก่อน แค่ตั้งค่า generationOptionId เป็นค่าจำลองไว้ให้ผ่านการตรวจสอบฟอร์ม เพราะ
+          // เซิร์ฟเวอร์จะคำนวณรุ่นจากรหัสนักศึกษาทับค่านี้อยู่แล้วเสมอเมื่อรูปแบบรหัสถูกต้อง
+          setGenerationOptionId(`new-${calculatedGenNumber}`);
           setAutoMatchedGen({
             genNumber: calculatedGenNumber,
-            label: matched.label,
+            label: `รุ่น ${calculatedGenNumber}`,
             yearBE,
             prefix,
+            isNew: true,
           });
           return;
         }
+        // รายการรุ่นยังโหลดไม่เสร็จ — เดี๋ยว useEffect ด้านล่างจะคำนวณซ้ำให้เองทันทีที่โหลดเสร็จ
       }
     }
+    setGenerationOptionId('');
     setAutoMatchedGen(null);
   }
+
+  // คำนวณรุ่นซ้ำอีกครั้งเมื่อรายชื่อรุ่นโหลดเสร็จ เผื่อผู้ใช้พิมพ์รหัสนักศึกษาเสร็จก่อนที่ข้อมูลรุ่นจะโหลดมาทัน
+  useEffect(() => {
+    if (generations.length > 0 && studentId.length === 10) {
+      handleStudentIdChange(studentId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generations]);
 
   // Toggle All Consents
   const areAllConsentsSelected =
@@ -483,10 +510,18 @@ export default function RegisterPage() {
                         placeholder="เช่น 66041013xx"
                         className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white font-mono placeholder:text-slate-500 focus:border-indigo-500 focus:bg-slate-950 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all"
                       />
-                      {autoMatchedGen && (
+                      {autoMatchedGen && !autoMatchedGen.isNew && (
                         <div className="flex items-center gap-1.5 text-xs text-indigo-300 bg-indigo-500/15 border border-indigo-500/30 rounded-xl px-3 py-1.5 font-medium animate-slide-up">
                           <Sparkles className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
                           <span>เชื่อมโยง: <strong>{autoMatchedGen.label}</strong> (รหัส {autoMatchedGen.prefix}xx / เข้าปี {autoMatchedGen.yearBE})</span>
+                        </div>
+                      )}
+                      {autoMatchedGen && autoMatchedGen.isNew && (
+                        <div className="flex items-center gap-1.5 text-xs text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 rounded-xl px-3 py-1.5 font-medium animate-slide-up">
+                          <Sparkles className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                          <span>
+                            <strong>{autoMatchedGen.label}</strong> เป็นรุ่นใหม่ล่าสุดในระบบ (รหัส {autoMatchedGen.prefix}xx / เข้าปี {autoMatchedGen.yearBE}) — ระบบจะสร้างตัวเลือกรุ่นนี้ให้อัตโนมัติ
+                          </span>
                         </div>
                       )}
                     </div>

@@ -18,13 +18,19 @@ export interface HofCandidateRecord {
 
 export class HofDbService {
   /**
-   * ดึงสถานะแคมเปญ Hall of Fame ปัจจุบัน (ใช้แคมเปญแรกที่มีอยู่ในระบบ)
+   * ดึงสถานะแคมเปญ Hall of Fame "ปัจจุบัน" = แคมเปญล่าสุดที่สร้างไว้ (id มากสุด)
    * คืนค่า null ถ้ายังไม่มีแคมเปญเลยในระบบ
+   *
+   * เดิมใช้ ORDER BY id ASC (แคมเปญแรกสุด/เก่าสุด) ซึ่งขัดกับระบบ "สร้างรอบใหม่" (createNewCycle
+   * ใน hof-results.service.ts) ที่สร้างแถวใหม่ทุกครั้งที่เปิดรอบใหม่ — พอมีมากกว่า 1 แคมเปญ ปุ่ม
+   * เปิด/ปิดโหวตแบบง่ายนี้จะไปแก้แคมเปญเก่าสุดเสมอ ในขณะที่ระบบรอบใหม่มองว่าแคมเปญล่าสุดคือ
+   * "ตัวปัจจุบัน" ทำให้เปิดพร้อมกันได้ 2 แคมเปญ และหน้าโหวตจะสุ่มว่าใช้อันไหน (ไม่ deterministic)
+   * เปลี่ยนเป็น DESC ให้ทั้งสองระบบอ้างอิง "แคมเปญปัจจุบัน" เป็นแถวเดียวกันเสมอ
    */
   async getCampaignStatus(): Promise<{ id: number; status: 'open' | 'closed'; title: string } | null> {
     try {
       const { rows } = await pool.query(
-        `SELECT id, status, title FROM hof_campaigns ORDER BY id ASC LIMIT 1`
+        `SELECT id, status, title FROM hof_campaigns ORDER BY id DESC LIMIT 1`
       );
       return rows[0] ?? null;
     } catch (err) {
@@ -34,12 +40,13 @@ export class HofDbService {
   }
 
   /**
-   * เปิด/ปิดการโหวต Hall of Fame — ใช้กับแคมเปญที่มีอยู่แล้วในระบบเท่านั้น (ไม่สร้างใหม่)
+   * เปิด/ปิดการโหวต Hall of Fame — ใช้กับแคมเปญ "ปัจจุบัน" (ล่าสุด) เท่านั้น ไม่สร้างใหม่
+   * (ดูคำอธิบายเรื่อง ASC→DESC ที่ getCampaignStatus ด้านบน — ต้องอ้างอิงแคมเปญเดียวกันเสมอ)
    */
   async setCampaignStatus(status: 'open' | 'closed'): Promise<{ id: number; status: string; title: string }> {
     const { rows } = await pool.query(
       `UPDATE hof_campaigns SET status = $1
-       WHERE id = (SELECT id FROM hof_campaigns ORDER BY id ASC LIMIT 1)
+       WHERE id = (SELECT id FROM hof_campaigns ORDER BY id DESC LIMIT 1)
        RETURNING id, status, title`,
       [status]
     );
@@ -71,12 +78,17 @@ export class HofDbService {
   }
 
   /**
-   * ดึงรายชื่อผู้ได้รับการเสนอชื่อ Hall of Fame พร้อมคะแนนโหวตสะสม
+   * ดึงรายชื่อผู้ได้รับการเสนอชื่อ Hall of Fame พร้อมคะแนนโหวตสะสม — เฉพาะแคมเปญปัจจุบันเท่านั้น
+   *
+   * เดิม query นี้ไม่กรอง campaign_id เลย รวมคะแนนโหวตจาก hof_votes ทุกแคมเปญตั้งแต่วันแรก
+   * เข้าด้วยกันตลอดกาล ทำให้ "เปิดรอบใหม่" (createNewCycle) ไม่รีเซ็ตอันดับเลยตามที่ออกแบบไว้
+   * ต้องกรองด้วย hc.campaign_id เพื่อให้แต่ละรอบนับคะแนนแยกจากกันจริง
    */
   async getCandidates(): Promise<HofCandidateRecord[]> {
     try {
       const campaign = await this.getCampaignStatus();
-      if (campaign && campaign.status === 'open') {
+      if (!campaign) return [];
+      if (campaign.status === 'open') {
         await this.ensureAllAlumniAreCandidates(campaign.id);
       }
 
@@ -99,10 +111,11 @@ export class HofDbService {
         JOIN users u ON u.id = hc.user_id
         LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
         LEFT JOIN lookup_options ct ON ct.id = u.career_option_id
-        LEFT JOIN hof_votes hv ON hv.candidate_id = hc.id
+        LEFT JOIN hof_votes hv ON hv.candidate_id = hc.id AND hv.campaign_id = hc.campaign_id
+        WHERE hc.campaign_id = $1
         GROUP BY hc.id, hc.user_id, hc.description, u.student_id, u.name, u.avatar_url, u.position, u.company, u.generation_option_id, gen.label, ct.label
         ORDER BY hof_points DESC, vote_count DESC
-      `);
+      `, [campaign.id]);
 
       return rows.map((r) => ({
         id: r.id,
@@ -126,10 +139,12 @@ export class HofDbService {
   }
 
   /**
-   * ค้นหาผู้ได้รับการเสนอชื่อ Hall of Fame
+   * ค้นหาผู้ได้รับการเสนอชื่อ Hall of Fame — เฉพาะแคมเปญปัจจุบันเท่านั้น (เหตุผลเดียวกับ getCandidates)
    */
   async searchCandidates(query: string): Promise<HofCandidateRecord[]> {
     try {
+      const campaign = await this.getCampaignStatus();
+      if (!campaign) return [];
       const searchTerm = `%${query}%`;
       const { rows } = await pool.query(`
         SELECT
@@ -150,16 +165,19 @@ export class HofDbService {
         JOIN users u ON u.id = hc.user_id
         LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
         LEFT JOIN lookup_options ct ON ct.id = u.career_option_id
-        LEFT JOIN hof_votes hv ON hv.candidate_id = hc.id
-        WHERE u.name ILIKE $1
-           OR u.company ILIKE $1
-           OR u.position ILIKE $1
-           OR hc.description ILIKE $1
-           OR gen.label ILIKE $1
+        LEFT JOIN hof_votes hv ON hv.candidate_id = hc.id AND hv.campaign_id = hc.campaign_id
+        WHERE hc.campaign_id = $1
+          AND (
+            u.name ILIKE $2
+            OR u.company ILIKE $2
+            OR u.position ILIKE $2
+            OR hc.description ILIKE $2
+            OR gen.label ILIKE $2
+          )
         GROUP BY hc.id, hc.user_id, hc.description, u.student_id, u.name, u.avatar_url, u.position, u.company, u.generation_option_id, gen.label, ct.label
         ORDER BY hof_points DESC
         LIMIT 50
-      `, [searchTerm]);
+      `, [campaign.id, searchTerm]);
 
       return rows.map((r) => ({
         id: r.id,
@@ -196,7 +214,7 @@ export class HofDbService {
       throw new Error('คุณได้โหวตให้ผู้ได้รับการเสนอชื่อท่านนี้ไปแล้ว');
     }
 
-    const { rows: campaignRows } = await pool.query(`SELECT id FROM hof_campaigns LIMIT 1`);
+    const { rows: campaignRows } = await pool.query(`SELECT id FROM hof_campaigns ORDER BY id DESC LIMIT 1`);
     const campaignId = campaignRows[0]?.id;
 
     const { rows: voter } = await pool.query(`SELECT generation_option_id FROM users WHERE id = $1`, [voterId]);

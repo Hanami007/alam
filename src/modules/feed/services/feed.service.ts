@@ -270,7 +270,18 @@ export class FeedDbService {
     );
 
     if (existing.length > 0) {
+      // เดิมตอนยกเลิกไลก์ ลบแค่แถว post_interactions แต่ไม่หักแต้มที่เคยให้ไปตอนกดไลก์คืนเลย —
+      // แปลว่ากดไลก์/เลิกไลก์โพสต์เดิมซ้ำไปเรื่อยๆ จะได้ +1 แต้มสะสมทุกรอบแบบไม่มีที่สิ้นสุด (ยืนยัน
+      // แล้วด้วยการทดสอบจริง) ต้องหักแต้มคืนให้เท่ากับตอนให้ไปเป๊ะ ป้องกันการฟาร์มแต้ม
       await pool.query(`delete from post_interactions where id = $1`, [existing[0].id]);
+      await pool.query(`update users set total_points = greatest(total_points - 1, 0) where id = $1`, [userId]);
+      try {
+        await pool.query(
+          `insert into point_transactions (user_id, points, reason, reference_id)
+           values ($1, -1, 'unlike_post', $2)`,
+          [userId, String(postId)]
+        );
+      } catch {}
       return { liked: false };
     }
 
@@ -600,6 +611,38 @@ export class FeedDbService {
       [currentMonth, limit]
     );
     return rows;
+  }
+
+  /**
+   * ส่งคำอวยพรวันเกิดให้ศิษย์เก่าอีกคน — ให้ +1 แต้มแก่ผู้ส่งจริงๆ (idempotent ต่อวัน)
+   *
+   * เดิม UI (feed-list.tsx handleSendWish) โชว์ "+1 แต้ม" ให้ผู้ใช้เห็น แต่ยิง PUT
+   * /api/user/profile ด้วยฟิลด์ pointsAdded ซึ่งฝั่ง server ไม่เคยอ่านฟิลด์นี้เลย (เงียบๆ ทิ้งไป)
+   * แต้มที่เห็นเป็นแค่ state ฝั่ง browser พอรีเฟรช/ล็อกอินใหม่ก็หายไป — ทำให้เป็นสัญญาปลอม
+   * ย้ายมาเป็น endpoint เฉพาะที่ให้แต้มจริงใน DB และกันสแปม (ส่งซ้ำคนเดิมวันเดียวกันไม่ได้แต้มซ้ำ)
+   * โดยใช้ point_transactions เป็นตัวเช็คความซ้ำ (reason='birthday_wish', reference_id=`recipientId:วันที่`)
+   */
+  async sendBirthdayWish(senderId: number, recipientId: number): Promise<{ alreadySent: boolean }> {
+    if (senderId === recipientId) {
+      throw new Error('ไม่สามารถอวยพรวันเกิดให้ตัวเองได้');
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const referenceId = `${recipientId}:${today}`;
+
+    const { rows: existing } = await pool.query(
+      `SELECT id FROM point_transactions WHERE user_id = $1 AND reason = 'birthday_wish' AND reference_id = $2`,
+      [senderId, referenceId]
+    );
+    if (existing.length > 0) {
+      return { alreadySent: true };
+    }
+
+    await pool.query(`UPDATE users SET total_points = total_points + 1 WHERE id = $1`, [senderId]);
+    await pool.query(
+      `INSERT INTO point_transactions (user_id, points, reason, reference_id) VALUES ($1, 1, 'birthday_wish', $2)`,
+      [senderId, referenceId]
+    );
+    return { alreadySent: false };
   }
 
   /** ศิษย์เก่าแบบสุ่ม — สำหรับวิดเจ็ต icebreaker บน sidebar */

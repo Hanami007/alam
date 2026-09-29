@@ -36,40 +36,48 @@ import {
   type AppNotification,
 } from '@/lib/events';
 
-const INITIAL_NOTIFICATIONS: AppNotification[] = [
-  {
-    id: 'n_bday_1',
-    type: 'birthday',
-    title: 'สุขสันต์วันเกิด! 🎂',
-    description: 'พี่ณัฐพล ชัยชนะ (รุ่น 38) ส่งคำอวยพรวันเกิดให้คุณ 🎉 (+1 แต้ม)',
-    time: '5 นาทีที่แล้ว',
-    unread: true,
-  },
-  {
-    id: 'n_poll_1',
-    type: 'poll',
-    title: 'มีโพลใหม่ให้โหวต 📊',
-    description: 'ศิษย์เก่าดีเด่นประจำปี 2569 (+5 แต้ม)',
-    time: '15 นาทีที่แล้ว',
-    unread: true,
-  },
-  {
-    id: 'n_verify_1',
-    type: 'verify',
-    title: 'ยืนยันตัวตนสำเร็จ ✨',
-    description: 'Admin อนุมัติบัญชีศิษย์เก่าแล้ว',
-    time: '1 ชั่วโมงที่แล้ว',
-    unread: false,
-  },
-  {
-    id: 'n_comment_1',
-    type: 'comment',
-    title: 'ความคิดเห็นใหม่ 💬',
-    description: 'สมพงษ์ ตอบกลับโพสต์ของคุณ',
-    time: 'เมื่อวานนี้',
-    unread: false,
-  },
-];
+// ไอคอน/สีของการแจ้งเตือนแยกตาม type จริงจาก DB (admin_pending, batchmate_pending, user_approved,
+// system) รวมถึง type ที่ใช้เฉพาะฝั่ง client สำหรับ event จำลอง (birthday, poll, comment, general)
+const NOTIF_ICON_MAP: Record<string, { icon: any; bg: string; color: string }> = {
+  birthday: { icon: PartyPopper, bg: 'bg-pink-100', color: 'text-pink-600' },
+  poll: { icon: Sparkles, bg: 'bg-purple-100', color: 'text-purple-600' },
+  verify: { icon: CheckCheck, bg: 'bg-emerald-500/10', color: 'text-emerald-600' },
+  user_approved: { icon: CheckCheck, bg: 'bg-emerald-500/10', color: 'text-emerald-600' },
+  admin_pending: { icon: Shield, bg: 'bg-amber-100', color: 'text-amber-600' },
+  batchmate_pending: { icon: User, bg: 'bg-indigo-100', color: 'text-indigo-600' },
+  system: { icon: Bell, bg: 'bg-slate-100', color: 'text-slate-600' },
+  comment: { icon: MessageSquare, bg: 'bg-slate-100', color: 'text-slate-600' },
+  general: { icon: MessageSquare, bg: 'bg-slate-100', color: 'text-slate-600' },
+};
+const DEFAULT_NOTIF_ICON = NOTIF_ICON_MAP.general;
+
+function formatRelativeTimeTH(dateStr: string): string {
+  const then = new Date(dateStr).getTime();
+  if (Number.isNaN(then)) return '';
+  const diffMin = Math.floor((Date.now() - then) / 60000);
+  if (diffMin < 1) return 'เมื่อสักครู่';
+  if (diffMin < 60) return `${diffMin} นาทีที่แล้ว`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} ชั่วโมงที่แล้ว`;
+  const diffDay = Math.floor(diffHour / 24);
+  if (diffDay === 1) return 'เมื่อวานนี้';
+  if (diffDay < 7) return `${diffDay} วันที่แล้ว`;
+  return new Date(dateStr).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** แปลงแถวจากตาราง notifications (DB จริง) ให้เป็นรูปแบบที่ UI ใช้แสดงผล */
+function mapDbNotification(n: any): AppNotification {
+  return {
+    id: `db_${n.id}`,
+    dbId: n.id,
+    type: n.type,
+    title: n.title,
+    description: n.message,
+    time: formatRelativeTimeTH(n.created_at),
+    unread: !n.is_read,
+    link: n.link || undefined,
+  };
+}
 
 const MAIN_NAV = [
   { href: '/feed', label: 'วอลล์/ฟีด', icon: Sparkles },
@@ -153,14 +161,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
-  const [notifications, setNotifications] = useState<AppNotification[]>(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  // แสดงเฉพาะรายการที่ยังไม่อ่าน — พออ่านแล้ว (คลิก/กดอ่านทั้งหมด) จะถือว่า "ล้าง" ออกจาก
+  // กระดิ่งไปเลยโดยอัตโนมัติ ส่วนแถวจริงใน DB ยังเก็บไว้ (is_read=true) ไม่ได้ลบทิ้ง
+  const visibleNotifications = notifications.filter((n) => n.unread);
 
   const notifPopoverRef = useRef<HTMLDivElement>(null);
   const notifBtnMobileRef = useRef<HTMLDivElement>(null);
   const notifBtnDesktopRef = useRef<HTMLDivElement>(null);
   const avatarRef = useRef<HTMLDivElement>(null);
 
-  const unreadNotifCount = notifications.filter((n) => n.unread).length;
+  const unreadNotifCount = visibleNotifications.length;
   const isAdmin = currentUser?.role === 'admin';
   const navAccountItems = ACCOUNT_NAV.filter((item) => !item.adminOnly || isAdmin);
 
@@ -243,38 +254,71 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [fetchUserProfile]);
 
-  const [thankedNotifIds, setThankedNotifIds] = useState<Record<string, boolean>>({});
-
-  function handleSendThankYou(notifId: string, _description?: string) {
-    setThankedNotifIds((prev) => ({ ...prev, [notifId]: true }));
-    handleMarkAsRead(notifId);
-
-    // Reward points for gratitude
-    notifyPointsUpdated(1);
-    if (currentUser?.id) {
-      fetch('/api/user/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pointsAdded: 1, userId: currentUser.id }),
-      }).catch(() => {});
+  // ดึงการแจ้งเตือนจริงจาก DB (ตาราง notifications) เมื่อล็อกอินแล้ว และ poll ซ้ำทุก 30 วิ
+  // เพื่อให้เห็นของใหม่โดยไม่ต้องรีเฟรชหน้าเอง — merge กับรายการที่มาจาก event จำลองในเบราว์เซอร์
+  // (เช่น toast ยืนยันส่งคำอวยพรวันเกิด) ซึ่งไม่มี dbId ไว้ด้วยกัน ไม่ทับกัน
+  useEffect(() => {
+    if (!currentUser?.id) {
+      setNotifications((prev) => prev.filter((n) => !n.dbId));
+      return;
     }
 
-    // Add confirmation notification
-    notifyNewNotification({
-      type: 'general',
-      title: 'ส่งคำขอบคุณสำเร็จ! 💌',
-      description: 'ส่งคำขอบคุณสำหรับคำอวยพรวันเกิดเรียบร้อยแล้ว (+1 แต้ม)',
-    });
-  }
+    let cancelled = false;
+
+    async function fetchNotifications() {
+      try {
+        const res = await fetch('/api/notifications');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled || !Array.isArray(data.notifications)) return;
+        const dbMapped = data.notifications.map(mapDbNotification);
+        setNotifications((prev) => {
+          const localOnly = prev.filter((n) => !n.dbId);
+          return [...dbMapped, ...localOnly];
+        });
+      } catch {
+        // ดึงแจ้งเตือนไม่สำเร็จรอบนี้ — เงียบไว้ก่อน ไม่กระทบการใช้งานหลัก รอ poll รอบถัดไป
+      }
+    }
+
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [currentUser?.id]);
 
   function handleMarkAllAsRead() {
+    const hadRealUnread = notifications.some((n) => n.unread && n.dbId);
     setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+    if (hadRealUnread) {
+      fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true }),
+      }).catch(() => {});
+    }
   }
 
   function handleMarkAsRead(id: string) {
+    const target = notifications.find((n) => n.id === id);
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, unread: false } : n))
     );
+    // แจ้งเตือนจริงจาก DB เท่านั้นที่ต้องยิง API บันทึกสถานะอ่านแล้ว — รายการจำลองในเบราว์เซอร์
+    // (ไม่มี dbId) แค่เปลี่ยน state ฝั่ง client พอ
+    if (target?.dbId) {
+      fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notifId: target.dbId }),
+      }).catch(() => {});
+    }
+    if (target?.link) {
+      setNotifOpen(false);
+      router.push(target.link);
+    }
   }
 
   async function handleLogout() {
@@ -408,24 +452,25 @@ export function AppShell({ children }: { children: ReactNode }) {
               <button
                 onClick={handleMarkAllAsRead}
                 className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                title="ทำเครื่องหมายว่าอ่านแล้วทั้งหมด แล้วล้างออกจากรายการนี้"
               >
                 <CheckCheck className="h-3.5 w-3.5" />
-                อ่านทั้งหมด
+                ล้างทั้งหมด
               </button>
             )}
           </div>
 
           <div className="max-h-[340px] overflow-y-auto divide-y divide-border/60 text-xs">
-            {notifications.length === 0 ? (
+            {visibleNotifications.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
                 <Bell className="mx-auto h-8 w-8 text-slate-300 mb-2" />
                 <p>ยังไม่มีการแจ้งเตือน</p>
               </div>
             ) : (
-              notifications.map((item) => {
+              visibleNotifications.map((item) => {
                 const isBirthday = item.type === 'birthday';
-                const isPoll = item.type === 'poll';
-                const isVerify = item.type === 'verify';
+                const iconInfo = NOTIF_ICON_MAP[item.type] || DEFAULT_NOTIF_ICON;
+                const NotifIcon = iconInfo.icon;
 
                 return (
                   <div
@@ -440,52 +485,15 @@ export function AppShell({ children }: { children: ReactNode }) {
                     }`}
                   >
                     <div
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl mt-0.5 shadow-2xs ${
-                        isBirthday
-                          ? 'bg-pink-100 text-pink-600'
-                          : isPoll
-                          ? 'bg-purple-100 text-purple-600'
-                          : isVerify
-                          ? 'bg-emerald-500/10 text-emerald-600'
-                          : 'bg-slate-100 text-slate-600'
-                      }`}
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl mt-0.5 shadow-2xs ${iconInfo.bg} ${iconInfo.color}`}
                     >
-                      {isBirthday ? (
-                        <PartyPopper className="h-4 w-4" />
-                      ) : isPoll ? (
-                        <Sparkles className="h-4 w-4" />
-                      ) : isVerify ? (
-                        <CheckCheck className="h-4 w-4" />
-                      ) : (
-                        <MessageSquare className="h-4 w-4" />
-                      )}
+                      <NotifIcon className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className={`text-xs ${item.unread ? 'font-bold text-foreground' : 'font-medium text-slate-700'}`}>
                         {item.title}
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{item.description}</p>
-                      
-                      {/* Quick Thank-You Button for Birthday Wishes */}
-                      {isBirthday && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSendThankYou(item.id, item.description);
-                            }}
-                            disabled={Boolean(thankedNotifIds[item.id])}
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition-all ${
-                              thankedNotifIds[item.id]
-                                ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-2xs'
-                                : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-2xs hover:opacity-90 active:scale-95 cursor-pointer'
-                            }`}
-                          >
-                            <span>{thankedNotifIds[item.id] ? '🙏 ส่งคำขอบคุณแล้ว ✨' : '🙏 ส่งคำขอบคุณ (+1 แต้ม)'}</span>
-                          </button>
-                        </div>
-                      )}
 
                       <span className="text-[11px] text-muted-foreground/80 mt-1 inline-block font-medium">
                         {item.time}

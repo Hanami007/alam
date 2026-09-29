@@ -86,10 +86,10 @@ function generateGraduationPortraitSvg(studentId: string, name: string, code3: s
 
 export async function GET(
   req: Request,
-  { params }: { params?: Promise<{ slug: string[] }> }
+  { params }: { params: Promise<{ slug: string[] }> }
 ) {
   try {
-    const slugParams = params ? await params : { slug: [] };
+    const slugParams = await params;
     const slug = slugParams.slug || [];
     const { searchParams } = new URL(req.url);
 

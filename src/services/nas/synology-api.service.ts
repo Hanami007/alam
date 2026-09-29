@@ -2,6 +2,7 @@
  * Synology DSM WebAPI Client สำหรับเชื่อมต่อกับ nas.csmju.com
  */
 import sharp from 'sharp';
+import { LRUCache } from 'lru-cache';
 
 const NAS_HOST = process.env.NAS_BASE_URL || 'https://nas.csmju.com';
 // ไฟล์ต้นฉบับบน NAS เป็นรูปถ่ายจริงความละเอียดสูง (พบว่าบางไฟล์ ~6000x4000px, ~5MB)
@@ -12,8 +13,14 @@ let cachedSid = process.env.NAS_SYNOLOGY_SID || '';
 let sidExpiresAt = 0;
 let loginPromise: Promise<string | null> | null = null;
 
-// In-memory cache สำหรับเก็บรูปที่ดาวน์โหลดมาแล้ว เพื่อความเร็วสูงสุด
-const imageBufferCache = new Map<string, { buffer: ArrayBuffer; contentType: string }>();
+// LRU Cache สำหรับเก็บรูปที่ดาวน์โหลดมาแล้ว — มีขีดจำกัดไม่ให้ memory บวมและ crash
+// max: 200 รูป, maxSize: 500MB รวม, TTL: 2 ชั่วโมง (ตรงกับอายุ SID)
+const imageBufferCache = new LRUCache<string, { buffer: ArrayBuffer; contentType: string }>({
+  max: 200,
+  maxSize: 500 * 1024 * 1024,                    // 500 MB
+  sizeCalculation: (v) => v.buffer.byteLength,
+  ttl: 1000 * 60 * 60 * 2,                       // 2 ชั่วโมง
+});
 
 export class SynologyApiService {
   /**

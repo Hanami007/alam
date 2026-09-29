@@ -32,7 +32,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'ไม่สามารถลบบัญชีของตนเองได้' }, { status: 400 });
     }
 
-    const result = await adminDbService.deleteUser(userId);
+    const result = await adminDbService.deleteUser(userId, user.id);
     if (!result.success) {
       return NextResponse.json({ error: result.error || 'ลบสมาชิกไม่สำเร็จ' }, { status: 400 });
     }

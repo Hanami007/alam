@@ -87,12 +87,16 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    sendBirthdayWish: (recipientId: number) =>
+      fetchJson<{ success: boolean; alreadySent: boolean; pointsAwarded: number }>('/api/feed/birthday-wish', {
+        method: 'POST',
+        body: JSON.stringify({ recipientId }),
+      }),
   },
 
   // Hall of Fame API
   hof: {
     // /api/hof คืน { candidates, campaignStatus, campaignTitle } ไม่ใช่ array เปล่าๆ แล้ว
-    // (ต้องรู้สถานะแคมเปญเพื่อโชว์ popup วิธีโหวต / สถานะยังไม่เปิดโหวตที่หน้า Hall of Fame)
     getCandidates: () =>
       fetchJson<{ candidates: any[]; campaignStatus: 'open' | 'closed'; campaignTitle: string | null }>('/api/hof'),
     search: (q: string) => fetchJson<any[]>(`/api/hof/search?q=${encodeURIComponent(q)}`),
@@ -101,6 +105,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ candidateId }),
       }),
+    // ผล TOP 10 ทุกรอบ (ใช้ใน /hall-of-fame/results)
+    getResultsHistory: () => fetchJson<{ success: boolean; cycles: any[] }>('/api/hof/results/history'),
   },
 
   // Gallery & Photo Archive API
@@ -190,18 +196,40 @@ export const api = {
         body: JSON.stringify({ userId, decision, remark }),
       }),
     getPostRequests: () => fetchJson<any[]>('/api/admin/post-requests'),
+    getAuditLogs: () => fetchJson<any>('/api/admin/audit-logs'),
     createAnnouncement: (data: { title: string; body: string; category?: string; pinned?: boolean }) =>
       fetchJson<any>('/api/admin/announcement', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    // Hall of Fame campaign (เปิด/ปิดการโหวต)
+    // Hall of Fame campaign management (quarterly cycle)
     getHofCampaign: () => fetchJson<any>('/api/admin/hof-campaign'),
     toggleHofCampaign: (status: 'open' | 'closed') =>
       fetchJson<any>('/api/admin/hof-campaign', {
         method: 'POST',
         body: JSON.stringify({ status }),
       }),
+    hofCreateCycle: (data: { title: string; period_start: string; period_end: string; quarter?: string }) =>
+      fetchJson<any>('/api/admin/hof-campaign/new', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    hofFinalize: (campaignId: number) =>
+      fetchJson<any>('/api/admin/hof-campaign/finalize', {
+        method: 'POST',
+        body: JSON.stringify({ campaign_id: campaignId }),
+      }),
+    hofHistory: () => fetchJson<any>('/api/admin/hof-campaign/history'),
+    hofUpdateResult: (resultId: number, data: { rank?: number; achievement?: string }) =>
+      fetchJson<any>(`/api/admin/hof-campaign/results/${resultId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    hofDeleteResult: (resultId: number) =>
+      fetchJson<any>(`/api/admin/hof-campaign/results/${resultId}`, { method: 'DELETE' }),
+    getPublicApiKey: () => fetchJson<{ apiKey: string | null }>('/api/admin/public-api-key'),
+    regeneratePublicApiKey: () =>
+      fetchJson<{ success: boolean; apiKey: string }>('/api/admin/public-api-key', { method: 'POST' }),
     // Yearbook Data Management
     getYearbookList: () => fetchJson<any[]>('/api/admin/yearbook'),
     addYearbookEntry: (data: { name: string; nickname?: string; avatarUrl?: string; quote?: string; generation?: string }) =>

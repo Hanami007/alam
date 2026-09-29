@@ -8,7 +8,7 @@ export async function GET(req: Request) {
 
     if (q.trim() === '') {
       const profiles = await hofDbService.getCandidatesLegacyFormat();
-      const results = profiles.map((p: any, idx: number) => ({
+      const results = profiles.map((p: any) => ({
         id: p.id,
         name: p.name,
         company: p.company || '',
@@ -16,13 +16,13 @@ export async function GET(req: Request) {
         avatar_url: p.image || p.avatar_url || '',
         description: p.achievement || p.description || '',
         generation_label: p.generation || p.generation_label || '',
-        votes: p.hof_points && p.hof_points > 0 ? p.hof_points : 184 - idx * 28,
+        votes: p.hof_points ?? 0,  // คะแนนจริงจาก DB (ไม่มี fake fallback)
       }));
       return NextResponse.json({ results });
     }
 
     const rows = await hofDbService.searchCandidatesLegacyFormat(q.trim());
-    const results = rows.map((r: any, idx: number) => ({
+    const results = rows.map((r: any) => ({
       id: r.id,
       name: r.name,
       company: r.company || '',
@@ -30,7 +30,7 @@ export async function GET(req: Request) {
       avatar_url: r.avatar_url || r.image || '',
       description: r.description || r.achievement || '',
       generation_label: r.generation_label || r.generation || '',
-      votes: r.votes ?? r.hof_points ?? (150 - idx * 20),
+      votes: r.votes ?? r.hof_points ?? 0,  // คะแนนจริงจาก DB (ไม่มี fake fallback)
     }));
 
     return NextResponse.json({ results });

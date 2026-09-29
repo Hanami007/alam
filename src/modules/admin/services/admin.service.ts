@@ -66,11 +66,19 @@ export class AdminDbService {
       const { rows: alumniCount } = await pool.query(
         `SELECT COUNT(*)::int as count FROM users WHERE role = 'alumni' AND status = 'approved'`
       );
+      // เดิมนับ COUNT(*) ของ "ตัวเลือกรุ่น" ทั้งหมดใน dropdown สมัครสมาชิก (ปัจจุบัน 44 ตัวเลือก)
+      // ซึ่งเป็นค่าคงที่ของ dropdown ไม่ใช่จำนวนรุ่นที่มีศิษย์เก่าจริงอยู่เลย — เปลี่ยนมานับจำนวน
+      // รุ่นที่แตกต่างกันจริงจากศิษย์เก่าที่อนุมัติแล้วแทน ให้ตรงกับความหมายของป้าย "รุ่นศิษย์เก่าทั้งหมด"
       const { rows: genCount } = await pool.query(
-        `SELECT COUNT(*)::int as count FROM lookup_options WHERE category = 'generation'`
+        `SELECT COUNT(DISTINCT generation_option_id)::int as count
+         FROM users WHERE status = 'approved' AND generation_option_id IS NOT NULL`
       );
+      // เดิมนับ COUNT(*) ของ hof_candidates ทุกแคมเปญสะสมตลอดกาล ซึ่งมีแต่จะโตขึ้นเรื่อยๆ ไม่เคย
+      // ลดลง และไม่ได้แปลว่า "ดีเด่น/ชนะแล้ว" จริง (ระบบนี้ไม่มีสถานะผู้ชนะเลย) — จำกัดเฉพาะ
+      // แคมเปญล่าสุดแทน ให้สื่อถึง "ผู้เข้าชิงรอบปัจจุบัน" ซึ่งมีความหมายและเปลี่ยนแปลงตามจริง
       const { rows: candidateCount } = await pool.query(
-        `SELECT COUNT(*)::int as count FROM hof_candidates`
+        `SELECT COUNT(*)::int as count FROM hof_candidates
+         WHERE campaign_id = (SELECT id FROM hof_campaigns ORDER BY id DESC LIMIT 1)`
       );
       const { rows: pendingUsers } = await pool.query(
         `SELECT COUNT(*)::int as count FROM users WHERE status = 'pending'`
@@ -177,10 +185,14 @@ export class AdminDbService {
    * ส่วนข้อมูลของ "คนอื่น" ที่แค่มีสมาชิกคนนี้เป็นแอดมินผู้อนุมัติ จะแค่ล้างอ้างอิง (set null)
    * ไม่ลบข้อมูลของคนอื่นทิ้งไปด้วย
    */
-  async deleteUser(userId: number): Promise<{ success: boolean; error?: string }> {
+  async deleteUser(userId: number, actorId?: number): Promise<{ success: boolean; error?: string }> {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+
+      // เก็บชื่อไว้ก่อนลบ เพื่อบันทึกลง audit log — หลังลบแล้ว user row จะหายไป join หาชื่อย้อนหลังไม่ได้
+      const { rows: targetRows } = await client.query(`SELECT name, student_id FROM users WHERE id = $1`, [userId]);
+      const targetName = targetRows[0]?.name || null;
 
       // ล้างอ้างอิงที่สมาชิกคนนี้เป็นเพียง "ผู้ดำเนินการ" ให้คนอื่น — ไม่ลบข้อมูลของคนอื่น
       await client.query(`UPDATE posts SET admin_id = NULL WHERE admin_id = $1`, [userId]);
@@ -216,6 +228,18 @@ export class AdminDbService {
       if (!rowCount) {
         await client.query('ROLLBACK');
         return { success: false, error: 'ไม่พบสมาชิกที่ต้องการลบ' };
+      }
+
+      if (actorId) {
+        try {
+          await client.query(
+            `INSERT INTO audit_logs (actor_id, action, target_type, target_id, metadata)
+             VALUES ($1, 'delete_user', 'user', $2, $3)`,
+            [actorId, userId, JSON.stringify({ name: targetName, studentId: targetRows[0]?.student_id || null })]
+          );
+        } catch {
+          // บันทึกประวัติไม่สำเร็จ ไม่ใช่เหตุผลให้ยกเลิกการลบที่ทำสำเร็จแล้ว
+        }
       }
 
       await client.query('COMMIT');
@@ -502,38 +526,24 @@ export class AdminDbService {
     }));
   }
 
-  // ---------------------------------------------------------------
-  // ฟังก์ชันด้านล่างย้ายมาจาก src/lib/db.ts (god-file) — ปัจจุบันไม่มี route ใดเรียกใช้
-  // คงไว้เพื่อรักษาพฤติกรรมเดิมทั้งหมด ไม่ได้ผูกกับ route ใดในตอนนี้
-  // ---------------------------------------------------------------
-
-  /** สถิติแดชบอร์ดรูปแบบเดิม (legacy, ยังไม่ได้ใช้งาน — ถูกแทนที่ด้วย getOverviewStats) */
-  async getDashboardStatsLegacy() {
-    const { rows: alumniCount } = await pool.query(
-      `select count(*)::int as count from users where role = 'alumni' and status = 'approved'`
-    );
-    const { rows: genCount } = await pool.query(
-      `select count(*)::int as count from lookup_options where category = 'generation'`
-    );
-    const { rows: candidateCount } = await pool.query(`select count(*)::int as count from hof_candidates`);
-    const { rows: pendingCount } = await pool.query(`select count(*)::int as count from users where status = 'pending'`);
-
-    return {
-      totalAlumni: alumniCount[0].count,
-      totalGenerations: genCount[0].count,
-      outstandingAlumni: candidateCount[0].count,
-      pendingApprovals: pendingCount[0].count,
-    };
-  }
-
-  /** ดึง audit logs สำหรับ admin (legacy, ยังไม่ได้ใช้งาน — ไม่มีหน้า UI เรียกใช้ในปัจจุบัน) */
+  /**
+   * ดึงประวัติการดำเนินการของแอดมิน (audit trail) — ใช้จริงใน /api/admin/audit-logs
+   * และแท็บ "ประวัติการดำเนินการ" ในแดชบอร์ด join ชื่อเป้าหมายจริงมาด้วยเท่าที่รู้จัก
+   * target_type (user/post/campaign) ให้อ่านง่ายกว่าโชว์แค่ id ดิบๆ
+   */
   async getAuditLogs(limit = 50) {
     const { rows } = await pool.query(
       `SELECT al.id, al.action, al.target_type, al.target_id,
               al.metadata, al.created_at,
-              u.name AS actor_name
+              u.name AS actor_name,
+              CASE WHEN al.target_type = 'user' THEN tu.name ELSE NULL END AS target_user_name,
+              CASE WHEN al.target_type = 'post' THEN tp.title ELSE NULL END AS target_post_title,
+              CASE WHEN al.target_type = 'campaign' THEN tc.title ELSE NULL END AS target_campaign_title
        FROM audit_logs al
        LEFT JOIN users u ON u.id = al.actor_id
+       LEFT JOIN users tu ON al.target_type = 'user' AND tu.id = al.target_id
+       LEFT JOIN posts tp ON al.target_type = 'post' AND tp.id = al.target_id
+       LEFT JOIN hof_campaigns tc ON al.target_type = 'campaign' AND tc.id = al.target_id
        ORDER BY al.created_at DESC
        LIMIT $1`,
       [limit]

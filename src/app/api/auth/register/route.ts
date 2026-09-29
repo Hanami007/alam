@@ -90,12 +90,36 @@ export async function POST(req: Request) {
       const prefixNum = parseInt(matchPrefix[1], 10);
       const calculatedGen = prefixNum - 37;
       if (calculatedGen >= 1) {
+        const genCode = `gen-${calculatedGen}`;
         const { rows: autoGenRows } = await pool.query(
           `SELECT id FROM lookup_options WHERE category = 'generation' AND code = $1 LIMIT 1`,
-          [`gen-${calculatedGen}`]
+          [genCode]
         );
         if (autoGenRows.length > 0) {
           resolvedGenerationId = autoGenRows[0].id;
+        } else {
+          // ยังไม่มีตัวเลือกรุ่นนี้ในระบบ (เช่นรุ่นใหม่ที่ยังไม่เคยมีใครสมัครมาก่อน) — สร้างให้เองทันที
+          // แทนที่จะปล่อยให้สมัครไม่ได้แล้วต้องรอโปรแกรมเมอร์มา insert เพิ่มด้วยมือทุกปีไปตลอดกาล
+          // ON CONFLICT กันแถวซ้ำกรณีมีคนรุ่นเดียวกันสมัครพร้อมกันหลายคน (race condition)
+          const entryYearBE = 2500 + prefixNum;
+          const { rows: createdGenRows } = await pool.query(
+            `INSERT INTO lookup_options (category, code, label, extra)
+             VALUES ('generation', $1, $2, $3::jsonb)
+             ON CONFLICT (category, code) DO UPDATE SET category = EXCLUDED.category
+             RETURNING id`,
+            [
+              genCode,
+              `รุ่น ${calculatedGen}`,
+              JSON.stringify({
+                prefix: String(prefixNum),
+                gen_number: calculatedGen,
+                entry_year_be: entryYearBE,
+                year_start: entryYearBE - 543,
+                year_end: entryYearBE - 543 + 4,
+              }),
+            ]
+          );
+          resolvedGenerationId = createdGenRows[0].id;
         }
       }
     }

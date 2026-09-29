@@ -522,6 +522,11 @@ export function FeedList({
 
 
   // Handle Birthday Wish Click
+  // เดิม +1 แต้มที่โชว์ตรงนี้เป็นของปลอม — ยิง PUT /api/user/profile ด้วย pointsAdded ซึ่งฝั่ง
+  // server ไม่เคยอ่านฟิลด์นี้เลย พอรีเฟรช/ล็อกอินใหม่แต้มจะหายไป ตอนนี้เปลี่ยนไปเรียก endpoint
+  // เฉพาะที่ให้แต้มจริงใน DB (feedDbService.sendBirthdayWish) กันสแปมด้วยการจำกัด 1 แต้ม/คน/วัน
+  // และตัด "การจำลองว่ามีคนอวยพรกลับ" ออกทั้งหมด เพราะเป็นการแจ้งเตือนปลอมที่ไม่มีคนจริงส่งมาจริงๆ
+  // (ยิงทุกครั้งหลัง 2.8 วิ ไม่ว่าจะอวยพรใครก็ตาม) ให้แต้มปลอมซ้ำอีกชั้นหนึ่งด้วย
   async function handleSendWish(id: number, e?: React.MouseEvent) {
     if (e) {
       const rect = e.currentTarget.getBoundingClientRect();
@@ -531,34 +536,40 @@ export function FeedList({
     }
     setWishedIds((prev) => ({ ...prev, [id]: true }));
 
-    // Add +1 point & sync DB
-    notifyPointsUpdated(1);
-    fetch('/api/user/profile', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pointsAdded: 1, userId: currentUserId }),
-    }).catch(() => {});
-
     const target = birthdayAlumni.find((a) => a.id === id);
     const targetName = target ? target.name : 'เพื่อนศิษย์เก่า';
     const targetGen = target ? target.gen : 'CSMJU';
 
-    // Send notification into the top-bar bell notification system
-    notifyNewNotification({
-      type: 'birthday',
-      title: 'ส่งคำอวยพรวันเกิดสำเร็จ! 🎂',
-      description: `คุณได้ส่งคำอวยพรวันเกิดให้ ${targetName} (${targetGen}) แล้ว 🎉 (+1 แต้ม)`,
-    });
+    try {
+      const res = await fetch('/api/feed/birthday-wish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipientId: id }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        setWishedIds((prev) => ({ ...prev, [id]: false }));
+        return;
+      }
 
-    // Simulate real-time incoming birthday wish interaction
-    setTimeout(() => {
+      if (data.alreadySent) {
+        notifyNewNotification({
+          type: 'birthday',
+          title: 'อวยพรไปแล้ววันนี้! 🎂',
+          description: `คุณได้ส่งคำอวยพรวันเกิดให้ ${targetName} (${targetGen}) ไปแล้วในวันนี้`,
+        });
+        return;
+      }
+
+      notifyPointsUpdated(1);
       notifyNewNotification({
         type: 'birthday',
-        title: 'มีคนส่งคำอวยพรวันเกิดให้คุณ! 🎂',
-        description: `${targetName} (${targetGen}) ได้ส่งความปรารถนาดีและคำอวยพรกลับให้คุณ 🎉 (+1 แต้ม)`,
+        title: 'ส่งคำอวยพรวันเกิดสำเร็จ! 🎂',
+        description: `คุณได้ส่งคำอวยพรวันเกิดให้ ${targetName} (${targetGen}) แล้ว 🎉 (+1 แต้ม)`,
       });
-      notifyPointsUpdated(1);
-    }, 2800);
+    } catch {
+      setWishedIds((prev) => ({ ...prev, [id]: false }));
+    }
   }
 
   // Handle Emoji Selection for Post
@@ -1538,6 +1549,7 @@ export function FeedList({
                           <input
                             type="text"
                             value={commentInputs[post.id] || ''}
+                            maxLength={500}
                             onChange={(e) =>
                               setCommentInputs((prev) => ({ ...prev, [post.id]: e.target.value }))
                             }

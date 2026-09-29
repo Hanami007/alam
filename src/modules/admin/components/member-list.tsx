@@ -14,6 +14,7 @@ import {
   CalendarDays,
   ShieldCheck,
   Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 
 export interface AdminMember {
@@ -62,6 +63,25 @@ export function MemberList({ members, onDelete }: MemberListProps) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+
+  // ลบเร็วจากแถวในรายชื่อโดยตรง ไม่ต้องเปิด modal รายละเอียดก่อน — ยังคงต้องกดยืนยันซ้ำ
+  // เพราะเป็นการลบถาวร ไม่ใช่แค่เปลี่ยนสถานะ
+  const [quickDeleteId, setQuickDeleteId] = useState<number | null>(null);
+  const [quickDeleting, setQuickDeleting] = useState<number | null>(null);
+  const [quickDeleteError, setQuickDeleteError] = useState<Record<number, string>>({});
+
+  async function handleQuickDelete(userId: number) {
+    if (!onDelete) return;
+    setQuickDeleting(userId);
+    try {
+      await onDelete(userId);
+      setQuickDeleteId(null);
+    } catch (err: any) {
+      setQuickDeleteError((prev) => ({ ...prev, [userId]: err?.message || 'เกิดข้อผิดพลาดในการลบสมาชิก' }));
+    } finally {
+      setQuickDeleting(null);
+    }
+  }
 
   function closeModal() {
     setSelectedMember(null);
@@ -153,63 +173,105 @@ export function MemberList({ members, onDelete }: MemberListProps) {
           <div className="col-span-2">รุ่น</div>
           <div className="col-span-2">บทบาท</div>
           <div className="col-span-2">สถานะ</div>
-          <div className="col-span-2 text-right pr-2">แต้มสะสม</div>
+          <div className="col-span-1 text-right">แต้ม</div>
+          <div className="col-span-1 text-right">ลบ</div>
         </div>
         <div className="divide-y divide-slate-100 max-h-[560px] overflow-y-auto">
           {filtered.length === 0 ? (
             <p className="p-6 text-center text-xs text-slate-400">ไม่พบสมาชิกที่ตรงกับเงื่อนไข</p>
           ) : (
-            filtered.map((m) => (
-              <div
-                key={m.id}
-                onClick={() => setSelectedMember(m)}
-                className="grid grid-cols-12 gap-3 px-4 py-3 items-center hover:bg-slate-50/60 transition-colors cursor-pointer"
-              >
-                <div className="col-span-4 flex items-center gap-3 min-w-0">
-                  {m.avatarUrl ? (
-                    <img
-                      src={m.avatarUrl}
-                      alt={m.name}
-                      className="h-9 w-9 rounded-full object-cover ring-2 ring-slate-100 shrink-0"
-                    />
-                  ) : (
-                    <div className="h-9 w-9 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0">
-                      {m.name?.charAt(0) || '?'}
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-slate-800 truncate">{m.name}</p>
-                    <p className="text-[11px] text-slate-400 truncate">
-                      {m.studentId || 'ไม่ระบุรหัส'} · {m.email}
-                    </p>
+            filtered.map((m) =>
+              quickDeleteId === m.id ? (
+                <div key={m.id} className="flex items-center justify-between gap-3 px-4 py-3 bg-rose-50/70">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <AlertTriangle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
+                    <span className="text-xs font-bold text-rose-700 truncate">
+                      ยืนยันลบ &ldquo;{m.name}&rdquo; ถาวร? {quickDeleteError[m.id] && `— ${quickDeleteError[m.id]}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      disabled={quickDeleting === m.id}
+                      onClick={() => handleQuickDelete(m.id)}
+                      className="rounded-lg bg-rose-600 px-3 py-1.5 text-[11px] font-extrabold text-white hover:bg-rose-700 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      {quickDeleting === m.id ? 'กำลังลบ...' : 'ยืนยันลบ'}
+                    </button>
+                    <button
+                      disabled={quickDeleting === m.id}
+                      onClick={() => setQuickDeleteId(null)}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      ยกเลิก
+                    </button>
                   </div>
                 </div>
-                <div className="col-span-2 text-xs text-slate-600 truncate">{m.generation || '-'}</div>
-                <div className="col-span-2">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
-                      m.role === 'admin'
-                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                        : 'bg-slate-50 text-slate-600 border-slate-200'
-                    }`}
-                  >
-                    {m.role === 'admin' ? 'แอดมิน' : 'ศิษย์เก่า'}
-                  </span>
+              ) : (
+                <div
+                  key={m.id}
+                  onClick={() => setSelectedMember(m)}
+                  className="grid grid-cols-12 gap-3 px-4 py-3 items-center hover:bg-slate-50/60 transition-colors cursor-pointer"
+                >
+                  <div className="col-span-4 flex items-center gap-3 min-w-0">
+                    {m.avatarUrl ? (
+                      <img
+                        src={m.avatarUrl}
+                        alt={m.name}
+                        className="h-9 w-9 rounded-full object-cover ring-2 ring-slate-100 shrink-0"
+                      />
+                    ) : (
+                      <div className="h-9 w-9 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0">
+                        {m.name?.charAt(0) || '?'}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-800 truncate">{m.name}</p>
+                      <p className="text-[11px] text-slate-400 truncate">
+                        {m.studentId || 'ไม่ระบุรหัส'} · {m.email}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="col-span-2 text-xs text-slate-600 truncate">{m.generation || '-'}</div>
+                  <div className="col-span-2">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
+                        m.role === 'admin'
+                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                          : 'bg-slate-50 text-slate-600 border-slate-200'
+                      }`}
+                    >
+                      {m.role === 'admin' ? 'แอดมิน' : 'ศิษย์เก่า'}
+                    </span>
+                  </div>
+                  <div className="col-span-2">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
+                        STATUS_STYLE[m.status] || 'bg-slate-50 text-slate-600 border-slate-200'
+                      }`}
+                    >
+                      {STATUS_LABEL[m.status] || m.status}
+                    </span>
+                  </div>
+                  <div className="col-span-1 text-right text-xs font-bold text-slate-700">
+                    {m.totalPoints ?? 0}
+                  </div>
+                  <div className="col-span-1 flex justify-end">
+                    {onDelete && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setQuickDeleteId(m.id);
+                        }}
+                        title="ลบสมาชิกนี้"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="col-span-2">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
-                      STATUS_STYLE[m.status] || 'bg-slate-50 text-slate-600 border-slate-200'
-                    }`}
-                  >
-                    {STATUS_LABEL[m.status] || m.status}
-                  </span>
-                </div>
-                <div className="col-span-2 text-right pr-2 text-xs font-bold text-slate-700">
-                  {m.totalPoints ?? 0} แต้ม
-                </div>
-              </div>
-            ))
+              )
+            )
           )}
         </div>
       </div>
@@ -219,58 +281,98 @@ export function MemberList({ members, onDelete }: MemberListProps) {
         {filtered.length === 0 ? (
           <p className="p-6 text-center text-xs text-slate-400">ไม่พบสมาชิกที่ตรงกับเงื่อนไข</p>
         ) : (
-          filtered.map((m) => (
-            <div
-              key={m.id}
-              onClick={() => setSelectedMember(m)}
-              className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3.5 space-y-2 cursor-pointer active:scale-[0.99] transition-transform"
-            >
-              <div className="flex items-center gap-3">
-                {m.avatarUrl ? (
-                  <img
-                    src={m.avatarUrl}
-                    alt={m.name}
-                    className="h-10 w-10 rounded-full object-cover ring-2 ring-white shrink-0"
-                  />
-                ) : (
-                  <div className="h-10 w-10 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0">
-                    {m.name?.charAt(0) || '?'}
-                  </div>
+          filtered.map((m) =>
+            quickDeleteId === m.id ? (
+              <div key={m.id} className="rounded-2xl border border-rose-200 bg-rose-50 p-3.5 space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
+                  <p className="text-xs font-bold text-rose-700">ยืนยันลบ &ldquo;{m.name}&rdquo; ถาวร?</p>
+                </div>
+                {quickDeleteError[m.id] && (
+                  <p className="text-[11px] font-semibold text-rose-600">{quickDeleteError[m.id]}</p>
                 )}
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-slate-800 truncate">{m.name}</p>
-                  <p className="text-[11px] text-slate-400 truncate">{m.studentId || 'ไม่ระบุรหัส'}</p>
+                <div className="flex gap-2">
+                  <button
+                    disabled={quickDeleting === m.id}
+                    onClick={() => handleQuickDelete(m.id)}
+                    className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    {quickDeleting === m.id ? 'กำลังลบ...' : 'ยืนยันลบ'}
+                  </button>
+                  <button
+                    disabled={quickDeleting === m.id}
+                    onClick={() => setQuickDeleteId(null)}
+                    className="flex-1 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 font-extrabold text-xs hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    ยกเลิก
+                  </button>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
-                    m.role === 'admin'
-                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                      : 'bg-slate-50 text-slate-600 border-slate-200'
-                  }`}
-                >
-                  {m.role === 'admin' ? 'แอดมิน' : 'ศิษย์เก่า'}
-                </span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
-                    STATUS_STYLE[m.status] || 'bg-slate-50 text-slate-600 border-slate-200'
-                  }`}
-                >
-                  {STATUS_LABEL[m.status] || m.status}
-                </span>
-                {m.generation && (
-                  <span className="rounded-full px-2 py-0.5 text-[10px] font-bold border bg-violet-50 text-violet-700 border-violet-200">
-                    {m.generation}
-                  </span>
+            ) : (
+              <div
+                key={m.id}
+                onClick={() => setSelectedMember(m)}
+                className="relative rounded-2xl border border-slate-100 bg-slate-50/60 p-3.5 space-y-2 cursor-pointer active:scale-[0.99] transition-transform"
+              >
+                {onDelete && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setQuickDeleteId(m.id);
+                    }}
+                    title="ลบสมาชิกนี้"
+                    className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-100 hover:text-rose-600 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                 )}
-                <span className="rounded-full px-2 py-0.5 text-[10px] font-bold border bg-amber-50 text-amber-700 border-amber-200">
-                  {m.totalPoints ?? 0} แต้ม
-                </span>
+                <div className="flex items-center gap-3 pr-8">
+                  {m.avatarUrl ? (
+                    <img
+                      src={m.avatarUrl}
+                      alt={m.name}
+                      className="h-10 w-10 rounded-full object-cover ring-2 ring-white shrink-0"
+                    />
+                  ) : (
+                    <div className="h-10 w-10 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0">
+                      {m.name?.charAt(0) || '?'}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-slate-800 truncate">{m.name}</p>
+                    <p className="text-[11px] text-slate-400 truncate">{m.studentId || 'ไม่ระบุรหัส'}</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
+                      m.role === 'admin'
+                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                        : 'bg-slate-50 text-slate-600 border-slate-200'
+                    }`}
+                  >
+                    {m.role === 'admin' ? 'แอดมิน' : 'ศิษย์เก่า'}
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
+                      STATUS_STYLE[m.status] || 'bg-slate-50 text-slate-600 border-slate-200'
+                    }`}
+                  >
+                    {STATUS_LABEL[m.status] || m.status}
+                  </span>
+                  {m.generation && (
+                    <span className="rounded-full px-2 py-0.5 text-[10px] font-bold border bg-violet-50 text-violet-700 border-violet-200">
+                      {m.generation}
+                    </span>
+                  )}
+                  <span className="rounded-full px-2 py-0.5 text-[10px] font-bold border bg-amber-50 text-amber-700 border-amber-200">
+                    {m.totalPoints ?? 0} แต้ม
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 truncate">{m.email}</p>
               </div>
-              <p className="text-[11px] text-slate-400 truncate">{m.email}</p>
-            </div>
-          ))
+            )
+          )
         )}
       </div>
 
