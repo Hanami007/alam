@@ -1,4 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
+import { publicErrorMessage } from '@/lib/api-error';
 import { notificationDbService } from '@/modules/notifications/services/notification.service';
 import { NextResponse } from 'next/server';
 
@@ -20,7 +21,7 @@ export async function GET() {
     });
   } catch (err: any) {
     console.error('[API /api/notifications] Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err) }, { status: 500 });
   }
 }
 
@@ -45,6 +46,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
   } catch (err: any) {
     console.error('[API POST /api/notifications] Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err) }, { status: 500 });
   }
 }

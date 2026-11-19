@@ -1,5 +1,5 @@
 import { pool } from '@/lib/db';
-import { randomBytes } from 'crypto';
+import { randomBytes, createHash, timingSafeEqual } from 'crypto';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -372,16 +372,23 @@ export class HofResultsService {
    */
   async verifyPublicApiKey(key: string): Promise<boolean> {
     if (!key) return false;
+    // เทียบแบบ constant-time (เทียบ hash ที่ยาวเท่ากันเสมอ) — `===` หยุดทันทีที่เจอตัวอักษรแรกที่ต่าง
+    // ทำให้เดา key ทีละตัวจากเวลาตอบกลับได้ในทางทฤษฎี
+    const safeEqual = (a: string, b: string) => {
+      const ha = createHash('sha256').update(a).digest();
+      const hb = createHash('sha256').update(b).digest();
+      return timingSafeEqual(ha, hb);
+    };
     // ถ้ากำหนด PUBLIC_HOF_API_KEY ใน env ให้ใช้ env ก่อน (ง่ายกว่าไม่ต้องแตะ DB)
     if (process.env.PUBLIC_HOF_API_KEY) {
-      return key === process.env.PUBLIC_HOF_API_KEY;
+      return safeEqual(key, process.env.PUBLIC_HOF_API_KEY);
     }
     // Fallback: ดูจาก system_settings
     try {
       const { rows } = await pool.query(
         `SELECT value FROM system_settings WHERE key = 'public_api_key' LIMIT 1`
       );
-      return rows[0]?.value === key;
+      return typeof rows[0]?.value === 'string' && rows[0].value !== '' && safeEqual(key, rows[0].value);
     } catch {
       return false;
     }

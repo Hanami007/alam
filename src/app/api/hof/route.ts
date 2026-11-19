@@ -1,4 +1,5 @@
 import { hofDbService } from '@/modules/hall-of-fame/services/hof.service';
+import { publicErrorMessage } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
@@ -14,6 +15,6 @@ export async function GET() {
     });
   } catch (err: any) {
     console.error('[API /api/hof] Error:', err);
-    return NextResponse.json({ error: err.message || 'ไม่สามารถโหลดข้อมูลศิษย์เก่าดีเด่นได้' }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err, 'ไม่สามารถโหลดข้อมูลศิษย์เก่าดีเด่นได้') }, { status: 500 });
   }
 }

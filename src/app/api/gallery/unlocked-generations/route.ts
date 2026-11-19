@@ -1,4 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
+import { publicErrorMessage } from '@/lib/api-error';
 import { galleryDbService } from '@/modules/gallery/services/gallery.service';
 import { NextResponse } from 'next/server';
 
@@ -17,6 +18,6 @@ export async function GET() {
     });
   } catch (err: any) {
     console.error('Error fetching unlocked generations:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err) }, { status: 500 });
   }
 }

@@ -1,4 +1,6 @@
 import { pool } from '@/lib/db';
+import { checkLength } from '@/lib/field-limits';
+import { deleteAvatarFile, normalizeAvatarInput } from '@/lib/upload-storage';
 
 export interface UserProfileData {
   id: number;
@@ -29,7 +31,44 @@ export interface UserProfileData {
   facebookUrl: string | null;
   lineId: string | null;
   showContactOnMap: boolean;
+  showEmail: boolean;
+  showBirthDate: boolean;
+  showStudentId: boolean;
+  showFacebook: boolean;
+  showLineId: boolean;
   createdAt: string;
+}
+
+/** ฟิลด์ข้อมูลส่วนตัวที่เจ้าของเลือกเปิด/ปิดได้ทีละฟิลด์ (ไอคอนเขียว/แดง) */
+export const PRIVATE_FIELD_FLAGS = {
+  showEmail: 'show_email',
+  showBirthDate: 'show_birth_date',
+  showStudentId: 'show_student_id',
+  showFacebook: 'show_facebook',
+  showLineId: 'show_line_id',
+  showHometownOnMap: 'show_hometown_on_map',
+  showWorkplaceOnMap: 'show_workplace_on_map',
+  showContactOnMap: 'show_contact_on_map',
+} as const;
+export type PrivacyFlag = keyof typeof PRIVATE_FIELD_FLAGS;
+export type PrivacySettings = Partial<Record<PrivacyFlag, boolean>>;
+
+/**
+ * ตัดข้อมูลส่วนตัวที่เจ้าของปิดไว้ออกจากโปรไฟล์ก่อนส่งให้คนอื่นดู
+ * (เจ้าของและแอดมินเห็นครบ) — เดิม /api/user/profile?id= ส่งอีเมล วันเกิด และช่องทางติดต่อ
+ * ของทุกคนให้ผู้ใช้ทุกคนโดยไม่สนการตั้งค่า
+ */
+export function redactPrivateFields<T extends Record<string, any>>(
+  profile: T,
+  privacy: Pick<UserProfileData, 'showEmail' | 'showBirthDate' | 'showStudentId' | 'showFacebook' | 'showLineId'>
+): T {
+  const out: Record<string, any> = { ...profile };
+  if (!privacy.showEmail) out.email = null;
+  if (!privacy.showBirthDate) out.birthDate = null;
+  if (!privacy.showStudentId) out.studentId = null;
+  if (!privacy.showFacebook) out.facebookUrl = null;
+  if (!privacy.showLineId) out.lineId = null;
+  return out as T;
 }
 
 export interface ActivityLogEntry {
@@ -52,6 +91,7 @@ export class UserDbService {
         u.show_hometown_on_map, u.show_workplace_on_map, u.is_available_for_mentorship, u.birth_date, u.created_at,
         u.generation_option_id, u.province_option_id, u.work_province_id, u.career_option_id,
         u.facebook_url, u.line_id, u.show_contact_on_map,
+        u.show_email, u.show_birth_date, u.show_student_id, u.show_facebook, u.show_line_id,
         gen.label as generation,
         prov.label as province,
         work_prov.label as work_province,
@@ -96,6 +136,11 @@ export class UserDbService {
       facebookUrl: r.facebook_url,
       lineId: r.line_id,
       showContactOnMap: Boolean(r.show_contact_on_map),
+      showEmail: Boolean(r.show_email),
+      showBirthDate: Boolean(r.show_birth_date),
+      showStudentId: Boolean(r.show_student_id),
+      showFacebook: Boolean(r.show_facebook),
+      showLineId: Boolean(r.show_line_id),
       createdAt: r.created_at,
     };
   }
@@ -131,20 +176,22 @@ export class UserDbService {
   }
 
   /**
-   * อัปเดตการตั้งค่าความเป็นส่วนตัวบนแผนที่
+   * อัปเดตการตั้งค่าความเป็นส่วนตัวรายฟิลด์ — อัปเดตเฉพาะ key ที่ส่งมา
+   * (เดิมเขียนทับทั้ง 3 ฟิลด์ทุกครั้ง client ต้องแนบค่าปัจจุบันของฟิลด์อื่นมาด้วยเสมอ)
    */
-  async updatePrivacySettings(
-    userId: number,
-    settings: { showHometownOnMap: boolean; showWorkplaceOnMap: boolean; showContactOnMap: boolean }
-  ) {
-    await pool.query(`
-      UPDATE users
-      SET show_hometown_on_map = $1,
-          show_workplace_on_map = $2,
-          show_contact_on_map = $3
-      WHERE id = $4
-    `, [settings.showHometownOnMap, settings.showWorkplaceOnMap, settings.showContactOnMap, userId]);
+  async updatePrivacySettings(userId: number, settings: PrivacySettings) {
+    const updates: string[] = [];
+    const values: any[] = [];
+    for (const [key, column] of Object.entries(PRIVATE_FIELD_FLAGS)) {
+      const value = settings[key as PrivacyFlag];
+      if (value === undefined) continue;
+      values.push(Boolean(value));
+      updates.push(`${column} = $${values.length}`);
+    }
+    if (updates.length === 0) return { success: true };
 
+    values.push(userId);
+    await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = $${values.length}`, values);
     return { success: true };
   }
 
@@ -177,6 +224,16 @@ export class UserDbService {
     const values: any[] = [];
     let idx = 1;
 
+    const lengthError =
+      checkLength(data.name, 'name', 'ชื่อ-นามสกุล') ||
+      checkLength(data.nickname, 'nickname', 'ชื่อเล่น') ||
+      checkLength(data.position, 'position', 'ตำแหน่งงาน') ||
+      checkLength(data.company, 'company', 'ชื่อบริษัท/องค์กร') ||
+      checkLength(data.bio, 'bio', 'คำแนะนำตัว') ||
+      checkLength(data.facebookUrl, 'facebookUrl', 'Facebook') ||
+      checkLength(data.lineId, 'lineId', 'LINE ID');
+    if (lengthError) throw new Error(lengthError);
+
     if (data.name !== undefined) {
       updates.push(`name = $${idx++}`);
       values.push(data.name);
@@ -197,9 +254,19 @@ export class UserDbService {
       updates.push(`bio = $${idx++}`);
       values.push(data.bio);
     }
+    let previousAvatar: string | null = null;
     if (data.avatarUrl !== undefined) {
-      updates.push(`avatar_url = $${idx++}`);
-      values.push(data.avatarUrl);
+      // data:image/... จาก client → บันทึกเป็นไฟล์ใน data/uploads/avatars แล้วเก็บแค่ path
+      // (เดิมเก็บ base64 ลง users.avatar_url ตรงๆ ซึ่งถูกดึงไปทุกหน้า ทำให้ทุก query หนักตาม)
+      const { rows: cur } = await pool.query(`SELECT avatar_url FROM users WHERE id = $1`, [userId]);
+      previousAvatar = cur[0]?.avatar_url ?? null;
+      const avatar = await normalizeAvatarInput(data.avatarUrl);
+      if (avatar !== previousAvatar) {
+        updates.push(`avatar_url = $${idx++}`);
+        values.push(avatar);
+      } else {
+        previousAvatar = null;
+      }
     }
     if (data.birthDate !== undefined) {
       updates.push(`birth_date = $${idx++}`);
@@ -226,9 +293,17 @@ export class UserDbService {
       updates.push(`is_available_for_mentorship = $${idx++}`);
       values.push(Boolean(mentorshipVal));
     }
+    // รุ่น (generation) เป็นตัวกำหนดสิทธิ์ยืนยันตัวตนผู้สมัครรุ่นเดียวกัน (member.service approveBatchmate)
+    // จึงตั้งเองได้ครั้งเดียวตอนยังไม่มีค่า — เดิมเปลี่ยนได้อิสระ ทำให้สมาชิกคนไหนก็ได้สลับไปเป็นรุ่นอื่น
+    // แล้วกดยืนยันผู้สมัครรุ่นนั้นได้ (เลี่ยงระบบยืนยันโดยเพื่อนร่วมรุ่น) ถ้าต้องแก้รุ่นให้แอดมินทำ
+    let requestedGenId: number | null = null;
     if (data.generationOptionId !== undefined) {
-      updates.push(`generation_option_id = $${idx++}`);
-      values.push(Number(data.generationOptionId));
+      const genRes = await pool.query(
+        `SELECT id FROM lookup_options WHERE category = 'generation' AND id = $1 LIMIT 1`,
+        [Number(data.generationOptionId)]
+      );
+      if (!genRes.rows.length) throw new Error('ไม่พบรุ่นที่เลือก');
+      requestedGenId = genRes.rows[0].id;
     } else if (data.generation !== undefined) {
       // เลือกได้เฉพาะรุ่นที่มีข้อมูลจริงใน lookup_options เท่านั้น (ฝั่ง frontend ดึงตัวเลือก
       // จากที่นี่โดยตรงแล้ว) ถ้าไม่เจอแปลว่าไม่มีรุ่นนั้นจริงในระบบ ก็ไม่ต้องอัปเดต
@@ -236,9 +311,17 @@ export class UserDbService {
         `SELECT id FROM lookup_options WHERE category = 'generation' AND label = $1 LIMIT 1`,
         [data.generation]
       );
-      if (genRes.rows.length > 0) {
+      if (genRes.rows.length > 0) requestedGenId = genRes.rows[0].id;
+    }
+    if (requestedGenId !== null) {
+      const { rows: cur } = await pool.query(`SELECT generation_option_id FROM users WHERE id = $1`, [userId]);
+      const currentGenId = cur[0]?.generation_option_id ?? null;
+      if (currentGenId === null) {
         updates.push(`generation_option_id = $${idx++}`);
-        values.push(genRes.rows[0].id);
+        values.push(requestedGenId);
+      } else if (Number(currentGenId) !== Number(requestedGenId) && data.generationOptionId !== undefined) {
+        // ทาง label (`generation` จากฟอร์ม yearbook) แค่ไม่อัปเดตรุ่น — ถ้า throw จะทำให้ชื่อ/bio ไม่ถูกบันทึกไปด้วย
+        throw new Error('ไม่สามารถเปลี่ยนรุ่นได้เอง กรุณาติดต่อผู้ดูแลระบบ');
       }
     }
     if (data.provinceOptionId !== undefined) {
@@ -266,6 +349,16 @@ export class UserDbService {
       `UPDATE users SET ${updates.join(', ')} WHERE id = $${idx}`,
       values
     );
+
+    // ลบไฟล์รูปเดิมทิ้ง — ยกเว้นถูกใช้เป็น snapshot ผลประกาศ Hall of Fame อยู่ (ต้องคงไว้ตามวันประกาศ)
+    if (previousAvatar) {
+      const { rows: inUse } = await pool.query(
+        `SELECT 1 FROM hof_results WHERE snapshot_avatar = $1
+         UNION ALL SELECT 1 FROM users WHERE avatar_url = $1 LIMIT 1`,
+        [previousAvatar]
+      );
+      if (inUse.length === 0) await deleteAvatarFile(previousAvatar);
+    }
 
     return { success: true };
   }
@@ -388,11 +481,10 @@ export class UserDbService {
            (expected_graduation_year IS NOT NULL AND (expected_graduation_year <= $1 OR expected_graduation_year <= $2))
            OR
            (admission_year IS NOT NULL AND (admission_year <= ($1 - 4) OR admission_year <= ($2 - 4)))
-           OR
-           (
-             student_id ~ '^[0-9]{2}' AND
-             (2500 + substring(student_id from 1 for 2)::int + 4) <= $2
-           )
+           -- ปีเข้าศึกษาจากรหัสนักศึกษา (ต้องตรงกับ src/lib/student-id.ts):
+           -- 10 หลัก = 2500 + 2 หลักแรก, 8 หลัก = 2520 + 2 หลักแรก (รุ่น = prefix − 17, รุ่น 1 เข้าปี 2538)
+           OR (student_id ~ '^[0-9]{10}$' AND (2500 + left(student_id, 2)::int + 4) <= $2)
+           OR (student_id ~ '^[0-9]{8}$' AND (2520 + left(student_id, 2)::int + 4) <= $2)
          )`,
       [currentYearCE, currentYearBE]
     );

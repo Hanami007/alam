@@ -1,4 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
+import { publicErrorMessage } from '@/lib/api-error';
 import { adminDbService } from '@/modules/admin/services/admin.service';
 import { NextResponse } from 'next/server';
 
@@ -24,6 +25,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, result });
   } catch (err: any) {
     console.error('[API /api/admin/verify] Error:', err);
-    return NextResponse.json({ error: err.message || 'Error processing verification' }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err, 'Error processing verification') }, { status: 500 });
   }
 }

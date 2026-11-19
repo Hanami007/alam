@@ -8,6 +8,8 @@ import {
   Loader2, Quote, Link2
 } from 'lucide-react';
 import { LocationPicker } from '@/components/ui/location-picker';
+import { resizeImageToDataUrl } from '@/lib/image-resize';
+import { PrivacyToggle } from '@/components/ui/privacy-toggle';
 
 const PRESET_AVATARS = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
@@ -21,7 +23,7 @@ const PRESET_AVATARS = [
 interface Photo {
   id: number;
   image_url: string;
-  watermark_url?: string | null;
+  original_image_url?: string | null;
   caption: string;
   created_at?: string;
   tagged_by_name?: string;
@@ -62,6 +64,18 @@ interface EditProfileForm {
 
 const POINTS_PER_LEVEL = 20;
 
+type FieldVisibilityKey = 'showEmail' | 'showStudentId' | 'showBirthDate' | 'showFacebook' | 'showLineId';
+
+function readFieldVisibility(user: any): Record<FieldVisibilityKey, boolean> {
+  return {
+    showEmail: Boolean(user?.show_email ?? user?.showEmail),
+    showStudentId: Boolean(user?.show_student_id ?? user?.showStudentId),
+    showBirthDate: Boolean(user?.show_birth_date ?? user?.showBirthDate),
+    showFacebook: Boolean(user?.show_facebook ?? user?.showFacebook),
+    showLineId: Boolean(user?.show_line_id ?? user?.showLineId),
+  };
+}
+
 function activityIcon(description: string) {
   if (description.includes('คอมเมนต์')) return MessageCircle;
   if (description.includes('โหวตโพล')) return Vote;
@@ -98,13 +112,40 @@ export function ProfileCard({
     Boolean(user?.show_workplace_on_map ?? user?.showWorkplaceOnMap)
   );
   const [isSavingPrivacy, setIsSavingPrivacy] = useState<boolean>(false);
+  const [fieldVisibility, setFieldVisibility] = useState<Record<FieldVisibilityKey, boolean>>(() =>
+    readFieldVisibility(user)
+  );
 
   useEffect(() => {
     if (user) {
       setShowHometownOnMap(Boolean(user?.show_hometown_on_map ?? user?.showHometownOnMap));
       setShowWorkplaceOnMap(Boolean(user?.show_workplace_on_map ?? user?.showWorkplaceOnMap));
+      setFieldVisibility(readFieldVisibility(user));
     }
   }, [user]);
+
+  /** เปิด/ปิดการแสดงข้อมูลส่วนตัวทีละฟิลด์ — บันทึกทันที ย้อนค่ากลับถ้าบันทึกไม่สำเร็จ */
+  async function handleToggleFieldVisibility(key: FieldVisibilityKey, value: boolean) {
+    setFieldVisibility((prev) => ({ ...prev, [key]: value }));
+    setIsSavingPrivacy(true);
+    try {
+      const res = await fetch('/api/user/privacy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: value }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      setToastMessage({ message: 'บันทึกการตั้งค่าความเป็นส่วนตัวเรียบร้อย ✨', type: 'success' });
+      setTimeout(() => setToastMessage(null), 3000);
+    } catch (err: any) {
+      setFieldVisibility((prev) => ({ ...prev, [key]: !value }));
+      setToastMessage({ message: err.message || 'บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', type: 'error' });
+      setTimeout(() => setToastMessage(null), 3500);
+    } finally {
+      setIsSavingPrivacy(false);
+    }
+  }
 
   async function handleTogglePrivacy(key: 'showHometownOnMap' | 'showWorkplaceOnMap', value: boolean) {
     const nextHometown = key === 'showHometownOnMap' ? value : showHometownOnMap;
@@ -169,18 +210,20 @@ export function ProfileCard({
   function handleAvatarFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      setToastMessage({ message: 'ขนาดรูปภาพต้องไม่เกิน 2MB', type: 'error' });
+    e.target.value = '';
+    if (file.size > 15 * 1024 * 1024) {
+      setToastMessage({ message: 'ขนาดรูปภาพต้องไม่เกิน 15MB', type: 'error' });
       setTimeout(() => setToastMessage(null), 3500);
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setEditForm((prev) => ({ ...prev, avatarUrl: event.target!.result as string }));
-      }
-    };
-    reader.readAsDataURL(file);
+    // ย่อรูปก่อนเก็บลงฟอร์ม — เดิมส่ง base64 ของไฟล์เต็มขนาด (สูงสุด ~2.7MB) ซึ่งเกินเพดาน body
+    // ของ nginx (1MB) ทำให้บันทึกโปรไฟล์ไม่ติด
+    resizeImageToDataUrl(file)
+      .then((dataUrl) => setEditForm((prev) => ({ ...prev, avatarUrl: dataUrl })))
+      .catch((err) => {
+        setToastMessage({ message: err?.message || 'ไม่สามารถอ่านไฟล์รูปภาพได้', type: 'error' });
+        setTimeout(() => setToastMessage(null), 3500);
+      });
   }
 
   async function handleSaveProfileSubmit(e: React.FormEvent) {
@@ -541,6 +584,50 @@ export function ProfileCard({
       ════════════════════════════════════════════════════════════════ */}
       {activeTab === 'privacy' && (
         <div className="space-y-6 animate-fade-in">
+          {isOwner && (
+            <section className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-5">
+              <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                  <Eye className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">ข้อมูลส่วนตัวที่สมาชิกคนอื่นเห็น</h3>
+                  <p className="text-xs text-slate-500">
+                    เขียว = สมาชิกคนอื่นเห็นในหน้าโปรไฟล์ของคุณ · แดง = เห็นเฉพาะคุณและผู้ดูแลระบบ
+                  </p>
+                </div>
+              </div>
+              <ul className="divide-y divide-slate-100">
+                {(
+                  [
+                    { key: 'showEmail', label: 'อีเมล', value: user.email },
+                    { key: 'showStudentId', label: 'รหัสนักศึกษา', value: user.student_id },
+                    { key: 'showBirthDate', label: 'วันเกิด', value: user.birth_date, hint: 'ใช้ในวิดเจ็ตอวยพรวันเกิดหน้าฟีดด้วย' },
+                    { key: 'showFacebook', label: 'Facebook', value: user.facebook_url },
+                    { key: 'showLineId', label: 'LINE ID', value: user.line_id },
+                  ] as const
+                ).map((field) => (
+                  <li key={field.key} className="flex items-center justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-900">{field.label}</p>
+                      <p className="text-xs text-slate-500 truncate">
+                        {field.value ? String(field.value) : 'ยังไม่ได้กรอก'}
+                        {'hint' in field && field.hint ? ` · ${field.hint}` : ''}
+                      </p>
+                    </div>
+                    <PrivacyToggle
+                      size="md"
+                      fieldLabel={field.label}
+                      visible={fieldVisibility[field.key]}
+                      disabled={isSavingPrivacy}
+                      onChange={(next) => handleToggleFieldVisibility(field.key, next)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           <section className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-6">
             <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
@@ -777,7 +864,7 @@ export function ProfileCard({
                   onClick={() => setSelectedPhoto(photo)}
                 >
                   <img
-                    src={photo.watermark_url || photo.image_url}
+                    src={photo.original_image_url || photo.image_url}
                     alt={photo.caption}
                     onError={(e) => {
                       const img = e.currentTarget;
@@ -930,7 +1017,7 @@ export function ProfileCard({
             {/* Photo Image */}
             <div className="relative aspect-4/3 w-full bg-slate-900 flex items-center justify-center overflow-hidden">
               <img
-                src={selectedPhoto.image_url || selectedPhoto.watermark_url || ''}
+                src={selectedPhoto.image_url || selectedPhoto.original_image_url || ''}
                 alt={selectedPhoto.caption}
                 className="h-full w-full object-contain"
               />
@@ -1147,7 +1234,9 @@ export function ProfileCard({
                 <select
                   value={editForm.generationOptionId}
                   onChange={(e) => setEditForm((prev) => ({ ...prev, generationOptionId: e.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                  disabled={Boolean(user.generation_option_id)}
+                  title={user.generation_option_id ? 'เปลี่ยนรุ่นได้โดยผู้ดูแลระบบเท่านั้น' : undefined}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
                   <option value="">ไม่ระบุ</option>
                   {(lookupOptions?.generations || []).map((g) => (

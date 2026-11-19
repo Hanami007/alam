@@ -5,7 +5,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-alumni}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-alumni_dev_password}
+      # บังคับให้ตั้งใน .env เสมอ — ห้ามมีค่า default (เดิม fallback เป็นรหัส dev ที่อยู่ใน repo สาธารณะ)
+      # หมายเหตุ: ค่านี้มีผลเฉพาะตอนสร้าง DB ครั้งแรก ถ้า DB มีอยู่แล้วและต้องการเปลี่ยนรหัส
+      # ต้องรัน ALTER USER ... WITH PASSWORD ... ใน psql ด้วย แล้วแก้ DATABASE_URL ให้ตรงกัน
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?ต้องตั้ง POSTGRES_PASSWORD ใน .env}
       POSTGRES_DB: ${POSTGRES_DB:-alam_db}
     volumes:
       - ./data/db:/var/lib/postgresql/data
@@ -28,6 +31,11 @@ services:
       - "${APP_PORT:-4007}:3000"
     env_file:
       - .env
+    # รูปโปรไฟล์ที่ผู้ใช้อัปโหลด (DB เก็บแค่ path /api/uploads/avatars/...) — ต้องอยู่นอก container
+    # ไม่งั้น rebuild/redeploy แล้วรูปหายหมด โฟลเดอร์บน host ต้องให้ uid 1001 (nextjs) เขียนได้
+    # (deploy/02-deploy.sh สร้างและ chown ให้แล้ว)
+    volumes:
+      - ./data/uploads:/app/data/uploads
 
   # ไม่ใช่ service ที่รันตลอด — ใช้ครั้งคราวผ่าน:
   #   docker compose -f docker-compose.prod.yml --env-file .env run --rm migrate
@@ -43,6 +51,9 @@ services:
         condition: service_healthy
     env_file:
       - .env
+    # migration 1750000017000 ย้ายรูป base64 เดิมใน DB ออกมาเป็นไฟล์ในโฟลเดอร์นี้
+    volumes:
+      - ./data/uploads:/app/data/uploads
     entrypoint: ["npx", "node-pg-migrate", "up", "--config", ".node-pg-migrate.json"]
 
 # กำหนด subnet ตายตัว ไม่ให้ Docker ดึงจาก default address pool เอง

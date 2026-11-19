@@ -1,4 +1,5 @@
 import { nasCatalogService } from '@/services/nas/catalog.service';
+import { publicErrorMessage } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 
 export async function GET(req: Request) {
@@ -46,6 +47,6 @@ export async function GET(req: Request) {
     });
   } catch (err: any) {
     console.error('Error fetching NAS catalog:', err);
-    return NextResponse.json({ error: err.message || 'Error fetching catalog' }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err, 'Error fetching catalog') }, { status: 500 });
   }
 }

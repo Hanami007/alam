@@ -1,4 +1,5 @@
 import { galleryDbService } from '@/modules/gallery/services/gallery.service';
+import { publicErrorMessage } from '@/lib/api-error';
 import { getCurrentUser } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, result });
   } catch (err: any) {
     console.error('Gallery tag error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err) }, { status: 500 });
   }
 }
 
@@ -54,6 +55,6 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ success: true, result });
   } catch (err: any) {
     console.error('Gallery untag error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err) }, { status: 500 });
   }
 }

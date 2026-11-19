@@ -99,7 +99,8 @@ export async function GET(req: Request) {
           status: 200,
           headers: {
             'Content-Type': result.contentType,
-            'Cache-Control': 'public, max-age=604800, stale-while-revalidate=86400',
+            'Cache-Control': 'private, max-age=604800',
+            'X-Content-Type-Options': 'nosniff',
           },
         });
       }
@@ -171,7 +172,8 @@ export async function GET(req: Request) {
           status: 200,
           headers: {
             'Content-Type': result.contentType,
-            'Cache-Control': 'public, max-age=604800, stale-while-revalidate=86400',
+            'Cache-Control': 'private, max-age=604800',
+            'X-Content-Type-Options': 'nosniff',
           },
         });
       }

@@ -1,6 +1,7 @@
 import { getCurrentUser } from '@/lib/auth';
+import { publicErrorMessage } from '@/lib/api-error';
 import { feedDbService } from '@/modules/feed/services/feed.service';
-import { adminDbService } from '@/modules/admin/services/admin.service';
+import { bannedWordsResponse, findBannedWords } from '@/lib/content-filter';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
@@ -71,16 +72,9 @@ export async function POST(req: Request) {
       ...(pollData?.options ?? []),
     ].filter(Boolean);
 
-    const foundKeywords = await adminDbService.checkForBannedKeywords(textsToCheck);
+    const foundKeywords = await findBannedWords(textsToCheck);
     if (foundKeywords.length > 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `โพสต์ของคุณมีคำที่ไม่เหมาะสม: "${foundKeywords.join('", "')}" กรุณาแก้ไขก่อนส่งอีกครั้ง`,
-          bannedWords: foundKeywords,
-        },
-        { status: 400 }
-      );
+      return bannedWordsResponse(foundKeywords, type === 'poll' ? 'โพล' : 'โพสต์');
     }
     // ───────────────────────────
 
@@ -101,7 +95,7 @@ export async function POST(req: Request) {
   } catch (err: any) {
     console.error('Error creating post request:', err);
     return NextResponse.json(
-      { success: false, error: err.message || 'เกิดข้อผิดพลาดในการส่งคำขอ' },
+      { success: false, error: publicErrorMessage(err, 'เกิดข้อผิดพลาดในการส่งคำขอ') },
       { status: 500 }
     );
   }

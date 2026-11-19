@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { Megaphone, Pin, Send, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api-client';
+import { FIELD_LIMITS } from '@/lib/field-limits';
+import { ContentWarningModal, toContentWarning, type ContentWarning } from '@/components/ui/content-warning-modal';
 
 interface AdminAnnouncementFormProps {
   onSuccess?: () => void;
@@ -15,6 +17,7 @@ export function AdminAnnouncementForm({ onSuccess }: AdminAnnouncementFormProps)
   const [pinned, setPinned] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [contentWarning, setContentWarning] = useState<ContentWarning | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,6 +43,11 @@ export function AdminAnnouncementForm({ onSuccess }: AdminAnnouncementFormProps)
 
       if (onSuccess) onSuccess();
     } catch (err: any) {
+      const warning = toContentWarning(err?.data);
+      if (warning) {
+        setContentWarning(warning);
+        return;
+      }
       console.error('Error creating announcement:', err);
       setStatusMessage({ type: 'error', text: err.message || 'เกิดข้อผิดพลาดในการสร้างประกาศ' });
     } finally {
@@ -86,6 +94,7 @@ export function AdminAnnouncementForm({ onSuccess }: AdminAnnouncementFormProps)
           <input
             type="text"
             required
+            maxLength={FIELD_LIMITS.postTitle}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="เช่น ขอเชิญร่วมงานราตรีศิษย์เก่า CS MJU ครั้งที่ 43..."
@@ -130,6 +139,7 @@ export function AdminAnnouncementForm({ onSuccess }: AdminAnnouncementFormProps)
           </label>
           <textarea
             rows={4}
+            maxLength={FIELD_LIMITS.postContent}
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="พิมพ์เนื้อหาข่าวสาร สถานที่ เวลา หรือรายละเอียดที่ต้องการประชาสัมพันธ์..."
@@ -157,6 +167,8 @@ export function AdminAnnouncementForm({ onSuccess }: AdminAnnouncementFormProps)
           </button>
         </div>
       </form>
+
+      <ContentWarningModal warning={contentWarning} onClose={() => setContentWarning(null)} />
     </div>
   );
 }

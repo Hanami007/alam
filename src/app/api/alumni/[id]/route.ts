@@ -1,4 +1,5 @@
 import { alumniAggregator } from '@/services/aggregator/alumni.aggregator';
+import { publicErrorMessage } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 
 export async function GET(
@@ -16,6 +17,6 @@ export async function GET(
     return NextResponse.json(profile);
   } catch (err: any) {
     console.error('[API /api/alumni/[id]] Error:', err);
-    return NextResponse.json({ error: err.message || 'ไม่สามารถโหลดข้อมูลศิษย์เก่าได้' }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err, 'ไม่สามารถโหลดข้อมูลศิษย์เก่าได้') }, { status: 500 });
   }
 }

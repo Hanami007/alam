@@ -1,4 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
+import { publicErrorMessage } from '@/lib/api-error';
 import { adminDbService } from '@/modules/admin/services/admin.service';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'ระบุ type ไม่ถูกต้อง' }, { status: 400 });
   } catch (err: any) {
     console.error('[API /api/admin/wall-widgets POST] Error:', err);
-    return NextResponse.json({ error: err.message || 'เกิดข้อผิดพลาด' }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err, 'เกิดข้อผิดพลาด') }, { status: 500 });
   }
 }
 
@@ -74,6 +75,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error('[API /api/admin/wall-widgets DELETE] Error:', err);
-    return NextResponse.json({ error: err.message || 'เกิดข้อผิดพลาด' }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err, 'เกิดข้อผิดพลาด') }, { status: 500 });
   }
 }
