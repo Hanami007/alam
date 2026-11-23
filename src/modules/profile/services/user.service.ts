@@ -414,7 +414,7 @@ export class UserDbService {
          pt.tag_source,
          ma.id,
          ma.image_url,
-         ma.watermark_url,
+         ma.original_image_url,
          ma.caption,
          gen.label as generation,
          u_by.name as tagged_by_name
@@ -430,7 +430,7 @@ export class UserDbService {
       id: r.id,
       tag_id: r.tag_id,
       image_url: r.image_url,
-      watermark_url: r.watermark_url,
+      original_image_url: r.original_image_url,
       caption: r.caption || 'รูปภาพกิจกรรม',
       generation: r.generation,
       tagged_by_name: r.tagged_by_name,
@@ -445,7 +445,7 @@ export class UserDbService {
          pv.verified_at,
          ma.id,
          ma.image_url,
-         ma.watermark_url,
+         ma.original_image_url,
          ma.caption,
          gen.label as generation
        FROM photo_view_verifications pv
@@ -458,7 +458,7 @@ export class UserDbService {
     return rows.map((r) => ({
       id: r.id,
       image_url: r.image_url,
-      watermark_url: r.watermark_url,
+      original_image_url: r.original_image_url,
       caption: r.caption || 'รูปภาพที่ปลดล็อก',
       generation: r.generation,
       verified_at: r.verified_at,
