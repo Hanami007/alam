@@ -1,97 +1,11 @@
 import { StudioAlbum, StudioPhoto, StudioPhotoSearchParams } from './types';
 
-const MOCK_ALBUMS: StudioAlbum[] = [
-  {
-    id: 'album-gen-43',
-    title: 'อัลบั้มรุ่น 43 (CSMJU #28)',
-    description: 'ประมวลภาพกิจกรรมและวันรับปริญญาบัตร รุ่น 43',
-    generation: 'รุ่น 43',
-    year: 2015,
-    coverImageUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=700&q=80',
-    totalPhotos: 45,
-    createdAt: '2015-03-01T00:00:00Z',
-  },
-  {
-    id: 'album-gen-46',
-    title: 'อัลบั้มรุ่น 46 (CSMJU #31)',
-    description: 'ภาพกิจกรรมค่ายไอที และทริปสัมมนารุ่น 46',
-    generation: 'รุ่น 46',
-    year: 2018,
-    coverImageUrl: 'https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&w=700&q=80',
-    totalPhotos: 62,
-    createdAt: '2018-05-15T00:00:00Z',
-  },
-  {
-    id: 'album-sports-2019',
-    title: 'การแข่งขันกีฬาสานสัมพันธ์ศิษย์เก่า 2019',
-    description: 'ภาพบรรยากาศการแข่งขันฟุตบอลกระชับมิตรศิษย์เก่า',
-    generation: 'รวมทุกรุ่น',
-    year: 2019,
-    coverImageUrl: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=700&q=80',
-    totalPhotos: 38,
-    createdAt: '2019-11-20T00:00:00Z',
-  }
-];
-
-const MOCK_PHOTOS: StudioPhoto[] = [
-  {
-    id: 'photo-1',
-    albumId: 'album-gen-43',
-    albumTitle: 'อัลบั้มรุ่น 43',
-    generation: 'รุ่น 43',
-    year: 2015,
-    title: 'พิธีรับปริญญา รุ่น 43',
-    description: 'ภาพถ่ายรวมหน้าอาคารวิทยาการคอมพิวเตอร์หลังเสร็จสิ้นพิธีพระราชทานปริญญาบัตร',
-    watermarkedUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=700&q=60&blur=60',
-    originalUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1200&q=85',
-    metadata: {
-      camera: 'Canon EOS 5D Mark III',
-      lens: 'EF 24-70mm f/2.8L II USM',
-      location: 'ลานหน้าตึกวิทยาการคอมพิวเตอร์ แม่โจ้',
-      capturedAt: '2015-02-14T11:00:00Z',
-    },
-    tags: ['สมชาย ใจดี', 'สมศักดิ์ มั่นคง'],
-    createdAt: '2015-02-15T00:00:00Z',
-  },
-  {
-    id: 'photo-2',
-    albumId: 'album-gen-46',
-    albumTitle: 'อัลบั้มรุ่น 46',
-    generation: 'รุ่น 46',
-    year: 2018,
-    title: 'ทริปเพื่อนกลุ่ม IT สัมมนาแม่แจ่ม',
-    description: 'บรรยากาศกิจกรรมกลุ่มวิชาสัมมนาทางวิทยาการคอมพิวเตอร์',
-    watermarkedUrl: 'https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&w=700&q=60&blur=60',
-    originalUrl: 'https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&w=1200&q=85',
-    metadata: {
-      camera: 'Sony A7 III',
-      lens: 'FE 24-105mm F4 G OSS',
-      location: 'อำเภอแม่แจ่ม เชียงใหม่',
-      capturedAt: '2018-04-10T15:30:00Z',
-    },
-    tags: ['สมหญิง รักเรียน'],
-    createdAt: '2018-04-12T00:00:00Z',
-  },
-  {
-    id: 'photo-3',
-    albumId: 'album-sports-2019',
-    albumTitle: 'กีฬาสานสัมพันธ์ 2019',
-    generation: 'รุ่น 44',
-    year: 2019,
-    title: 'พิธีเปิดการแข่งขันฟุตบอลกระชับมิตร',
-    description: 'ตัวแทนศิษย์เก่าแต่ละรุ่นร่วมลงสนามในงานแข่งขันกีฬา',
-    watermarkedUrl: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=700&q=60&blur=60',
-    originalUrl: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=85',
-    metadata: {
-      camera: 'Nikon D850',
-      lens: 'AF-S NIKKOR 70-200mm f/2.8E FL ED VR',
-      location: 'สนามฟุตบอล มหาวิทยาลัยแม่โจ้',
-      capturedAt: '2019-11-20T14:00:00Z',
-    },
-    tags: ['อนันต์ รุ่งเรืองกิจ'],
-    createdAt: '2019-11-21T00:00:00Z',
-  }
-];
+/**
+ * ไม่มีข้อมูลจำลองแล้ว — ถ้าไม่ได้ตั้ง APISTUDIO_BASE_URL จะคืนค่าว่าง
+ * (รูปจริงของระบบมาจาก media_assets ใน DB และ NAS)
+ */
+const MOCK_ALBUMS: StudioAlbum[] = [];
+const MOCK_PHOTOS: StudioPhoto[] = [];
 
 export class ApistudioClient {
   private baseUrl: string | null;

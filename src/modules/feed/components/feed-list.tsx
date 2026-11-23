@@ -173,7 +173,7 @@ export function FeedList({
   leaderboard = [],
   currentUserId,
   currentUserRole = 'alumni',
-  currentUserName = 'สมชาย ใจดี',
+  currentUserName = 'ผู้ใช้งาน',
   currentUserMentorship = false,
 }: FeedListProps) {
   // Current Role (from authenticated session)
@@ -1725,4 +1725,4 @@ export function FeedList({
       )}
     </div>
   );
-}
+}

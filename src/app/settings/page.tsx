@@ -16,13 +16,6 @@ export default function SettingsPage() {
         const meRes = await api.auth.me().catch(() => null);
         if (meRes?.user) {
           setUser(meRes.user);
-        } else {
-          setUser({
-            id: 2,
-            name: 'สมชาย ใจดี',
-            show_hometown_on_map: false,
-            show_workplace_on_map: false,
-          });
         }
       } catch (err) {
         console.error('[SettingsPage] Error loading settings:', err);
@@ -43,7 +36,7 @@ export default function SettingsPage() {
         </div>
       ) : (
         <SettingsPanel
-          userId={user?.id || 2}
+          userId={user?.id ?? 0}
           userName={user?.name ?? 'ผู้ใช้งาน'}
           initialPrivacy={{
             showHometownOnMap: user?.show_hometown_on_map ?? false,
