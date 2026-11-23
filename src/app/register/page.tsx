@@ -172,8 +172,8 @@ export default function RegisterPage() {
 
       setAdmissionYear(String(yearBE));
 
-      // กฎ 4 ปีเทียบกับปีปัจจุบัน
-      setStudentStatus(isAlumniByEntryYear(yearBE) ? 'alumni' : 'studying');
+      // รหัส 8 หลักเป็นรหัสระบบเดิม = ศิษย์เก่าเสมอ / 10 หลักใช้กฎ 4 ปีเทียบกับปีปัจจุบัน
+      setStudentStatus(parsed.length === 8 || isAlumniByEntryYear(yearBE) ? 'alumni' : 'studying');
 
       // แสดงรหัสรูปแบบไหนให้ผู้ใช้เห็น (8 หลักกับ 10 หลักให้รุ่นต่างกันแม้ 2 หลักแรกเหมือนกัน)
       const idFormat = `${parsed.length} หลัก`;
@@ -218,6 +218,15 @@ export default function RegisterPage() {
     }
     setGenerationOptionId('');
     setAutoMatchedGen(null);
+  }
+
+  // เลือกรูปแบบรหัส: 8 หลัก (ระบบเดิม) → ศิษย์เก่า, 10 หลัก → ศิษย์ปัจจุบันเป็นค่าเริ่มต้น
+  // (ถ้ารหัส 10 หลักที่กรอกไว้ครบแล้วเข้าเกิน 4 ปี handleStudentIdChange จะสลับเป็นศิษย์เก่าให้เอง)
+  function selectStudentIdLength(len: StudentIdLength) {
+    if (len === studentIdLength) return;
+    setStudentIdLength(len);
+    setStudentStatus(len === 8 ? 'alumni' : 'studying');
+    handleStudentIdChange(studentId, len);
   }
 
   // คำนวณรุ่นซ้ำอีกครั้งเมื่อรายชื่อรุ่นโหลดเสร็จ เผื่อผู้ใช้พิมพ์รหัสนักศึกษาเสร็จก่อนที่ข้อมูลรุ่นจะโหลดมาทัน
@@ -459,7 +468,14 @@ export default function RegisterPage() {
                   <div className="grid grid-cols-2 gap-2.5 p-1.5 bg-slate-950/60 rounded-2xl border border-white/10">
                     <button
                       type="button"
-                      onClick={() => setStudentStatus('studying')}
+                      onClick={() => {
+                        setStudentStatus('studying');
+                        // ศิษย์ปัจจุบันมีแต่รหัส 10 หลัก
+                        if (studentIdLength !== 10) {
+                          setStudentIdLength(10);
+                          handleStudentIdChange(studentId, 10);
+                        }
+                      }}
                       className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                         studentStatus === 'studying'
                           ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30'
@@ -534,11 +550,7 @@ export default function RegisterPage() {
                             type="button"
                             role="radio"
                             aria-checked={studentIdLength === len}
-                            onClick={() => {
-                              if (len === studentIdLength) return;
-                              setStudentIdLength(len);
-                              handleStudentIdChange(studentId, len);
-                            }}
+                            onClick={() => selectStudentIdLength(len)}
                             className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                               studentIdLength === len
                                 ? 'bg-indigo-600 text-white shadow shadow-indigo-600/30'

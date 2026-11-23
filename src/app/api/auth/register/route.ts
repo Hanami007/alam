@@ -144,7 +144,9 @@ export async function POST(req: Request) {
     // ปีเข้าศึกษา/ปีจบ/สถานะ คำนวณจากรุ่น (ไม่ใช่ 2500 + 2 หลักแรก ซึ่งผิดกับรหัส 8 หลัก)
     const parsedAdmissionYear = parsedId.entryYearBE;
     const expectedGradYear = parsedId.expectedGraduationYearBE;
-    const actualStatus = isAlumniByEntryYear(parsedId.entryYearBE) ? 'alumni' : studentStatus;
+    // รหัส 8 หลัก (ระบบเดิม) เป็นศิษย์เก่าเสมอ — ปัจจุบันออกรหัสแค่ 10 หลัก
+    const actualStatus =
+      parsedId.length === 8 || isAlumniByEntryYear(parsedId.entryYearBE) ? 'alumni' : studentStatus;
 
     // ข้อมูลศิษย์เก่า (ถ้ามีระบุ)
     const cleanCompany = company ? String(company).trim() : null;
