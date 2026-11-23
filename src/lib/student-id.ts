@@ -37,9 +37,11 @@ export function isValidStudentIdFormat(raw: string): boolean {
 }
 
 /** แยกรหัสนักศึกษา คืน null ถ้ารูปแบบผิดหรือคำนวณได้รุ่นน้อยกว่า 1 */
-export function parseStudentId(raw: string): ParsedStudentId | null {
+export function parseStudentId(raw: string, expectedLength?: StudentIdLength): ParsedStudentId | null {
   const studentId = raw.trim();
   if (!isValidStudentIdFormat(studentId)) return null;
+  // หน้าสมัครให้ผู้ใช้เลือกรูปแบบก่อน — กันไม่ให้รหัส 10 หลักที่พิมพ์ได้ 8 หลักถูกตีความเป็นรหัสระบบเดิม
+  if (expectedLength && studentId.length !== expectedLength) return null;
 
   const length = studentId.length as StudentIdLength;
   const prefix = studentId.slice(0, 2);

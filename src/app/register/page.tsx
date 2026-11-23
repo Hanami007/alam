@@ -7,7 +7,7 @@ import { LocationPicker } from '@/components/ui/location-picker';
 import { PrivacyToggle } from '@/components/ui/privacy-toggle';
 import { FIELD_LIMITS } from '@/lib/field-limits';
 import { resizeImageToDataUrl } from '@/lib/image-resize';
-import { isAlumniByEntryYear, isValidStudentIdFormat, parseStudentId } from '@/lib/student-id';
+import { isAlumniByEntryYear, parseStudentId, type StudentIdLength } from '@/lib/student-id';
 import {
   GraduationCap,
   Lock,
@@ -67,6 +67,9 @@ export default function RegisterPage() {
   // Form Fields
   const [name, setName] = useState('');
   const [studentId, setStudentId] = useState('');
+  // ผู้ใช้เลือกรูปแบบรหัสก่อน: 10 หลัก (ระบบปัจจุบัน) หรือ 8 หลัก (ระบบเดิม)
+  // ถ้าเดาจากความยาวที่พิมพ์ รหัส 10 หลักจะถูกตีความเป็น 8 หลักระหว่างพิมพ์ ทำให้รุ่น/สถานะเพี้ยน
+  const [studentIdLength, setStudentIdLength] = useState<StudentIdLength>(10);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -156,11 +159,12 @@ export default function RegisterPage() {
 
   // เมื่อผู้ใช้พิมพ์รหัสนักศึกษาครบ 8 หลัก (ระบบเดิม) หรือ 10 หลัก: คำนวณรุ่นอัตโนมัติ
   // สูตรต่างกันตามความยาว ดู src/lib/student-id.ts (10 หลัก: −37, 8 หลัก: −17)
-  function handleStudentIdChange(val: string) {
-    const cleaned = val.replace(/[^0-9]/g, '').slice(0, 10);
+  function handleStudentIdChange(val: string, idLength: StudentIdLength = studentIdLength) {
+    const cleaned = val.replace(/[^0-9]/g, '').slice(0, idLength);
     setStudentId(cleaned);
 
-    const parsed = parseStudentId(cleaned);
+    // คำนวณเฉพาะเมื่อพิมพ์ครบตามรูปแบบที่เลือก
+    const parsed = parseStudentId(cleaned, idLength);
     if (parsed) {
       const prefix = parsed.prefix;
       const calculatedGenNumber = parsed.generationNumber;
@@ -218,7 +222,7 @@ export default function RegisterPage() {
 
   // คำนวณรุ่นซ้ำอีกครั้งเมื่อรายชื่อรุ่นโหลดเสร็จ เผื่อผู้ใช้พิมพ์รหัสนักศึกษาเสร็จก่อนที่ข้อมูลรุ่นจะโหลดมาทัน
   useEffect(() => {
-    if (generations.length > 0 && isValidStudentIdFormat(studentId)) {
+    if (generations.length > 0 && parseStudentId(studentId, studentIdLength)) {
       handleStudentIdChange(studentId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -266,11 +270,11 @@ export default function RegisterPage() {
       return;
     }
 
-    if (!isValidStudentIdFormat(studentId)) {
-      setError('รหัสนักศึกษาต้องเป็นตัวเลข 8 หลัก (รหัสระบบเดิม) หรือ 10 หลัก');
+    if (!/^\d+$/.test(studentId) || studentId.length !== studentIdLength) {
+      setError(`รหัสนักศึกษาต้องเป็นตัวเลข ${studentIdLength} หลักตามรูปแบบที่เลือก`);
       return;
     }
-    if (!parseStudentId(studentId)) {
+    if (!parseStudentId(studentId, studentIdLength)) {
       setError('รหัสนักศึกษานี้คำนวณรุ่นไม่ได้ กรุณาตรวจสอบเลข 2 หลักแรกอีกครั้ง');
       return;
     }
@@ -511,7 +515,7 @@ export default function RegisterPage() {
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <label htmlFor="register-student-id" className="text-xs font-semibold text-slate-300">
-                          รหัสนักศึกษา (8 หรือ 10 หลัก) <span className="text-rose-400">*</span>
+                          รหัสนักศึกษา <span className="text-rose-400">*</span>
                         </label>
                         <PrivacyToggle
                           fieldLabel="รหัสนักศึกษา"
@@ -519,15 +523,42 @@ export default function RegisterPage() {
                           onChange={setVisibility('showStudentId')}
                         />
                       </div>
+                      <div
+                        role="radiogroup"
+                        aria-label="รูปแบบรหัสนักศึกษา"
+                        className="grid grid-cols-2 gap-1.5 p-1 bg-slate-950/60 rounded-xl border border-white/10"
+                      >
+                        {([10, 8] as const).map((len) => (
+                          <button
+                            key={len}
+                            type="button"
+                            role="radio"
+                            aria-checked={studentIdLength === len}
+                            onClick={() => {
+                              if (len === studentIdLength) return;
+                              setStudentIdLength(len);
+                              handleStudentIdChange(studentId, len);
+                            }}
+                            className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              studentIdLength === len
+                                ? 'bg-indigo-600 text-white shadow shadow-indigo-600/30'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            }`}
+                          >
+                            {len === 10 ? '10 หลัก (ปัจจุบัน)' : '8 หลัก (ระบบเดิม)'}
+                          </button>
+                        ))}
+                      </div>
                       <input
                         id="register-student-id"
                         type="text"
                         inputMode="numeric"
                         required
-                        maxLength={10}
+                        minLength={studentIdLength}
+                        maxLength={studentIdLength}
                         value={studentId}
                         onChange={(e) => handleStudentIdChange(e.target.value)}
-                        placeholder="เช่น 66041013xx หรือรหัสเดิม 8 หลัก"
+                        placeholder={studentIdLength === 10 ? 'เช่น 66041013xx' : 'รหัสระบบเดิม 8 หลัก'}
                         className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white font-mono placeholder:text-slate-500 focus:border-indigo-500 focus:bg-slate-950 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all"
                       />
                       {autoMatchedGen && !autoMatchedGen.isNew && (
