@@ -182,6 +182,15 @@ create table sessions (
   created_at  timestamptz not null default now()
 );
 
+-- 16) login_attempts (กันบรูทฟอร์ซรหัสผ่าน)
+create table login_attempts (
+  id          serial primary key,
+  identifier  text not null,
+  success     boolean not null,
+  created_at  timestamptz not null default now()
+);
+create index login_attempts_identifier_created_at_index on login_attempts (identifier, created_at);
+
 -- ============================================================
 -- ข้อมูลอ้างอิงเริ่มต้น (รุ่น / จังหวัด / อาชีพ / อีโมจิ) + บัญชีแอดมิน
 -- ============================================================
