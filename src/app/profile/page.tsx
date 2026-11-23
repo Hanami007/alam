@@ -71,6 +71,12 @@ export default function ProfilePage() {
           facebook_url: u.facebookUrl ?? u.facebook_url ?? '',
           line_id: u.lineId ?? u.line_id ?? '',
           show_contact_on_map: Boolean(u.showContactOnMap ?? u.show_contact_on_map),
+          birth_date: u.birthDate ?? u.birth_date ?? null,
+          show_email: Boolean(u.showEmail),
+          show_student_id: Boolean(u.showStudentId),
+          show_birth_date: Boolean(u.showBirthDate),
+          show_facebook: Boolean(u.showFacebook),
+          show_line_id: Boolean(u.showLineId),
         });
       } else {
         router.replace('/login?callbackUrl=/profile');
@@ -87,7 +93,7 @@ export default function ProfilePage() {
           setTaggedPhotos(tagged.map((p: any) => ({
             id: p.id,
             image_url: p.image_url,
-            watermark_url: p.watermark_url || null,
+            original_image_url: p.original_image_url || null,
             caption: p.caption || 'รูปภาพกิจกรรม',
             created_at: p.created_at,
             tagged_by_name: p.tagged_by_name || null,
@@ -95,7 +101,7 @@ export default function ProfilePage() {
           setUnlockedPhotos(unlocked.map((p: any) => ({
             id: p.id,
             image_url: p.image_url,
-            watermark_url: p.watermark_url || null,
+            original_image_url: p.original_image_url || null,
             caption: p.caption || 'รูปภาพที่ปลดล็อก',
             created_at: p.created_at,
           })));

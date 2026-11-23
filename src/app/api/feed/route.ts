@@ -1,4 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
+import { publicErrorMessage } from '@/lib/api-error';
 import { feedDbService } from '@/modules/feed/services/feed.service';
 import { NextResponse } from 'next/server';
 
@@ -9,6 +10,6 @@ export async function GET() {
     return NextResponse.json(posts);
   } catch (err: any) {
     console.error('[API /api/feed] Error:', err);
-    return NextResponse.json({ error: err.message || 'ไม่สามารถโหลดฟีดได้' }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err, 'ไม่สามารถโหลดฟีดได้') }, { status: 500 });
   }
 }

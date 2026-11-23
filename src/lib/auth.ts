@@ -160,7 +160,7 @@ export async function getSessionUser(sessionId: string): Promise<UserSession | n
      LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
      LEFT JOIN lookup_options prov ON prov.id = u.province_option_id
      LEFT JOIN lookup_options ct ON ct.id = u.career_option_id
-     WHERE s.id = $1 AND s.expires_at > now()`,
+     WHERE s.id = $1 AND s.expires_at > now() AND u.status = 'approved'`,
     [sessionId]
   );
 

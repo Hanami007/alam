@@ -4,6 +4,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { LocationPicker } from '@/components/ui/location-picker';
+import { PrivacyToggle } from '@/components/ui/privacy-toggle';
+import { FIELD_LIMITS } from '@/lib/field-limits';
+import { resizeImageToDataUrl } from '@/lib/image-resize';
+import { isAlumniByEntryYear, parseStudentId, type StudentIdLength } from '@/lib/student-id';
 import {
   GraduationCap,
   Lock,
@@ -63,6 +67,9 @@ export default function RegisterPage() {
   // Form Fields
   const [name, setName] = useState('');
   const [studentId, setStudentId] = useState('');
+  // ผู้ใช้เลือกรูปแบบรหัสก่อน: 10 หลัก (ระบบปัจจุบัน) หรือ 8 หลัก (ระบบเดิม)
+  // ถ้าเดาจากความยาวที่พิมพ์ รหัส 10 หลักจะถูกตีความเป็น 8 หลักระหว่างพิมพ์ ทำให้รุ่น/สถานะเพี้ยน
+  const [studentIdLength, setStudentIdLength] = useState<StudentIdLength>(10);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -88,6 +95,18 @@ export default function RegisterPage() {
   );
   const [customAvatarInput, setCustomAvatarInput] = useState<string>('');
   const [isAvailableForMentorship, setIsAvailableForMentorship] = useState<boolean>(true);
+
+  // การแสดงข้อมูลส่วนตัวรายฟิลด์ (ไอคอนเขียว = สมาชิกคนอื่นเห็น, แดง = ซ่อน) — ค่าเริ่มต้นซ่อนทั้งหมด
+  // ยกเว้นวันเกิดซึ่งใช้ในวิดเจ็ตอวยพรวันเกิดหน้าฟีด (แสดงแค่วัน/เดือน)
+  const [fieldVisibility, setFieldVisibility] = useState({
+    showEmail: false,
+    showStudentId: false,
+    showBirthDate: true,
+    showFacebook: false,
+    showLineId: false,
+  });
+  const setVisibility = (key: keyof typeof fieldVisibility) => (next: boolean) =>
+    setFieldVisibility((prev) => ({ ...prev, [key]: next }));
 
   // Consents & Agreements (ข้อกำหนดและความยินยอม)
   const [consentPdpa, setConsentPdpa] = useState(false); // Required
@@ -138,28 +157,27 @@ export default function RegisterPage() {
     loadOptions();
   }, []);
 
-  // เมื่อผู้ใช้พิมพ์รหัสนักศึกษา 10 หลัก: คำนวณรุ่นอัตโนมัติ
-  function handleStudentIdChange(val: string) {
-    const cleaned = val.replace(/[^0-9]/g, '').slice(0, 10);
+  // เมื่อผู้ใช้พิมพ์รหัสนักศึกษาครบ 8 หลัก (ระบบเดิม) หรือ 10 หลัก: คำนวณรุ่นอัตโนมัติ
+  // สูตรต่างกันตามความยาว ดู src/lib/student-id.ts (10 หลัก: −37, 8 หลัก: −17)
+  function handleStudentIdChange(val: string, idLength: StudentIdLength = studentIdLength) {
+    const cleaned = val.replace(/[^0-9]/g, '').slice(0, idLength);
     setStudentId(cleaned);
 
-    if (cleaned.length >= 2) {
-      const prefix = cleaned.slice(0, 2);
-      const prefixNum = parseInt(prefix, 10);
-      const calculatedGenNumber = prefixNum - 37; // เช่น 66 - 37 = 29
-      const yearBE = 2500 + prefixNum;
+    // คำนวณเฉพาะเมื่อพิมพ์ครบตามรูปแบบที่เลือก
+    const parsed = parseStudentId(cleaned, idLength);
+    if (parsed) {
+      const prefix = parsed.prefix;
+      const calculatedGenNumber = parsed.generationNumber;
+      const yearBE = parsed.entryYearBE;
 
       setAdmissionYear(String(yearBE));
 
-      // กฎ 4 ปีเทียบกับปีปัจจุบัน (พ.ศ. 2569)
-      const currentYearBE = new Date().getFullYear() + 543;
-      if (yearBE + 4 <= currentYearBE) {
-        setStudentStatus('alumni');
-      } else {
-        setStudentStatus('studying');
-      }
+      // กฎ 4 ปีเทียบกับปีปัจจุบัน
+      setStudentStatus(isAlumniByEntryYear(yearBE) ? 'alumni' : 'studying');
 
-      if (calculatedGenNumber >= 1) {
+      // แสดงรหัสรูปแบบไหนให้ผู้ใช้เห็น (8 หลักกับ 10 หลักให้รุ่นต่างกันแม้ 2 หลักแรกเหมือนกัน)
+      const idFormat = `${parsed.length} หลัก`;
+      {
         if (generations.length > 0) {
           const matched = generations.find(
             (g: any) =>
@@ -174,6 +192,7 @@ export default function RegisterPage() {
               label: matched.label,
               yearBE,
               prefix,
+              idFormat,
               isNew: false,
             });
             return;
@@ -189,6 +208,7 @@ export default function RegisterPage() {
             label: `รุ่น ${calculatedGenNumber}`,
             yearBE,
             prefix,
+            idFormat,
             isNew: true,
           });
           return;
@@ -202,7 +222,7 @@ export default function RegisterPage() {
 
   // คำนวณรุ่นซ้ำอีกครั้งเมื่อรายชื่อรุ่นโหลดเสร็จ เผื่อผู้ใช้พิมพ์รหัสนักศึกษาเสร็จก่อนที่ข้อมูลรุ่นจะโหลดมาทัน
   useEffect(() => {
-    if (generations.length > 0 && studentId.length === 10) {
+    if (generations.length > 0 && parseStudentId(studentId, studentIdLength)) {
       handleStudentIdChange(studentId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -225,18 +245,16 @@ export default function RegisterPage() {
 
   function handleAvatarFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      setError('ขนาดรูปภาพต้องไม่เกิน 2MB');
+    if (file.size > 15 * 1024 * 1024) {
+      setError('ขนาดรูปภาพต้องไม่เกิน 15MB');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setAvatarUrl(event.target.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
+    // ย่อรูปเหลือ ≤512px ก่อนส่ง — เซิร์ฟเวอร์จะบันทึกเป็นไฟล์แยก แล้วเก็บแค่ path ลงฐานข้อมูล
+    resizeImageToDataUrl(file)
+      .then(setAvatarUrl)
+      .catch((err) => setError(err?.message || 'ไม่สามารถอ่านไฟล์รูปภาพได้'));
   }
 
   // Check required consents
@@ -252,8 +270,12 @@ export default function RegisterPage() {
       return;
     }
 
-    if (studentId.trim().length !== 10) {
-      setError('รหัสนักศึกษาต้องมีความยาวครบ 10 หลัก');
+    if (!/^\d+$/.test(studentId) || studentId.length !== studentIdLength) {
+      setError(`รหัสนักศึกษาต้องเป็นตัวเลข ${studentIdLength} หลักตามรูปแบบที่เลือก`);
+      return;
+    }
+    if (!parseStudentId(studentId, studentIdLength)) {
+      setError('รหัสนักศึกษานี้คำนวณรุ่นไม่ได้ กรุณาตรวจสอบเลข 2 หลักแรกอีกครั้ง');
       return;
     }
 
@@ -319,6 +341,7 @@ export default function RegisterPage() {
           birthDate: birthDate || undefined,
           facebookUrl: facebookUrl.trim() || undefined,
           lineId: lineId.trim() || undefined,
+          ...fieldVisibility,
           // Consents (4 ตัวเลือกเดิมรวมเป็น 1 ตัวเลือก ส่งครบถ้วนเข้าสู่ระบบ)
           consentPdpa,
           consentTerms,
@@ -379,10 +402,10 @@ export default function RegisterPage() {
 
             <div className="space-y-2">
               <h2 className="text-2xl sm:text-3xl font-black text-white">
-                ลงทะเบียนสำเร็จและพร้อมใช้งานทันที!
+                ลงทะเบียนสำเร็จ! รอการยืนยันตัวตน
               </h2>
               <p className="text-sm text-slate-300 max-w-lg mx-auto leading-relaxed">
-                บัญชีของคุณได้รับการบันทึกลงสู่ฐานข้อมูล และตั้งค่าสถานะ <span className="font-bold text-emerald-400">อนุมัติแล้ว (Approved)</span> พร้อมเข้าใช้งานระบบเครือข่าย CS MJU CONNECT ได้ทันที
+                บัญชีของคุณได้รับการบันทึกแล้ว และอยู่ในสถานะ <span className="font-bold text-amber-300">รอยืนยันตัวตน (Pending)</span> เมื่อเพื่อนร่วมรุ่นหรือผู้ดูแลระบบยืนยันแล้ว คุณจะเข้าสู่ระบบได้ทันที
               </p>
             </div>
 
@@ -393,24 +416,18 @@ export default function RegisterPage() {
               </p>
               <ul className="space-y-2 text-slate-300 list-disc list-inside">
                 <li>ข้อมูลโปรไฟล์ รูปภาพประจำตัว และการตั้งค่าความเป็นส่วนตัวได้รับการบันทึกลง Database เรียบร้อย</li>
-                <li>คุณได้เข้าสู่ระบบโดยอัตโนมัติแล้ว สามารถเริ่มใช้งานกระดานข่าวสาร ทำเนียบรุ่น หรือแผนที่เครือข่ายได้ทันที</li>
-                <li>ระบบได้ส่งการแจ้งเตือนไปยังผู้ดูแลระบบและเพื่อนร่วมรุ่นเพื่อต้อนรับคุณสู่เครือข่าย</li>
+                <li>ระบบได้ส่งการแจ้งเตือนไปยังเพื่อนร่วมรุ่นและผู้ดูแลระบบให้ช่วยยืนยันตัวตนของคุณแล้ว</li>
+                <li>หลังได้รับการยืนยัน ให้เข้าสู่ระบบด้วยรหัสนักศึกษาหรืออีเมล และรหัสผ่านที่ตั้งไว้</li>
               </ul>
             </div>
 
             <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Link
-                href="/feed"
-                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-indigo-600 p-4 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
+                href="/login"
+                className="w-full sm:col-span-2 inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-indigo-600 p-4 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
               >
-                <span>เริ่มใช้งานระบบ (Go to Feed)</span>
+                <span>ไปหน้าเข้าสู่ระบบ</span>
                 <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                href="/profile"
-                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 p-4 text-sm font-bold text-slate-200 active:scale-[0.98] transition-all cursor-pointer"
-              >
-                <span>ดูโปรไฟล์ของฉัน</span>
               </Link>
             </div>
           </div>
@@ -486,6 +503,7 @@ export default function RegisterPage() {
                       <input
                         type="text"
                         required
+                        maxLength={FIELD_LIMITS.name}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="เช่น สมชาย ใจดี"
@@ -496,31 +514,64 @@ export default function RegisterPage() {
                     {/* Student ID */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs font-semibold text-slate-300">
-                          รหัสนักศึกษา (10 หลัก) <span className="text-rose-400">*</span>
+                        <label htmlFor="register-student-id" className="text-xs font-semibold text-slate-300">
+                          รหัสนักศึกษา <span className="text-rose-400">*</span>
                         </label>
-                        <span className="text-[10px] text-slate-400">เลข 2 ตัวหน้าจะระบุรุ่น</span>
+                        <PrivacyToggle
+                          fieldLabel="รหัสนักศึกษา"
+                          visible={fieldVisibility.showStudentId}
+                          onChange={setVisibility('showStudentId')}
+                        />
+                      </div>
+                      <div
+                        role="radiogroup"
+                        aria-label="รูปแบบรหัสนักศึกษา"
+                        className="grid grid-cols-2 gap-1.5 p-1 bg-slate-950/60 rounded-xl border border-white/10"
+                      >
+                        {([10, 8] as const).map((len) => (
+                          <button
+                            key={len}
+                            type="button"
+                            role="radio"
+                            aria-checked={studentIdLength === len}
+                            onClick={() => {
+                              if (len === studentIdLength) return;
+                              setStudentIdLength(len);
+                              handleStudentIdChange(studentId, len);
+                            }}
+                            className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              studentIdLength === len
+                                ? 'bg-indigo-600 text-white shadow shadow-indigo-600/30'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            }`}
+                          >
+                            {len === 10 ? '10 หลัก (ปัจจุบัน)' : '8 หลัก (ระบบเดิม)'}
+                          </button>
+                        ))}
                       </div>
                       <input
+                        id="register-student-id"
                         type="text"
+                        inputMode="numeric"
                         required
-                        maxLength={10}
+                        minLength={studentIdLength}
+                        maxLength={studentIdLength}
                         value={studentId}
                         onChange={(e) => handleStudentIdChange(e.target.value)}
-                        placeholder="เช่น 66041013xx"
+                        placeholder={studentIdLength === 10 ? 'เช่น 66041013xx' : 'รหัสระบบเดิม 8 หลัก'}
                         className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white font-mono placeholder:text-slate-500 focus:border-indigo-500 focus:bg-slate-950 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all"
                       />
                       {autoMatchedGen && !autoMatchedGen.isNew && (
                         <div className="flex items-center gap-1.5 text-xs text-indigo-300 bg-indigo-500/15 border border-indigo-500/30 rounded-xl px-3 py-1.5 font-medium animate-slide-up">
                           <Sparkles className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
-                          <span>เชื่อมโยง: <strong>{autoMatchedGen.label}</strong> (รหัส {autoMatchedGen.prefix}xx / เข้าปี {autoMatchedGen.yearBE})</span>
+                          <span>เชื่อมโยง: <strong>{autoMatchedGen.label}</strong> (รหัส {autoMatchedGen.idFormat} ขึ้นต้น {autoMatchedGen.prefix} / เข้าปี {autoMatchedGen.yearBE})</span>
                         </div>
                       )}
                       {autoMatchedGen && autoMatchedGen.isNew && (
                         <div className="flex items-center gap-1.5 text-xs text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 rounded-xl px-3 py-1.5 font-medium animate-slide-up">
                           <Sparkles className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
                           <span>
-                            <strong>{autoMatchedGen.label}</strong> เป็นรุ่นใหม่ล่าสุดในระบบ (รหัส {autoMatchedGen.prefix}xx / เข้าปี {autoMatchedGen.yearBE}) — ระบบจะสร้างตัวเลือกรุ่นนี้ให้อัตโนมัติ
+                            <strong>{autoMatchedGen.label}</strong> เป็นรุ่นใหม่ล่าสุดในระบบ (รหัส {autoMatchedGen.idFormat} ขึ้นต้น {autoMatchedGen.prefix} / เข้าปี {autoMatchedGen.yearBE}) — ระบบจะสร้างตัวเลือกรุ่นนี้ให้อัตโนมัติ
                           </span>
                         </div>
                       )}
@@ -530,12 +581,20 @@ export default function RegisterPage() {
                   {/* Email & Hometown Province */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                        <Mail className="h-3.5 w-3.5 text-indigo-400" /> อีเมลติดต่อ <span className="text-rose-400">*</span>
-                      </label>
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                          <Mail className="h-3.5 w-3.5 text-indigo-400" /> อีเมลติดต่อ <span className="text-rose-400">*</span>
+                        </label>
+                        <PrivacyToggle
+                          fieldLabel="อีเมล"
+                          visible={fieldVisibility.showEmail}
+                          onChange={setVisibility('showEmail')}
+                        />
+                      </div>
                       <input
                         type="email"
                         required
+                        maxLength={FIELD_LIMITS.email}
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="somchai@example.com"
@@ -563,10 +622,19 @@ export default function RegisterPage() {
 
                   {/* Birth Date */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-                      <span>วันเกิด</span>
-                      <span className="text-[10px] text-slate-400">ใช้แสดงในวิดเจ็ต &ldquo;สุขสันต์วันเกิด&rdquo; หน้าฟีดเมื่อถึงวันจริง</span>
-                    </label>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-xs font-semibold text-slate-300">
+                        วันเกิด{' '}
+                        <span className="text-[10px] font-normal text-slate-400">
+                          (ถ้าแสดง จะขึ้นในวิดเจ็ต &ldquo;สุขสันต์วันเกิด&rdquo; หน้าฟีดเมื่อถึงวันจริง)
+                        </span>
+                      </label>
+                      <PrivacyToggle
+                        fieldLabel="วันเกิด"
+                        visible={fieldVisibility.showBirthDate}
+                        onChange={setVisibility('showBirthDate')}
+                      />
+                    </div>
                     <input
                       type="date"
                       value={birthDate}
@@ -725,6 +793,7 @@ export default function RegisterPage() {
                       </label>
                       <input
                         type="text"
+                        maxLength={FIELD_LIMITS.bio}
                         value={bio}
                         onChange={(e) => setBio(e.target.value)}
                         placeholder="เช่น สนใจศึกษาด้าน Web Development, Cloud & AI ยินดีทำความรู้จักเพื่อนๆ พี่ๆ ครับ"
@@ -736,11 +805,19 @@ export default function RegisterPage() {
                   {/* ช่องทางติดต่อ (ไม่บังคับ) — แก้ไขได้ทีหลังในหน้าโปรไฟล์ และมี toggle เปิด/ปิดการแสดงบนแผนที่แยกต่างหาก */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                        <Link2 className="h-3.5 w-3.5 text-indigo-400" /> Facebook (ไม่บังคับ)
-                      </label>
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                          <Link2 className="h-3.5 w-3.5 text-indigo-400" /> Facebook (ไม่บังคับ)
+                        </label>
+                        <PrivacyToggle
+                          fieldLabel="Facebook"
+                          visible={fieldVisibility.showFacebook}
+                          onChange={setVisibility('showFacebook')}
+                        />
+                      </div>
                       <input
                         type="text"
+                        maxLength={FIELD_LIMITS.facebookUrl}
                         value={facebookUrl}
                         onChange={(e) => setFacebookUrl(e.target.value)}
                         placeholder="ลิงก์โปรไฟล์ หรือ ชื่อผู้ใช้ Facebook"
@@ -748,11 +825,19 @@ export default function RegisterPage() {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                        <MessageCircle className="h-3.5 w-3.5 text-emerald-400" /> LINE ID (ไม่บังคับ)
-                      </label>
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                          <MessageCircle className="h-3.5 w-3.5 text-emerald-400" /> LINE ID (ไม่บังคับ)
+                        </label>
+                        <PrivacyToggle
+                          fieldLabel="LINE ID"
+                          visible={fieldVisibility.showLineId}
+                          onChange={setVisibility('showLineId')}
+                        />
+                      </div>
                       <input
                         type="text"
+                        maxLength={FIELD_LIMITS.lineId}
                         value={lineId}
                         onChange={(e) => setLineId(e.target.value)}
                         placeholder="LINE ID ของคุณ"
@@ -788,6 +873,7 @@ export default function RegisterPage() {
                         <input
                           type="text"
                           required={studentStatus === 'alumni'}
+                          maxLength={FIELD_LIMITS.company}
                           value={company}
                           onChange={(e) => setCompany(e.target.value)}
                           placeholder="เช่น Agoda, SCB TechX, ม.แม่โจ้..."
@@ -802,6 +888,7 @@ export default function RegisterPage() {
                         <input
                           type="text"
                           required={studentStatus === 'alumni'}
+                          maxLength={FIELD_LIMITS.position}
                           value={position}
                           onChange={(e) => setPosition(e.target.value)}
                           placeholder="เช่น Senior Software Engineer, ครู..."
@@ -852,6 +939,7 @@ export default function RegisterPage() {
                       </label>
                       <textarea
                         rows={2}
+                        maxLength={FIELD_LIMITS.bio}
                         value={bio}
                         onChange={(e) => setBio(e.target.value)}
                         placeholder="เช่น ศิษย์เก่า CS แม่โจ้ มีความเชี่ยวชาญด้าน Web & Cloud ยินดีให้คำปรึกษาแก่น้องๆ ในสาขา"

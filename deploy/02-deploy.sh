@@ -55,6 +55,20 @@ if [ ! -f "$ENV_FILE" ]; then
     fi
 fi
 
+# ── ตรวจรหัสผ่าน DB: ห้ามว่าง / ห้ามเป็นค่าตัวอย่างหรือรหัส dev ที่อยู่ใน repo ──
+DB_PW_LINE=$(grep -E '^POSTGRES_PASSWORD=' "$ENV_FILE" | tail -n1 | cut -d= -f2-)
+if [ -z "$DB_PW_LINE" ]; then
+    echo -e "${RED}✗ ยังไม่ได้ตั้ง POSTGRES_PASSWORD ใน .env${NC}"
+    exit 1
+fi
+case "$DB_PW_LINE" in
+    *changeme*|alumni_dev_password|postgres|password|123456)
+        echo -e "${YELLOW}⚠️  POSTGRES_PASSWORD ใน .env ยังเป็นค่าตัวอย่าง/รหัสที่เดาง่าย — ควรเปลี่ยนเป็นรหัสสุ่ม เช่น: openssl rand -base64 24${NC}"
+        echo -e "${YELLOW}   (DB ที่สร้างไปแล้วต้องเปลี่ยนด้วย ALTER USER ใน psql และแก้ DATABASE_URL ให้ตรงกันด้วย)${NC}"
+        ;;
+esac
+unset DB_PW_LINE
+
 # ── 1. Git Pull (ถ้าใช้ --pull) ──
 if [ "$DO_PULL" = true ]; then
     echo -e "${YELLOW}[1/4] Git Pull — ดึงโค้ดล่าสุด...${NC}"
@@ -71,6 +85,9 @@ fi
 echo -e "${YELLOW}[2/4] ตรวจสอบโฟลเดอร์ data...${NC}"
 mkdir -p "$PROJECT_DIR/data/db"
 mkdir -p "$PROJECT_DIR/data/backups"
+# รูปโปรไฟล์ที่อัปโหลด — app รันเป็น uid 1001 (user nextjs ใน Dockerfile) ต้องเขียนได้
+mkdir -p "$PROJECT_DIR/data/uploads/avatars"
+chown -R 1001:1001 "$PROJECT_DIR/data/uploads" 2>/dev/null || sudo chown -R 1001:1001 "$PROJECT_DIR/data/uploads"
 echo -e "${GREEN}✓ โฟลเดอร์ data พร้อม${NC}"
 echo ""
 

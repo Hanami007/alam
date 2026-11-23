@@ -7,6 +7,8 @@ import { StatsWidget } from './widgets/stats-widget';
 import { GalleryWidget } from './widgets/gallery-widget';
 import { BirthdayWidget } from './widgets/birthday-widget';
 import { LeaderboardWidget } from './widgets/leaderboard-widget';
+import { ContentWarningModal, toContentWarning, type ContentWarning } from '@/components/ui/content-warning-modal';
+import { ReportContentDialog, type ReportTarget } from '@/components/ui/report-content-dialog';
 
 function formatPostDateTime(dateStr: string) {
   if (!dateStr) return '';
@@ -55,7 +57,8 @@ import {
   Check,
   X,
   UserCheck,
-  Edit3
+  Edit3,
+  Flag
 } from 'lucide-react';
 
 interface Comment {
@@ -283,6 +286,9 @@ export function FeedList({
   const [postToDelete, setPostToDelete] = useState<Post | null>(null);
   const [isDeletingPost, setIsDeletingPost] = useState<boolean>(false);
   const [deleteToast, setDeleteToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  // pop-up กลางจอเมื่อโพสต์/โพล/ความคิดเห็นมีคำไม่เหมาะสม และกล่องรายงานเนื้อหาที่หลุดตัวกรอง
+  const [contentWarning, setContentWarning] = useState<ContentWarning | null>(null);
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
 
   // Close menus on click outside
   useEffect(() => {
@@ -495,9 +501,13 @@ export function FeedList({
           setRequestStatus('idle');
           setShowRequestForm(false);
         }, 2000);
+      } else if (toContentWarning(data)) {
+        // คงฟอร์มไว้ให้แก้คำแล้วส่งใหม่ได้เลย
+        setRequestStatus('idle');
+        setContentWarning(toContentWarning(data));
       } else {
         setRequestStatus('error');
-        setDeleteToast({ message: data.error || 'เกิดข้อผิดพลาดในการส่งคำขอ', type: 'error' });
+        setDeleteToast({ message: data?.error || 'เกิดข้อผิดพลาดในการส่งคำขอ', type: 'error' });
         setTimeout(() => {
           setRequestStatus('idle');
           setDeleteToast(null);
@@ -697,6 +707,21 @@ export function FeedList({
     setOpenComments((prev) => ({ ...prev, [postId]: !prev[postId] }));
   }
 
+  function revertTempComment(postId: number, tempId: number, text: string) {
+    setFeedPosts((prev) =>
+      prev.map((post) =>
+        post.id !== postId
+          ? post
+          : {
+              ...post,
+              comments: Math.max(0, post.comments - 1),
+              commentsList: (post.commentsList || []).filter((c) => c.id !== tempId),
+            }
+      )
+    );
+    setCommentInputs((prev) => ({ ...prev, [postId]: text }));
+  }
+
   // Handle Add Comment
   async function handleAddComment(postId: number) {
     const text = commentInputs[postId]?.trim();
@@ -747,9 +772,21 @@ export function FeedList({
         );
         setDeleteToast({ message: '💬 ส่งความคิดเห็นสำเร็จ! คุณได้รับ +1 แต้มกิจกรรม ✨', type: 'success' });
         setTimeout(() => setDeleteToast(null), 3500);
+      } else {
+        // ส่งไม่ผ่าน — ถอนความคิดเห็นชั่วคราวออก แล้วคืนข้อความให้แก้ไขต่อ
+        // (เดิมความคิดเห็นที่ถูกปฏิเสธยังค้างโชว์อยู่ในฟีดจนกว่าจะรีเฟรช)
+        revertTempComment(postId, tempComment.id, text);
+        const warning = toContentWarning(data);
+        if (warning) {
+          setContentWarning(warning);
+        } else {
+          setDeleteToast({ message: data?.error || 'ส่งความคิดเห็นไม่สำเร็จ', type: 'error' });
+          setTimeout(() => setDeleteToast(null), 3500);
+        }
       }
     } catch (err) {
       console.error('Failed to add comment:', err);
+      revertTempComment(postId, tempComment.id, text);
     } finally {
       setSubmittingComment((prev) => ({ ...prev, [postId]: false }));
     }
@@ -1170,6 +1207,23 @@ export function FeedList({
                             <span>คัดลอกลิงก์โพสต์</span>
                           </button>
 
+                          {activeRole !== 'admin' && (
+                            <button
+                              onClick={() => {
+                                setActivePostMenuId(null);
+                                setReportTarget({
+                                  targetType: 'post',
+                                  targetId: post.id,
+                                  preview: `${post.title}${post.body ? ` — ${post.body}` : ''}`,
+                                });
+                              }}
+                              className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-slate-700 hover:bg-rose-50 hover:text-rose-600 transition-colors text-left"
+                            >
+                              <Flag className="h-4 w-4 text-slate-400" />
+                              <span>รายงานโพสต์ไม่เหมาะสม</span>
+                            </button>
+                          )}
+
                           {activeRole === 'admin' ? (
                             <>
                               <div className="my-1 border-t border-slate-100" />
@@ -1512,6 +1566,26 @@ export function FeedList({
                                     >
                                       ↩ ตอบกลับ
                                     </button>
+
+                                    {/* Report comment (ซ่อนกับความคิดเห็นของตัวเอง และความคิดเห็นชั่วคราวที่ยังส่งไม่เสร็จ) */}
+                                    <button
+                                      hidden={
+                                        activeRole === 'admin' ||
+                                        comment.author === currentUserName ||
+                                        Boolean(submittingComment[post.id])
+                                      }
+                                      onClick={() =>
+                                        setReportTarget({
+                                          targetType: 'comment',
+                                          targetId: comment.id,
+                                          preview: comment.content,
+                                        })
+                                      }
+                                      className="inline-flex items-center gap-1 text-xs font-semibold text-slate-400 hover:text-rose-500 transition-colors"
+                                      title="รายงานความคิดเห็นไม่เหมาะสม"
+                                    >
+                                      <Flag className="h-3 w-3" /> รายงาน
+                                    </button>
                                   </div>
                                 </div>
                               </div>
@@ -1625,6 +1699,18 @@ export function FeedList({
       )}
 
       {/* ===== CUTE GLASSMORPHISM DELETE CONFIRMATION MODAL ===== */}
+      <ContentWarningModal warning={contentWarning} onClose={() => setContentWarning(null)} />
+      <ReportContentDialog
+        key={reportTarget ? `${reportTarget.targetType}-${reportTarget.targetId}` : 'closed'}
+        target={reportTarget}
+        onClose={() => setReportTarget(null)}
+        onDone={(message) => {
+          setReportTarget(null);
+          setDeleteToast({ message: `🚩 ${message}`, type: 'success' });
+          setTimeout(() => setDeleteToast(null), 3500);
+        }}
+      />
+
       {postToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
           <div
@@ -1725,4 +1811,4 @@ export function FeedList({
       )}
     </div>
   );
-}
+}

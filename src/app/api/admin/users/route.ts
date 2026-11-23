@@ -1,4 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
+import { publicErrorMessage } from '@/lib/api-error';
 import { adminDbService } from '@/modules/admin/services/admin.service';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -13,7 +14,7 @@ export async function GET() {
     return NextResponse.json(members);
   } catch (err: any) {
     console.error('[API /api/admin/users] Error:', err);
-    return NextResponse.json({ error: err.message || 'Error loading members' }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err, 'Error loading members') }, { status: 500 });
   }
 }
 
@@ -39,6 +40,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error('[API /api/admin/users] DELETE Error:', err);
-    return NextResponse.json({ error: err.message || 'Error deleting member' }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err, 'Error deleting member') }, { status: 500 });
   }
 }

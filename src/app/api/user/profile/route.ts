@@ -1,5 +1,6 @@
 import { getCurrentUser } from '@/lib/auth';
-import { userDbService } from '@/modules/profile/services/user.service';
+import { publicErrorMessage } from '@/lib/api-error';
+import { redactPrivateFields, userDbService } from '@/modules/profile/services/user.service';
 import { alumniAggregator } from '@/services/aggregator/alumni.aggregator';
 import { NextResponse } from 'next/server';
 
@@ -24,16 +25,31 @@ export async function GET(req: Request) {
     }
     const isOwner = user ? user.id === targetUserId : false;
 
-    return NextResponse.json({
+    const merged = {
       ...unified,
       ...profile,
       id: targetUserId,
       role: profile?.role || (isOwner ? user?.role : 'alumni'),
       isOwner,
-    });
+    };
+
+    // คนอื่นเห็นเฉพาะฟิลด์ที่เจ้าของเปิดไว้ (เจ้าของและแอดมินเห็นครบ)
+    // ไม่พบในระบบ local = ไม่มีการตั้งค่า → ปิดทั้งหมด
+    const canSeeAll = isOwner || user?.role === 'admin';
+    const body = canSeeAll
+      ? merged
+      : redactPrivateFields(merged, {
+          showEmail: Boolean(profile?.showEmail),
+          showBirthDate: Boolean(profile?.showBirthDate),
+          showStudentId: Boolean(profile?.showStudentId),
+          showFacebook: Boolean(profile?.showFacebook),
+          showLineId: Boolean(profile?.showLineId),
+        });
+
+    return NextResponse.json(body);
   } catch (err: any) {
     console.error('[API /api/user/profile] Error:', err);
-    return NextResponse.json({ error: err.message || 'ไม่สามารถโหลดข้อมูลผู้ใช้ได้' }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err, 'ไม่สามารถโหลดข้อมูลผู้ใช้ได้') }, { status: 500 });
   }
 }
 
@@ -51,6 +67,6 @@ export async function PUT(req: Request) {
     return NextResponse.json({ success: true, userId });
   } catch (err: any) {
     console.error('[API PUT /api/user/profile] Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err) }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { authenticateUser, createSession, checkLoginRateLimit, recordLoginAttempt, SESSION_MAX_AGE_SECONDS } from '@/lib/auth';
+import { publicErrorMessage } from '@/lib/api-error';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
@@ -80,6 +81,6 @@ export async function POST(req: Request) {
     });
   } catch (err: any) {
     console.error('Login error:', err);
-    return NextResponse.json({ error: err.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ' }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err, 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ') }, { status: 500 });
   }
 }

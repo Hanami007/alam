@@ -269,7 +269,7 @@ export class GalleryDbService {
         gen.label as generation,
         (gen.extra->>'year_start')::int as year,
         ma.image_url as image,
-        ma.watermark_url as original_image,
+        ma.original_image_url as original_image,
         not exists (
           select 1 from photo_view_verifications v
           where v.asset_id = ma.id and v.is_passed = true

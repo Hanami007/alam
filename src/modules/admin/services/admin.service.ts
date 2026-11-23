@@ -195,8 +195,8 @@ export class AdminDbService {
       const targetName = targetRows[0]?.name || null;
 
       // ล้างอ้างอิงที่สมาชิกคนนี้เป็นเพียง "ผู้ดำเนินการ" ให้คนอื่น — ไม่ลบข้อมูลของคนอื่น
-      await client.query(`UPDATE posts SET admin_id = NULL WHERE admin_id = $1`, [userId]);
-      await client.query(`UPDATE user_verifications SET admin_id = NULL WHERE admin_id = $1`, [userId]);
+      await client.query(`UPDATE posts SET published_by = NULL WHERE published_by = $1`, [userId]);
+      await client.query(`UPDATE user_verifications SET verified_by = NULL WHERE verified_by = $1`, [userId]);
 
       // ลบโพสต์ที่สมาชิกคนนี้ร้องขอเอง (ลบโพลของโพสต์ก่อน เพราะไม่มี cascade จาก posts)
       await client.query(
@@ -375,7 +375,7 @@ export class AdminDbService {
       const targetStatus = decision === 'approved' ? 'published' : 'rejected';
       const { rows } = await pool.query(
         `UPDATE posts 
-         SET status = $1, admin_id = $2, published_at = NOW() 
+         SET status = $1, published_by = $2, published_at = NOW()
          WHERE id = $3 
          RETURNING id, title, status`,
         [targetStatus, adminId || 1, postId]
@@ -397,25 +397,13 @@ export class AdminDbService {
   }
 
   // ---------------------------------------------------------------
-  // Banned Keywords (Keyword Filter) — ใช้จริงใน /api/admin/keywords และ /api/feed/request
+  // Banned Keywords (Keyword Filter) — จัดการรายการคำใน /api/admin/keywords
+  // การตรวจข้อความ (ตัดคำภาษาไทย) อยู่ที่ src/lib/content-filter.ts
+  // ตาราง banned_keywords สร้างโดย migration 1750000017000 (เดิมสร้างเองตอน runtime)
   // ---------------------------------------------------------------
-
-  /** สร้างตาราง banned_keywords หากยังไม่มี (auto-migrate) */
-  private async ensureBannedKeywordsTable() {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS banned_keywords (
-        id         SERIAL PRIMARY KEY,
-        keyword    TEXT NOT NULL,
-        added_by   INT REFERENCES users(id) ON DELETE SET NULL,
-        created_at TIMESTAMPTZ DEFAULT now(),
-        CONSTRAINT banned_keywords_keyword_uq UNIQUE (keyword)
-      )
-    `);
-  }
 
   /** ดึงรายการคำต้องห้ามทั้งหมด */
   async getBannedKeywords() {
-    await this.ensureBannedKeywordsTable();
     const { rows } = await pool.query(
       `SELECT bk.id, bk.keyword, bk.created_at, u.name AS added_by_name
        FROM banned_keywords bk
@@ -427,7 +415,6 @@ export class AdminDbService {
 
   /** เพิ่มคำต้องห้ามใหม่ */
   async addBannedKeyword(keyword: string, adminId: number) {
-    await this.ensureBannedKeywordsTable();
     const { rows } = await pool.query(
       `INSERT INTO banned_keywords (keyword, added_by)
        VALUES ($1, $2)
@@ -440,21 +427,8 @@ export class AdminDbService {
 
   /** ลบคำต้องห้าม */
   async removeBannedKeyword(id: number) {
-    await this.ensureBannedKeywordsTable();
     const { rows } = await pool.query(`DELETE FROM banned_keywords WHERE id = $1 RETURNING *`, [id]);
     return rows[0] ?? null;
-  }
-
-  /**
-   * ตรวจสอบข้อความว่ามีคำต้องห้ามหรือไม่
-   * คืนค่า array ของคำที่พบ (ถ้าไม่พบจะเป็น [])
-   */
-  async checkForBannedKeywords(texts: string[]): Promise<string[]> {
-    await this.ensureBannedKeywordsTable();
-    const { rows } = await pool.query(`SELECT keyword FROM banned_keywords`);
-    const keywords: string[] = rows.map((r: any) => r.keyword as string);
-    const combined = texts.join(' ').toLowerCase();
-    return keywords.filter((kw) => combined.includes(kw));
   }
 
   // ---------------------------------------------------------------
@@ -512,6 +486,7 @@ export class AdminDbService {
       LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
       WHERE u.status = 'approved'
         AND u.birth_date IS NOT NULL
+        AND u.show_birth_date
         AND EXTRACT(MONTH FROM u.birth_date) = EXTRACT(MONTH FROM CURRENT_DATE)
         AND EXTRACT(DAY FROM u.birth_date) = EXTRACT(DAY FROM CURRENT_DATE)
       ORDER BY u.name

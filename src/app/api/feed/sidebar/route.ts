@@ -1,4 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
+import { publicErrorMessage } from '@/lib/api-error';
 import { pool } from '@/lib/db';
 import { feedDbService } from '@/modules/feed/services/feed.service';
 import { NextResponse } from 'next/server';
@@ -69,6 +70,6 @@ export async function GET() {
     });
   } catch (err: any) {
     console.error('[API /api/feed/sidebar] Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err) }, { status: 500 });
   }
 }

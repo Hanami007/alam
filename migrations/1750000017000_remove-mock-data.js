@@ -28,7 +28,26 @@ const MOCK_ARCHIVE_CAPTIONS = ['พิธีรับปริญญา รุ�
 
 const MOCK_GENERATION_CODES = ['gen-38', 'gen-40', 'gen-41', 'gen-42', 'gen-43', 'gen-44', 'gen-45', 'gen-46', 'gen-48'];
 
+/**
+ * migration 1750000017000_naming-convention-and-field-sizes (ชื่อไฟล์เรียงก่อนไฟล์นี้) เปลี่ยนชื่อ
+ * posts.admin_id → published_by และ user_verifications.admin_id → verified_by
+ * DB ที่รันไฟล์นั้นไปแล้วจะไม่มี admin_id — เลือกชื่อคอลัมน์ที่มีอยู่จริงแทนการ hardcode
+ */
+async function pickColumn(pgm, table, candidates) {
+  const { rows } = await pgm.db.query(
+    `SELECT column_name FROM information_schema.columns
+     WHERE table_schema = current_schema() AND table_name = $1 AND column_name = ANY($2::text[])`,
+    [table, candidates]
+  );
+  const found = candidates.find((c) => rows.some((r) => r.column_name === c));
+  if (!found) throw new Error(`ไม่พบคอลัมน์ ${candidates.join('/')} ในตาราง ${table}`);
+  return found;
+}
+
 exports.up = async (pgm) => {
+  const postsAdminCol = await pickColumn(pgm, 'posts', ['admin_id', 'published_by']);
+  const verificationAdminCol = await pickColumn(pgm, 'user_verifications', ['admin_id', 'verified_by']);
+
   await pgm.db.query(`
     CREATE TEMP TABLE mock_users ON COMMIT DROP AS
     SELECT id FROM users
@@ -44,7 +63,9 @@ exports.up = async (pgm) => {
   );
 
   // ─── 1. โพสต์/โพล mock (poll_options, poll_votes, post_interactions cascade ตามไป) ──
-  await pgm.db.query(`UPDATE posts SET admin_id = NULL WHERE admin_id IN (SELECT id FROM mock_users)`);
+  await pgm.db.query(
+    `UPDATE posts SET ${postsAdminCol} = NULL WHERE ${postsAdminCol} IN (SELECT id FROM mock_users)`
+  );
   await pgm.db.query(`DELETE FROM polls WHERE post_id IN (SELECT id FROM mock_posts)`);
   await pgm.db.query(`DELETE FROM posts WHERE id IN (SELECT id FROM mock_posts)`);
 
@@ -85,7 +106,9 @@ exports.up = async (pgm) => {
   await pgm.db.query(`DELETE FROM photo_view_verifications WHERE user_id IN (SELECT id FROM mock_users)`);
 
   // ─── 5. ตัวคน mock (sessions, point_transactions, notifications cascade ตามไป) ──
-  await pgm.db.query(`UPDATE user_verifications SET admin_id = NULL WHERE admin_id IN (SELECT id FROM mock_users)`);
+  await pgm.db.query(
+    `UPDATE user_verifications SET ${verificationAdminCol} = NULL WHERE ${verificationAdminCol} IN (SELECT id FROM mock_users)`
+  );
   await pgm.db.query(`DELETE FROM user_verifications WHERE user_id IN (SELECT id FROM mock_users)`);
   await pgm.db.query(`DELETE FROM users WHERE id IN (SELECT id FROM mock_users)`);
 

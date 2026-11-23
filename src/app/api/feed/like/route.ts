@@ -1,4 +1,5 @@
 import { feedDbService } from '@/modules/feed/services/feed.service';
+import { publicErrorMessage } from '@/lib/api-error';
 import { getCurrentUser } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 
@@ -16,6 +17,6 @@ export async function POST(req: Request) {
     const result = await feedDbService.toggleLike(Number(postId), user.id);
     return NextResponse.json({ success: true, ...result });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err) }, { status: 500 });
   }
 }

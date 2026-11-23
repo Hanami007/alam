@@ -1,4 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
+import { publicErrorMessage } from '@/lib/api-error';
 import { adminDbService } from '@/modules/admin/services/admin.service';
 import { NextResponse } from 'next/server';
 
@@ -13,6 +14,6 @@ export async function GET() {
     return NextResponse.json(requests);
   } catch (err: any) {
     console.error('[API /api/admin/post-requests] Error:', err);
-    return NextResponse.json({ error: err.message || 'Error loading post requests' }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err, 'Error loading post requests') }, { status: 500 });
   }
 }

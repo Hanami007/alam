@@ -1,4 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
+import { publicErrorMessage } from '@/lib/api-error';
 import { userDbService } from '@/modules/profile/services/user.service';
 import { NextResponse } from 'next/server';
 
@@ -26,6 +27,6 @@ export async function GET(req: Request) {
     return NextResponse.json(logs);
   } catch (err: any) {
     console.error('[API /api/user/activity] Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err) }, { status: 500 });
   }
 }

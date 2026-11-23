@@ -1,0 +1,806 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2860" height="5513.5" viewBox="0 0 2860 5513.5" font-family="'Leelawadee UI','Tahoma','Segoe UI',sans-serif">
+<rect width="2860" height="5513.5" fill="#f8fafc"/>
+
+<defs>
+  <marker id="ah" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+  <marker id="ahs" markerWidth="10" markerHeight="10" refX="2" refY="5" orient="auto-start-reverse"><path d="M10,0 L0,5 L10,10 z" fill="#475569"/></marker>
+</defs>
+<rect width="2860" height="140" fill="#0f172a"/>
+<text x="40" y="62" font-size="40" font-weight="800" fill="#ffffff">CSMJU Connect (alam) — Alumni Directory</text>
+<text x="40" y="100" font-size="21" fill="#cbd5e1">Flow การทำงานของระบบโดยละเอียด · Next.js 16 · React 19 · TypeScript · Tailwind 4 · PostgreSQL 16 (node-pg-migrate) · Docker</text>
+<rect x="40" y="114" width="20" height="16" rx="4" fill="#e8f1ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="68" y="127" font-size="14" fill="#e2e8f0">ขั้นตอน / ผู้ใช้</text>
+<rect x="168.1" y="114" width="20" height="16" rx="4" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="196.1" y="127" font-size="14" fill="#e2e8f0">API route / Server</text>
+<rect x="358.64" y="114" width="20" height="16" rx="4" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="386.64" y="127" font-size="14" fill="#e2e8f0">เงื่อนไขตัดสินใจ</text>
+<rect x="498.64" y="114" width="20" height="16" rx="4" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<text x="526.64" y="127" font-size="14" fill="#e2e8f0">ฐานข้อมูล PostgreSQL</text>
+<rect x="690.72" y="114" width="20" height="16" rx="4" fill="#ffe9d6" stroke="#ea580c" stroke-width="2"/>
+<text x="718.72" y="127" font-size="14" fill="#e2e8f0">ระบบภายนอก</text>
+<rect x="816.72" y="114" width="20" height="16" rx="4" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="844.72" y="127" font-size="14" fill="#e2e8f0">ข้อผิดพลาด / ปฏิเสธ</text>
+<rect x="979.82" y="114" width="20" height="16" rx="4" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+<text x="1007.82" y="127" font-size="14" fill="#e2e8f0">ผลลัพธ์สำเร็จ</text>
+<rect x="1105.8200000000002" y="114" width="20" height="16" rx="4" fill="#fde7f3" stroke="#db2777" stroke-width="2"/>
+<text x="1133.8200000000002" y="127" font-size="14" fill="#e2e8f0">ฟีเจอร์แอดมิน</text>
+<g transform="translate(40,170)"><rect width="2780" height="720" rx="16" fill="#ffffff" stroke="#1d4ed8" stroke-width="3"/><path d="M0,16 a16,16 0 0 1 16,-16 h2748 a16,16 0 0 1 16,16 v28 h-2780 z" fill="#1d4ed8"/><text x="22" y="30" font-size="21" font-weight="800" fill="#ffffff">① ภาพรวมสถาปัตยกรรม — เส้นทางของ request ตั้งแต่ผู้ใช้จนถึงฐานข้อมูล</text></g>
+<g transform="translate(40,170)"><rect x="30" y="80" width="400" height="148" rx="9" fill="#e8f1ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="230" y="106" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">1) ผู้ใช้ / Browser</text>
+<text x="230" y="127" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">เปิดเว็บ → ไปที่ "/"</text>
+<text x="230" y="148" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ทุก request แนบ cookie session_id</text>
+<text x="230" y="169" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(httpOnly · sameSite=lax · อายุ 30 วัน)</text>
+<text x="230" y="190" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">หน้าเว็บเรียก API ผ่าน src/lib/api-client.ts</text>
+<text x="230" y="211" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(fetch → JSON)</text>
+<rect x="500" y="80" width="400" height="253" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="700" y="106" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">2) src/middleware.ts (Node runtime)</text>
+<text x="700" y="127" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ข้ามการตรวจ: /_next, /api/auth, /api/lookup,</text>
+<text x="700" y="148" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">/api/nas, /api/public และไฟล์ static</text>
+<text x="700" y="169" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a"></text>
+<text x="700" y="190" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">อ่าน cookie → query ตาราง sessions</text>
+<text x="700" y="211" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(id = cookie AND expires_at &gt; now())</text>
+<text x="700" y="232" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a"></text>
+<text x="700" y="253" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">/ → /feed (ล็อกอินแล้ว) หรือ /login</text>
+<text x="700" y="274" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">/login,/register ขณะล็อกอิน → /feed</text>
+<text x="700" y="295" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ไม่มี session: หน้าเว็บ → /login?callbackUrl</text>
+<text x="700" y="316" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">               API → 401 JSON</text>
+<rect x="970" y="80" width="400" height="232" rx="9" fill="#e8f1ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="1170" y="106" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">3) หน้าเว็บ  src/app/*</text>
+<text x="1170" y="127" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">AppShell (components/layout/app-shell.tsx)</text>
+<text x="1170" y="148" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">/login  /register</text>
+<text x="1170" y="169" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">/feed  /wall  /gallery</text>
+<text x="1170" y="190" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">/hall-of-fame (+ /results)  /voting</text>
+<text x="1170" y="211" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">/map  /search  /profile(/[id])</text>
+<text x="1170" y="232" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">/settings  /member/approvals</text>
+<text x="1170" y="253" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">/admin</text>
+<text x="1170" y="274" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a"></text>
+<text x="1170" y="295" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">โมดูล UI: src/modules/*/components</text>
+<rect x="1440" y="80" width="400" height="253" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="1640" y="106" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">4) API Routes  src/app/api/*</text>
+<text x="1640" y="127" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">auth · user · feed · gallery · nas</text>
+<text x="1640" y="148" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">hof · map · alumni · notifications</text>
+<text x="1640" y="169" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">lookup · wall-widgets · yearbook</text>
+<text x="1640" y="190" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">member/approvals</text>
+<text x="1640" y="211" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">admin/* → ต้อง role = "admin"</text>
+<text x="1640" y="232" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">public/hof/* → ใช้ x-api-key แทน session</text>
+<text x="1640" y="253" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a"></text>
+<text x="1640" y="274" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ทุก route เรียก getCurrentUser()</text>
+<text x="1640" y="295" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(cookie → sessions JOIN users)</text>
+<text x="1640" y="316" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ใช้ user.id จาก session เท่านั้น</text>
+<rect x="1910" y="80" width="400" height="253" rx="9" fill="#e8f1ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="2110" y="106" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">5) Services (business logic)</text>
+<text x="2110" y="127" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">modules/feed · gallery · hall-of-fame</text>
+<text x="2110" y="148" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">modules/profile · map · member</text>
+<text x="2110" y="169" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">modules/notifications · admin</text>
+<text x="2110" y="190" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">services/aggregator (alumni, gallery)</text>
+<text x="2110" y="211" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">services/apimju · apistudio (client)</text>
+<text x="2110" y="232" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">services/nas (synology-api, catalog)</text>
+<text x="2110" y="253" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">services/db/lookup.service</text>
+<text x="2110" y="274" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a"></text>
+<text x="2110" y="295" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">lib/auth (bcrypt, session, rate limit)</text>
+<text x="2110" y="316" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">lib/db → pg Pool</text>
+<path d="M2380,89 a200,9 0 0 1 400,0 v205 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M2380,89 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="2580" y="121" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">PostgreSQL 16</text>
+<text x="2580" y="142" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">users · sessions · login_attempts</text>
+<text x="2580" y="163" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">lookup_options (รุ่น/จังหวัด/อาชีพ)</text>
+<text x="2580" y="184" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">posts · polls · poll_options · poll_votes</text>
+<text x="2580" y="205" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">hof_campaigns · hof_candidates</text>
+<text x="2580" y="226" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">hof_votes · hof_results</text>
+<text x="2580" y="247" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">photo_view_verifications · photo_tags</text>
+<text x="2580" y="268" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">point_transactions · notifications</text>
+<text x="2580" y="289" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">audit_logs · media_assets</text>
+<rect x="2380" y="329" width="400" height="106" rx="9" fill="#ffe9d6" stroke="#ea580c" stroke-width="2"/>
+<text x="2580" y="355" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">apimju — ข้อมูลนักศึกษา/ศิษย์เก่า มหาวิทยาลัย</text>
+<text x="2580" y="376" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">GET {APIMJU_BASE_URL}/api/v1/students</text>
+<text x="2580" y="397" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">Bearer APIMJU_API_KEY · cache 5 นาที–1 ชม.</text>
+<text x="2580" y="418" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ไม่ตั้งค่า/พัง → ใช้ mock fallback</text>
+<rect x="2380" y="457" width="400" height="85" rx="9" fill="#ffe9d6" stroke="#ea580c" stroke-width="2"/>
+<text x="2580" y="483" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">apistudio — รูปภาพ/อัลบั้ม (watermark)</text>
+<text x="2580" y="504" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ให้ original + watermarked URL</text>
+<text x="2580" y="525" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ไม่ตั้งค่า → ใช้ mock fallback</text>
+<rect x="2380" y="564" width="400" height="85" rx="9" fill="#ffe9d6" stroke="#ea580c" stroke-width="2"/>
+<text x="2580" y="590" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">Synology NAS (DSM API)</text>
+<text x="2580" y="611" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">login → SID (cache) · listFiles · downloadFile</text>
+<text x="2580" y="632" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">เก็บรูปทำเนียบรุ่นต้นฉบับ</text>
+<path d="M430,200 L500,200" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)" marker-start="url(#ahs)"/>
+<rect x="433.52" y="190" width="62.96000000000001" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="465" y="205" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">request</text>
+<path d="M900,200 L970,200" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="919.25" y="190" width="31.5" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="935" y="205" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">ผ่าน</text>
+<path d="M1370,200 L1440,200" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)" marker-start="url(#ahs)"/>
+<rect x="1364.355" y="190" width="81.29000000000002" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="1405" y="205" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">fetch /api</text>
+<path d="M1840,200 L1910,200" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)" marker-start="url(#ahs)"/>
+<rect x="1828.57" y="190" width="92.86000000000001" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="1875" y="205" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">เรียก service</text>
+<path d="M2310,191.5 L2380,191.5" fill="none" stroke="#7c3aed" stroke-width="2" marker-end="url(#ah)" marker-start="url(#ahs)"/>
+<rect x="2310.14" y="181.5" width="69.72" height="20" rx="6" fill="#ffffff" stroke="#7c3aed" stroke-width="1"/>
+<text x="2345" y="196.5" text-anchor="middle" font-size="13" font-weight="600" fill="#7c3aed">SQL (pg)</text>
+<path d="M2310,309 L2345,309 L2345,606.5" fill="none" stroke="#ea580c" stroke-width="2"/>
+<path d="M2345,382 L2380,382" fill="none" stroke="#ea580c" stroke-width="2" marker-end="url(#ah)" marker-start="url(#ahs)"/>
+<rect x="2339.86" y="372" width="45.28" height="20" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="1"/>
+<text x="2362.5" y="387" text-anchor="middle" font-size="13" font-weight="600" fill="#ea580c">HTTP</text>
+<path d="M2345,499.5 L2380,499.5" fill="none" stroke="#ea580c" stroke-width="2" marker-end="url(#ah)" marker-start="url(#ahs)"/>
+<rect x="2339.86" y="489.5" width="45.28" height="20" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="1"/>
+<text x="2362.5" y="504.5" text-anchor="middle" font-size="13" font-weight="600" fill="#ea580c">HTTP</text>
+<path d="M2345,606.5 L2380,606.5" fill="none" stroke="#ea580c" stroke-width="2" marker-end="url(#ah)" marker-start="url(#ahs)"/>
+<rect x="2335.7" y="596.5" width="53.6" height="20" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="1"/>
+<text x="2362.5" y="611.5" text-anchor="middle" font-size="13" font-weight="600" fill="#ea580c">HTTPS</text>
+<rect x="30" y="373" width="2280" height="176" rx="10" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5"/>
+<text x="48" y="401" font-size="17" font-weight="800" fill="#0f172a">หลักการสำคัญของระบบ</text>
+<text x="48" y="427" font-size="15.5" font-weight="400" fill="#0f172a">• ตัวตนผู้ใช้ดึงจาก session cookie เท่านั้น — ห้ามเชื่อ userId/voterId ที่ client ส่งมา (ป้องกันแอบอ้างตัวตน)</text>
+<text x="48" y="453" font-size="15.5" font-weight="400" fill="#0f172a">• ไม่มี fallback "ผู้ใช้คนแรก" แล้ว: session ไม่ถูกต้อง → getCurrentUser() คืน null → API ตอบ 401</text>
+<text x="48" y="479" font-size="15.5" font-weight="400" fill="#0f172a">• ระบบแต้ม (total_points) ทุกครั้งที่เพิ่มแต้มจะบันทึกคู่กับ point_transactions (reason, reference_id)</text>
+<text x="48" y="505" font-size="15.5" font-weight="400" fill="#0f172a">• ข้อมูลศิษย์เก่ารวมจาก 2 แหล่ง: apimju (ข้อมูลมหาวิทยาลัย) + users ใน DB ของระบบ (โปรไฟล์ แต้ม ความเป็นส่วนตัว)</text>
+<text x="48" y="531" font-size="15.5" font-weight="400" fill="#0f172a">• ค่าตั้งต้นของรุ่น: รหัสนักศึกษา 2 หลักแรก − 37 = เลขรุ่น (เช่น 66 → รุ่น 29) · ครบ 4 ปี → สถานะ alumni อัตโนมัติ</text></g>
+<g transform="translate(40,930)"><rect width="900" height="1373.5" rx="16" fill="#ffffff" stroke="#0f766e" stroke-width="3"/><path d="M0,16 a16,16 0 0 1 16,-16 h868 a16,16 0 0 1 16,16 v28 h-900 z" fill="#0f766e"/><text x="22" y="30" font-size="21" font-weight="800" fill="#ffffff">② สมัครสมาชิก  POST /api/auth/register</text></g>
+<g transform="translate(40,930)"><rect x="30" y="80" width="400" height="106" rx="9" fill="#e8f1ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="230" y="106" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">ผู้ใช้กรอกฟอร์ม /register</text>
+<text x="230" y="127" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">รหัสนศ., ชื่อ, อีเมล, รหัสผ่าน, รุ่น, จังหวัด</text>
+<text x="230" y="148" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ติ๊กยินยอม PDPA / ข้อกำหนด / ตรวจสอบตัวตน</text>
+<text x="230" y="169" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">เลือกแสดงแผนที่บ้านเกิด/ที่ทำงาน</text>
+<polygon points="56,220 404,220 430,258 404,296 56,296 30,258" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="252" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">ตรวจ consent ครบ 3 ข้อ และฟิลด์จำเป็น?</text>
+<text x="230" y="273" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">รหัสผ่านอย่างน้อย 6 ตัวอักษร</text>
+<path d="M230,186 L230,220" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="480" y="226" width="360" height="64" rx="9" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="660" y="252" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">400 กรุณายอมรับ PDPA/ข้อกำหนด</text>
+<text x="660" y="273" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">หรือกรอกข้อมูลให้ครบ</text>
+<path d="M430,258 L480,258" fill="none" stroke="#e11d48" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="432.75" y="248" width="44.5" height="20" rx="6" fill="#ffffff" stroke="#e11d48" stroke-width="1"/>
+<text x="455" y="263" text-anchor="middle" font-size="13" font-weight="600" fill="#e11d48">ไม่ผ่าน</text>
+<polygon points="56,330 404,330 430,368 404,406 56,406 30,368" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="362" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">รหัสนศ./อีเมล ซ้ำในระบบ?</text>
+<text x="230" y="383" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">SELECT users WHERE student_id OR email</text>
+<path d="M230,296 L230,330" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="214.25" y="303" width="31.5" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="230" y="318" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">ครบ</text>
+<rect x="480" y="336" width="360" height="64" rx="9" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="660" y="362" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">409 รหัสนักศึกษา/อีเมล</text>
+<text x="660" y="383" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ลงทะเบียนในระบบแล้ว</text>
+<path d="M430,368 L480,368" fill="none" stroke="#e11d48" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="442.5" y="358" width="25" height="20" rx="6" fill="#ffffff" stroke="#e11d48" stroke-width="1"/>
+<text x="455" y="373" text-anchor="middle" font-size="13" font-weight="600" fill="#e11d48">ซ้ำ</text>
+<rect x="30" y="440" width="400" height="43" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="466" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">hash รหัสผ่านด้วย bcrypt (salt 10)</text>
+<path d="M230,406 L230,440" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="211" y="413" width="38" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="230" y="428" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">ไม่ซ้ำ</text>
+<rect x="30" y="517" width="400" height="85" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="543" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">คำนวณรุ่นจากรหัสนักศึกษา</text>
+<text x="230" y="564" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">2 หลักแรก − 37 = เลขรุ่น → gen-N</text>
+<text x="230" y="585" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ยังไม่มีรุ่นนี้ → INSERT lookup_options ให้เอง</text>
+<path d="M230,483 L230,517" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="480" y="527.5" width="360" height="64" rx="9" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="660" y="553.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ON CONFLICT กันซ้ำ</text>
+<text x="660" y="574.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">กรณีคนรุ่นเดียวกันสมัครพร้อมกัน</text>
+<path d="M430,559.5 L480,559.5" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="636" width="400" height="85" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="662" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">คำนวณสถานะ studying / alumni</text>
+<text x="230" y="683" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ปีเข้า + 4 ≤ ปีปัจจุบัน → alumni</text>
+<text x="230" y="704" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">และปีที่คาดว่าจะจบ</text>
+<path d="M230,602 L230,636" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<path d="M30,764 a200,9 0 0 1 400,0 v100 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,764 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="796" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">INSERT users</text>
+<text x="230" y="817" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">role = alumni · status = approved</text>
+<text x="230" y="838" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(อนุมัติทันที ใช้งานได้เลย)</text>
+<text x="230" y="859" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">แนบ company/position/bio/ติดต่อ ถ้ามี</text>
+<path d="M230,721 L230,755" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<path d="M30,916 a200,9 0 0 1 400,0 v58 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,916 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="948" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">แจ้งเตือน (notifications)</text>
+<text x="230" y="969" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ถึงแอดมิน + เพื่อนร่วมรุ่นที่อนุมัติแล้ว</text>
+<path d="M230,873 L230,907" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<path d="M30,1026 a200,9 0 0 1 400,0 v58 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,1026 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="1058" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">บันทึก audit_logs</text>
+<text x="230" y="1079" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">USER_REGISTER_CONSENT (เก็บหลักฐานความยินยอม)</text>
+<path d="M230,983 L230,1017" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="1127" width="400" height="64" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="1153" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">promoteEligibleStudentsToAlumni()</text>
+<text x="230" y="1174" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">เลื่อน studying → alumni ที่ครบ 4 ปีทั้งระบบ</text>
+<path d="M230,1093 L230,1127" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="1225" width="400" height="64" rx="26" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+<text x="230" y="1251" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">createSession(user.id) + ตั้ง cookie session_id</text>
+<text x="230" y="1272" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ตอบ success แล้ว redirect → /feed</text>
+<path d="M230,1191 L230,1225" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/></g>
+<g transform="translate(980,930)"><rect width="900" height="1373.5" rx="16" fill="#ffffff" stroke="#0f766e" stroke-width="3"/><path d="M0,16 a16,16 0 0 1 16,-16 h868 a16,16 0 0 1 16,16 v28 h-900 z" fill="#0f766e"/><text x="22" y="30" font-size="21" font-weight="800" fill="#ffffff">③ เข้าสู่ระบบ / ออกจากระบบ  /api/auth/*</text></g>
+<g transform="translate(980,930)"><rect x="30" y="80" width="400" height="64" rx="9" fill="#e8f1ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="230" y="106" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">ผู้ใช้กรอกรหัสนศ. หรืออีเมล + รหัสผ่าน</text>
+<text x="230" y="127" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">หน้า /login (+ callbackUrl ถ้ามี)</text>
+<rect x="30" y="178" width="400" height="43" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="204" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">POST /api/auth/login</text>
+<path d="M230,144 L230,178" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<polygon points="56,255 404,255 430,282.5 404,310 56,310 30,282.5" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="287" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">ข้อมูลครบ?</text>
+<path d="M230,221 L230,255" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="480" y="250.5" width="360" height="64" rx="9" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="660" y="276.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">400 กรุณากรอกรหัสนักศึกษา/อีเมล</text>
+<text x="660" y="297.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">และรหัสผ่าน</text>
+<path d="M430,282.5 L480,282.5" fill="none" stroke="#e11d48" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="432.75" y="272.5" width="44.5" height="20" rx="6" fill="#ffffff" stroke="#e11d48" stroke-width="1"/>
+<text x="455" y="287.5" text-anchor="middle" font-size="13" font-weight="600" fill="#e11d48">ไม่ผ่าน</text>
+<polygon points="56,348.5 404,348.5 430,386.5 404,424.5 56,424.5 30,386.5" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="380.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">checkLoginRateLimit</text>
+<text x="230" y="401.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">login_attempts ผิด ≥ 5 ครั้งใน 15 นาที?</text>
+<path d="M230,310 L230,348.5" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="214.25" y="319.25" width="31.5" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="230" y="334.25" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">ครบ</text>
+<rect x="480" y="354.5" width="360" height="64" rx="9" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="660" y="380.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">429 เข้าสู่ระบบผิดพลาดหลายครั้ง</text>
+<text x="660" y="401.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ลองใหม่อีกครั้งใน 15 นาที</text>
+<path d="M430,386.5 L480,386.5" fill="none" stroke="#e11d48" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="439.25" y="376.5" width="31.5" height="20" rx="6" fill="#ffffff" stroke="#e11d48" stroke-width="1"/>
+<text x="455" y="391.5" text-anchor="middle" font-size="13" font-weight="600" fill="#e11d48">เกิน</text>
+<rect x="30" y="458.5" width="400" height="106" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="484.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">authenticateUser</text>
+<text x="230" y="505.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">หา user ด้วย student_id หรือ LOWER(email)</text>
+<text x="230" y="526.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">bcrypt.compare (ไม่มี user ก็เทียบ dummy</text>
+<text x="230" y="547.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">hash เพื่อกัน timing attack)</text>
+<path d="M230,424.5 L230,458.5" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="207.75" y="431.5" width="44.5" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="230" y="446.5" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">ไม่เกิน</text>
+<polygon points="56,598.5 404,598.5 430,626 404,653.5 56,653.5 30,626" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="630.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">รหัสผ่านถูกต้อง?</text>
+<path d="M230,564.5 L230,598.5" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="480" y="594" width="360" height="64" rx="9" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="660" y="620" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">บันทึกผิดใน login_attempts</text>
+<text x="660" y="641" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">401 รหัส/อีเมลหรือรหัสผ่านไม่ถูกต้อง</text>
+<path d="M430,626 L480,626" fill="none" stroke="#e11d48" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="432.75" y="616" width="44.5" height="20" rx="6" fill="#ffffff" stroke="#e11d48" stroke-width="1"/>
+<text x="455" y="631" text-anchor="middle" font-size="13" font-weight="600" fill="#e11d48">ไม่ผ่าน</text>
+<path d="M30,701 a200,9 0 0 1 400,0 v58 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,701 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="733" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">บันทึกสำเร็จใน login_attempts</text>
+<text x="230" y="754" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(ล้างข้อมูลเก่ากว่า 1 วันแบบ lazy)</text>
+<path d="M230,653.5 L230,692" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="217.5" y="662.75" width="25" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="230" y="677.75" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">ถูก</text>
+<polygon points="56,802 404,802 430,829.5 404,857 56,857 30,829.5" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="834" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">users.status ?</text>
+<path d="M230,768 L230,802" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="480" y="797.5" width="360" height="64" rx="9" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="660" y="823.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">403 pending → รออนุมัติ</text>
+<text x="660" y="844.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">403 rejected → ไม่ผ่านการอนุมัติ</text>
+<path d="M430,829.5 L480,829.5" fill="none" stroke="#e11d48" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="432.75" y="819.5" width="44.5" height="20" rx="6" fill="#ffffff" stroke="#e11d48" stroke-width="1"/>
+<text x="455" y="834.5" text-anchor="middle" font-size="13" font-weight="600" fill="#e11d48">ไม่ผ่าน</text>
+<path d="M30,904.5 a200,9 0 0 1 400,0 v79 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,904.5 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="936.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">createSession → INSERT sessions</text>
+<text x="230" y="957.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(uuid, expires_at = +30 วัน)</text>
+<text x="230" y="978.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ลบ session ที่หมดอายุแบบ lazy</text>
+<path d="M230,857 L230,895.5" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="194.88" y="866.25" width="70.24000000000001" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="230" y="881.25" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">approved</text>
+<rect x="30" y="1026.5" width="400" height="64" rx="26" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+<text x="230" y="1052.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">Set-Cookie session_id (httpOnly)</text>
+<text x="230" y="1073.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ตอบ success → redirect /feed หรือ callbackUrl</text>
+<path d="M230,992.5 L230,1026.5" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="1130.5" width="810" height="30" rx="6" fill="#0f766e"/>
+<text x="42" y="1151.5" font-size="15" font-weight="700" fill="#ffffff">ออกจากระบบ &amp; ตรวจตัวตน</text>
+<rect x="30" y="1186.5" width="400" height="43" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="1212.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">POST /api/auth/logout</text>
+<path d="M30,1266.5 a200,9 0 0 1 400,0 v58 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,1266.5 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="1298.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">DELETE sessions WHERE id = cookie</text>
+<text x="230" y="1319.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ลบ cookie session_id → ไป /login</text>
+<path d="M230,1229.5 L230,1257.5" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="480" y="1186.5" width="360" height="85" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="660" y="1212.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">GET /api/auth/me</text>
+<text x="660" y="1233.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">getCurrentUser() → UserSession</text>
+<text x="660" y="1254.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(รู้ว่าใครล็อกอินอยู่)</text></g>
+<g transform="translate(1920,930)"><rect width="900" height="1373.5" rx="16" fill="#ffffff" stroke="#0f766e" stroke-width="3"/><path d="M0,16 a16,16 0 0 1 16,-16 h868 a16,16 0 0 1 16,16 v28 h-900 z" fill="#0f766e"/><text x="22" y="30" font-size="21" font-weight="800" fill="#ffffff">④ วงจรชีวิต Session &amp; การป้องกันทุก request</text></g>
+<g transform="translate(1920,930)"><rect x="30" y="80" width="400" height="43" rx="9" fill="#e8f1ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="230" y="106" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">ทุก request หน้าเว็บ/API (ยกเว้นเส้นทางสาธารณะ)</text>
+<rect x="30" y="157" width="400" height="43" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="183" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">middleware อ่าน cookie session_id</text>
+<path d="M230,123 L230,157" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<polygon points="56,234 404,234 430,282.5 404,331 56,331 30,282.5" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="266" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">มี cookie และ sessions ยังไม่หมดอายุ?</text>
+<text x="230" y="287" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">SELECT 1 FROM sessions</text>
+<text x="230" y="308" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">WHERE id = $1 AND expires_at &gt; now()</text>
+<path d="M230,200 L230,234" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="480" y="240" width="360" height="85" rx="9" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="660" y="266" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">หน้าเว็บ → redirect /login?callbackUrl=…</text>
+<text x="660" y="287" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">API → ตอบ 401 JSON</text>
+<text x="660" y="308" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(กัน fetch ได้ HTML แล้วพัง)</text>
+<path d="M430,282.5 L480,282.5" fill="none" stroke="#e11d48" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="432.75" y="272.5" width="44.5" height="20" rx="6" fill="#ffffff" stroke="#e11d48" stroke-width="1"/>
+<text x="455" y="287.5" text-anchor="middle" font-size="13" font-weight="600" fill="#e11d48">ไม่ผ่าน</text>
+<rect x="30" y="365" width="400" height="43" rx="21.5" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+<text x="230" y="391" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">ปล่อยผ่านเข้า page / API route</text>
+<path d="M230,331 L230,365" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="217.5" y="338" width="25" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="230" y="353" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">ใช่</text>
+<rect x="30" y="442" width="400" height="85" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="468" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">route handler เรียก getCurrentUser()</text>
+<text x="230" y="489" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">sessions JOIN users + lookup_options</text>
+<text x="230" y="510" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(รุ่น, จังหวัด, อาชีพ)</text>
+<path d="M230,408 L230,442" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<polygon points="56,561 404,561 430,599 404,637 56,637 30,599" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="593" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">เป็นเส้นทางของแอดมิน (/api/admin/*)?</text>
+<text x="230" y="614" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ตรวจ user.role === "admin"</text>
+<path d="M230,527 L230,561" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="480" y="577.5" width="360" height="43" rx="9" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="660" y="603.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">403 ไม่มีสิทธิ์แอดมิน</text>
+<path d="M430,599 L480,599" fill="none" stroke="#e11d48" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="436" y="589" width="38" height="20" rx="6" fill="#ffffff" stroke="#e11d48" stroke-width="1"/>
+<text x="455" y="604" text-anchor="middle" font-size="13" font-weight="600" fill="#e11d48">ไม่ใช่</text>
+<rect x="30" y="671" width="400" height="64" rx="26" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+<text x="230" y="697" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">ทำงานตามคำขอด้วย user.id จาก session</text>
+<text x="230" y="718" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(ไม่รับ userId จาก client)</text>
+<path d="M230,637 L230,671" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="194.425" y="644" width="71.15" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="230" y="659" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">ใช่/ไม่เกี่ยว</text>
+<rect x="30" y="769" width="400" height="85" rx="9" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="230" y="795" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">การเก็บกวาดแบบ lazy (ไม่ต้องมี cron)</text>
+<text x="230" y="816" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">createSession → ลบ sessions ที่หมดอายุ</text>
+<text x="230" y="837" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">recordLoginAttempt → ลบ attempts &gt; 1 วัน</text>
+<path d="M230,735 L230,769" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="888" width="400" height="106" rx="9" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="230" y="914" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">เส้นทางสาธารณะ (ไม่ต้องล็อกอิน)</text>
+<text x="230" y="935" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">/login · /register · /api/auth/*</text>
+<text x="230" y="956" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">/api/lookup/register-data (ข้อมูลฟอร์มสมัคร)</text>
+<text x="230" y="977" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">/api/nas/* · /api/public/* (ป้องกันด้วย API key)</text>
+<path d="M230,854 L230,888" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/></g>
+<g transform="translate(40,2343.5)"><rect width="900" height="1755" rx="16" fill="#ffffff" stroke="#b45309" stroke-width="3"/><path d="M0,16 a16,16 0 0 1 16,-16 h868 a16,16 0 0 1 16,16 v28 h-900 z" fill="#b45309"/><text x="22" y="30" font-size="21" font-weight="800" fill="#ffffff">⑤ Feed / Wall — โพสต์ โพล และแต้ม</text></g>
+<g transform="translate(40,2343.5)"><rect x="30" y="74" width="840" height="30" rx="6" fill="#b45309"/>
+<text x="42" y="95" font-size="15" font-weight="700" fill="#ffffff">สร้างโพสต์  POST /api/feed/request</text>
+<rect x="30" y="130" width="400" height="64" rx="9" fill="#e8f1ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="230" y="156" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">ผู้ใช้กด "สร้างโพสต์" (/feed, /wall)</text>
+<text x="230" y="177" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ประเภท: ทั่วไป หรือ โพลสำรวจความเห็น</text>
+<polygon points="56,228 404,228 430,255.5 404,283 56,283 30,255.5" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="260" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">getCurrentUser() มี session?</text>
+<path d="M230,194 L230,228" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="480" y="234" width="410" height="43" rx="9" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="685" y="260" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">401 กรุณาเข้าสู่ระบบก่อนสร้างโพสต์</text>
+<path d="M430,255.5 L480,255.5" fill="none" stroke="#e11d48" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="432.75" y="245.5" width="44.5" height="20" rx="6" fill="#ffffff" stroke="#e11d48" stroke-width="1"/>
+<text x="455" y="260.5" text-anchor="middle" font-size="13" font-weight="600" fill="#e11d48">ไม่ผ่าน</text>
+<polygon points="56,317 404,317 430,355 404,393 56,393 30,355" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="349" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">ข้อมูลครบ?</text>
+<text x="230" y="370" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">หัวข้อ · เนื้อหา · โพล: คำถาม + ≥ 2 ตัวเลือก</text>
+<path d="M230,283 L230,317" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="220.75" y="290" width="18.5" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="230" y="305" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">มี</text>
+<rect x="480" y="323" width="410" height="64" rx="9" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="685" y="349" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">400 ระบุสิ่งที่ขาด</text>
+<text x="685" y="370" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(หัวข้อ/เนื้อหา/คำถามโพล/ตัวเลือก)</text>
+<path d="M430,355 L480,355" fill="none" stroke="#e11d48" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="432.75" y="345" width="44.5" height="20" rx="6" fill="#ffffff" stroke="#e11d48" stroke-width="1"/>
+<text x="455" y="360" text-anchor="middle" font-size="13" font-weight="600" fill="#e11d48">ไม่ผ่าน</text>
+<polygon points="56,427 404,427 430,465 404,503 56,503 30,465" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="459" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">พบคำต้องห้าม (banned keywords)?</text>
+<text x="230" y="480" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ตรวจ title/content/คำถาม/ตัวเลือกโพล</text>
+<path d="M230,393 L230,427" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="214.25" y="400" width="31.5" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="230" y="415" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">ครบ</text>
+<rect x="480" y="433" width="410" height="64" rx="9" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="685" y="459" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">400 มีคำไม่เหมาะสม "…"</text>
+<text x="685" y="480" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ส่งรายการคำกลับให้แก้ไข</text>
+<path d="M430,465 L480,465" fill="none" stroke="#e11d48" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="442.5" y="455" width="25" height="20" rx="6" fill="#ffffff" stroke="#e11d48" stroke-width="1"/>
+<text x="455" y="470" text-anchor="middle" font-size="13" font-weight="600" fill="#e11d48">พบ</text>
+<polygon points="56,537 404,537 430,585.5 404,634 56,634 30,585.5" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="569" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">Rate limit + ความยาว</text>
+<text x="230" y="590" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">≤ 1 โพสต์/15 วิ · ≤ 10 โพสต์/ชม.</text>
+<text x="230" y="611" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">หัวข้อ ≤ 100 · เนื้อหา ≤ 1000 · ตัวเลือกโพล ≤ 60</text>
+<path d="M230,503 L230,537" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="211" y="510" width="38" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="230" y="525" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">ไม่พบ</text>
+<rect x="480" y="553.5" width="410" height="64" rx="9" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="685" y="579.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ปฏิเสธ: "กรุณารอสักครู่…"</text>
+<text x="685" y="600.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">หรือ "ครบจำนวนสูงสุดต่อชั่วโมง"</text>
+<path d="M430,585.5 L480,585.5" fill="none" stroke="#e11d48" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="432.75" y="575.5" width="44.5" height="20" rx="6" fill="#ffffff" stroke="#e11d48" stroke-width="1"/>
+<text x="455" y="590.5" text-anchor="middle" font-size="13" font-weight="600" fill="#e11d48">ไม่ผ่าน</text>
+<path d="M30,677 a200,9 0 0 1 400,0 v79 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,677 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="709" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">INSERT posts (status = published)</text>
+<text x="230" y="730" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">โพล: INSERT polls + poll_options</text>
+<text x="230" y="751" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(points_per_vote, default 5)</text>
+<path d="M230,634 L230,668" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="214.25" y="641" width="31.5" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="230" y="656" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">ผ่าน</text>
+<rect x="30" y="799" width="400" height="43" rx="21.5" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+<text x="230" y="825" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">โพสต์แสดงบน feed ทันที (ไม่ต้องรออนุมัติ)</text>
+<path d="M230,765 L230,799" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="878" width="840" height="30" rx="6" fill="#b45309"/>
+<text x="42" y="899" font-size="15" font-weight="700" fill="#ffffff">ปฏิสัมพันธ์ &amp; ให้แต้ม</text>
+<rect x="30" y="934" width="400" height="64" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="960" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">Like / Comment</text>
+<text x="230" y="981" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">POST /api/feed/like · /api/feed/comment</text>
+<path d="M30,1035 a200,9 0 0 1 400,0 v37 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,1035 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="1067" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">toggle like / INSERT comment</text>
+<path d="M230,998 L230,1026" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="1109" width="400" height="43" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="1135" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">โหวตโพล  POST /api/feed/poll/vote</text>
+<path d="M230,1081 L230,1109" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<polygon points="56,1180 404,1180 430,1207.5 404,1235 56,1235 30,1207.5" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="1212" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">poll ยัง active?</text>
+<path d="M230,1152 L230,1180" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="480" y="1186" width="410" height="43" rx="9" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="685" y="1212" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ปฏิเสธ: โพลปิดแล้ว/ไม่พบโพล</text>
+<path d="M430,1207.5 L480,1207.5" fill="none" stroke="#e11d48" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="432.75" y="1197.5" width="44.5" height="20" rx="6" fill="#ffffff" stroke="#e11d48" stroke-width="1"/>
+<text x="455" y="1212.5" text-anchor="middle" font-size="13" font-weight="600" fill="#e11d48">ไม่ผ่าน</text>
+<path d="M30,1272 a200,9 0 0 1 400,0 v58 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,1272 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="1304" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">TRANSACTION: INSERT poll_votes</text>
+<text x="230" y="1325" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">+ users.total_points += points_per_vote</text>
+<path d="M230,1235 L230,1263" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="217.5" y="1239" width="25" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="230" y="1254" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">ใช่</text>
+<rect x="30" y="1367" width="400" height="64" rx="26" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+<text x="230" y="1393" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">INSERT point_transactions (poll_vote)</text>
+<text x="230" y="1414" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ตอบกลับ pointsAwarded</text>
+<path d="M230,1339 L230,1367" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="1461" width="840" height="30" rx="6" fill="#b45309"/>
+<text x="42" y="1482" font-size="15" font-weight="700" fill="#ffffff">ส่วนอื่นของ Feed / แอดมิน</text>
+<rect x="30" y="1517" width="400" height="85" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="1543" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">Sidebar widgets  GET /api/feed/sidebar</text>
+<text x="230" y="1564" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">Leaderboard แต้ม · วันเกิดวันนี้ · สถิติ</text>
+<text x="230" y="1585" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">โชคชะตา (fortune) · แกลเลอรีย่อ</text>
+<rect x="480" y="1517" width="410" height="85" rx="9" fill="#e8f1ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="685" y="1543" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ส่งคำอวยพรวันเกิด</text>
+<text x="685" y="1564" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">POST /api/feed/birthday-wish</text>
+<text x="685" y="1585" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(กันส่งซ้ำ)</text>
+<path d="M430,1559.5 L480,1559.5" fill="none" stroke="#3b82f6" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="432.75" y="1549.5" width="44.5" height="20" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1"/>
+<text x="455" y="1564.5" text-anchor="middle" font-size="13" font-weight="600" fill="#3b82f6">ต่อยอด</text>
+<rect x="30" y="1630" width="400" height="85" rx="9" fill="#fde7f3" stroke="#db2777" stroke-width="2"/>
+<text x="230" y="1656" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">แอดมิน: ปักหมุด / ลบโพสต์ / ประกาศ</text>
+<text x="230" y="1677" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">/api/admin/announcement · post-requests</text>
+<text x="230" y="1698" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ทุกการลบ/ตัดสินบันทึก audit_logs</text>
+<path d="M230,1602 L230,1630" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/></g>
+<g transform="translate(980,2343.5)"><rect width="900" height="1755" rx="16" fill="#ffffff" stroke="#c2410c" stroke-width="3"/><path d="M0,16 a16,16 0 0 1 16,-16 h868 a16,16 0 0 1 16,16 v28 h-900 z" fill="#c2410c"/><text x="22" y="30" font-size="21" font-weight="800" fill="#ffffff">⑥ Gallery — ทำเนียบรุ่นจาก NAS &amp; ปลดล็อกด้วยแต้ม</text></g>
+<g transform="translate(980,2343.5)"><rect x="30" y="80" width="400" height="64" rx="9" fill="#e8f1ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="230" y="106" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">ผู้ใช้เปิด /gallery</text>
+<text x="230" y="127" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">เลือกรุ่น/อัลบั้ม ที่ต้องการดู</text>
+<rect x="30" y="174" width="400" height="64" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="200" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">GET /api/nas/generations · /api/nas/catalog</text>
+<text x="230" y="221" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(เส้นทางสาธารณะใน middleware)</text>
+<path d="M230,144 L230,174" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="268" width="400" height="106" rx="9" fill="#ffe9d6" stroke="#ea580c" stroke-width="2"/>
+<text x="230" y="294" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">Synology DSM API</text>
+<text x="230" y="315" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">login → SID (cache, กัน login ซ้ำพร้อมกัน)</text>
+<text x="230" y="336" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">listFiles โฟลเดอร์รุ่น → แยกชื่อไฟล์เป็น</text>
+<text x="230" y="357" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">รุ่น/ปี/อัลบั้ม (catalog.service)</text>
+<path d="M230,238 L230,268" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<path d="M30,413 a200,9 0 0 1 400,0 v58 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,413 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="445" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">syncGenerationsToDatabase</text>
+<text x="230" y="466" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">เติมรายการรุ่นใหม่ลง lookup_options</text>
+<path d="M230,374 L230,404" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="510" width="400" height="85" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="536" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">GET /api/gallery → galleryAggregator</text>
+<text x="230" y="557" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">apistudio.getPhotos() + photo_tags</text>
+<text x="230" y="578" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">+ photo_view_verifications ของผู้ใช้</text>
+<path d="M230,480 L230,510" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="480" y="520.5" width="360" height="64" rx="9" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="660" y="546.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">DB พัง → fallback แสดงรูป</text>
+<text x="660" y="567.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">watermark ทั้งหมดแบบ locked</text>
+<path d="M430,552.5 L480,552.5" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="419.88" y="542.5" width="70.24000000000001" height="20" rx="6" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/>
+<text x="455" y="557.5" text-anchor="middle" font-size="13" font-weight="600" fill="#94a3b8">fallback</text>
+<polygon points="56,625 404,625 430,652.5 404,680 56,680 30,652.5" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="657" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">รูปนี้ผู้ใช้ปลดล็อกแล้ว?</text>
+<path d="M230,595 L230,625" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="480" y="610" width="360" height="85" rx="9" fill="#e8f1ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="660" y="636" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">แสดงรูป watermark/เบลอ</text>
+<text x="660" y="657" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">พร้อมคำถามปลดล็อกประจำรุ่น</text>
+<text x="660" y="678" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(+5 แต้มรูป / +10 แต้มทำเนียบรุ่น)</text>
+<path d="M430,652.5 L480,652.5" fill="none" stroke="#3b82f6" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="442.5" y="642.5" width="25" height="20" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1"/>
+<text x="455" y="657.5" text-anchor="middle" font-size="13" font-weight="600" fill="#3b82f6">ยัง</text>
+<rect x="30" y="725" width="400" height="85" rx="9" fill="#e8f1ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="230" y="751" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">ผู้ใช้ตอบคำถาม</text>
+<text x="230" y="772" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">POST /api/gallery/unlock (รูป)</text>
+<text x="230" y="793" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">POST /api/gallery/unlock-generation (รุ่น)</text>
+<path d="M230,680 L230,725" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="200.275" y="692.5" width="59.449999999999996" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="230" y="707.5" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">ยัง → ตอบ</text>
+<polygon points="56,840 404,840 430,878 404,916 56,916 30,878" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="872" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">เคยปลดล็อกอันนี้แล้ว?</text>
+<text x="230" y="893" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ตรวจจากตาราง verifications / แต้ม</text>
+<path d="M230,810 L230,840" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="480" y="846" width="360" height="64" rx="26" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+<text x="660" y="872" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">คืนผลสำเร็จ · ได้ 0 แต้ม</text>
+<text x="660" y="893" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(กันฟาร์มแต้มซ้ำ)</text>
+<path d="M430,878 L480,878" fill="none" stroke="#059669" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="439.25" y="868" width="31.5" height="20" rx="6" fill="#ffffff" stroke="#059669" stroke-width="1"/>
+<text x="455" y="883" text-anchor="middle" font-size="13" font-weight="600" fill="#059669">เคย</text>
+<path d="M30,955 a200,9 0 0 1 400,0 v100 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,955 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="987" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">บันทึกการปลดล็อก</text>
+<text x="230" y="1008" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">INSERT photo_view_verifications (+5 แต้ม)</text>
+<text x="230" y="1029" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">หรือทำเนียบรุ่น (+10 แต้ม)</text>
+<text x="230" y="1050" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">UPDATE users.total_points</text>
+<path d="M230,916 L230,946" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="201.25" y="921" width="57.5" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="230" y="936" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">ยังไม่เคย</text>
+<path d="M30,1103 a200,9 0 0 1 400,0 v58 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,1103 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="1135" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">INSERT point_transactions</text>
+<text x="230" y="1156" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">reason = unlock_photo / unlock_generation</text>
+<path d="M230,1064 L230,1094" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="1200" width="400" height="85" rx="26" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+<text x="230" y="1226" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">แสดงรูปต้นฉบับ → GET /api/nas/image</text>
+<text x="230" y="1247" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ดึงไฟล์จาก NAS ย่อขนาดแล้วส่ง</text>
+<text x="230" y="1268" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ไม่พบไฟล์ → ส่ง SVG สำรอง (no-store)</text>
+<path d="M230,1170 L230,1200" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="1315" width="400" height="85" rx="9" fill="#e8f1ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="230" y="1341" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">แท็กเพื่อนในรูป POST /api/gallery/tag</text>
+<text x="230" y="1362" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ลบแท็กตัวเอง POST /api/gallery/untag</text>
+<text x="230" y="1383" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">photo_tags (ผู้ถูกแท็กปรากฏในรายชื่อรูป)</text>
+<path d="M230,1285 L230,1315" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/></g>
+<g transform="translate(1920,2343.5)"><rect width="900" height="1755" rx="16" fill="#ffffff" stroke="#6d28d9" stroke-width="3"/><path d="M0,16 a16,16 0 0 1 16,-16 h868 a16,16 0 0 1 16,16 v28 h-900 z" fill="#6d28d9"/><text x="22" y="30" font-size="21" font-weight="800" fill="#ffffff">⑦ Hall of Fame — โหวต &amp; ประกาศผล TOP 10</text></g>
+<g transform="translate(1920,2343.5)"><rect x="30" y="74" width="840" height="30" rx="6" fill="#be185d"/>
+<text x="42" y="95" font-size="15" font-weight="700" fill="#ffffff">แอดมินเปิดรอบ (campaign)</text>
+<rect x="30" y="130" width="400" height="64" rx="9" fill="#fde7f3" stroke="#db2777" stroke-width="2"/>
+<text x="230" y="156" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">แอดมินสร้างรอบใหม่</text>
+<text x="230" y="177" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">POST /api/admin/hof-campaign/new</text>
+<path d="M30,229 a200,9 0 0 1 400,0 v58 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,229 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="261" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">hof_campaigns status = open</text>
+<text x="230" y="282" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">+ เพิ่มผู้เข้าชิง hof_candidates</text>
+<path d="M230,194 L230,220" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="330" width="840" height="30" rx="6" fill="#6d28d9"/>
+<text x="42" y="351" font-size="15" font-weight="700" fill="#ffffff">ผู้ใช้โหวต  POST /api/hof/vote</text>
+<rect x="30" y="386" width="400" height="85" rx="9" fill="#e8f1ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="230" y="412" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">ผู้ใช้เปิด /voting · /hall-of-fame</text>
+<text x="230" y="433" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">GET /api/hof · /api/hof/search</text>
+<text x="230" y="454" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">เลือกผู้เข้าชิง → กดโหวต</text>
+<polygon points="56,501 404,501 430,528.5 404,556 56,556 30,528.5" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="533" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">มี session? และส่ง candidateId?</text>
+<path d="M230,471 L230,501" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="480" y="496.5" width="410" height="64" rx="9" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="685" y="522.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">401 กรุณาเข้าสู่ระบบก่อนโหวต</text>
+<text x="685" y="543.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">400 ต้องระบุ Candidate ID</text>
+<path d="M430,528.5 L480,528.5" fill="none" stroke="#e11d48" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="432.75" y="518.5" width="44.5" height="20" rx="6" fill="#ffffff" stroke="#e11d48" stroke-width="1"/>
+<text x="455" y="533.5" text-anchor="middle" font-size="13" font-weight="600" fill="#e11d48">ไม่ผ่าน</text>
+<polygon points="56,590.5 404,590.5 430,618 404,645.5 56,645.5 30,618" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="622.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">มีรอบที่ status = open?</text>
+<path d="M230,556 L230,590.5" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="217.5" y="563.25" width="25" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="230" y="578.25" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">ใช่</text>
+<rect x="480" y="596.5" width="410" height="43" rx="9" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="685" y="622.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">403 ขณะนี้ยังไม่เปิดโหวต Hall of Fame</text>
+<path d="M430,618 L480,618" fill="none" stroke="#e11d48" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="432.75" y="608" width="44.5" height="20" rx="6" fill="#ffffff" stroke="#e11d48" stroke-width="1"/>
+<text x="455" y="623" text-anchor="middle" font-size="13" font-weight="600" fill="#e11d48">ไม่ผ่าน</text>
+<polygon points="56,675.5 404,675.5 430,703 404,730.5 56,730.5 30,703" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="707.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">เคยโหวตผู้เข้าชิงคนนี้แล้ว?</text>
+<path d="M230,645.5 L230,675.5" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="220.75" y="650.5" width="18.5" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="230" y="665.5" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">มี</text>
+<rect x="480" y="681.5" width="410" height="43" rx="9" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="685" y="707.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">409 โหวตให้ท่านนี้ไปแล้ว</text>
+<path d="M430,703 L480,703" fill="none" stroke="#e11d48" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="439.25" y="693" width="31.5" height="20" rx="6" fill="#ffffff" stroke="#e11d48" stroke-width="1"/>
+<text x="455" y="708" text-anchor="middle" font-size="13" font-weight="600" fill="#e11d48">เคย</text>
+<rect x="30" y="760.5" width="400" height="85" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="786.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">จัดหมวดโหวต</text>
+<text x="230" y="807.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">รุ่นเดียวกับผู้โหวต → same_generation</text>
+<text x="230" y="828.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">อื่น ๆ → other_generation</text>
+<path d="M230,730.5 L230,760.5" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="207.75" y="735.5" width="44.5" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="230" y="750.5" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">ไม่เคย</text>
+<polygon points="56,875.5 404,875.5 430,913.5 404,951.5 56,951.5 30,913.5" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="907.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">ใช้สิทธิ์ในหมวดนี้ไปแล้ว?</text>
+<text x="230" y="928.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">โควตา: ในรุ่น 1 + นอกรุ่น 1 = สูงสุด 2/รอบ</text>
+<path d="M230,845.5 L230,875.5" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="480" y="892" width="410" height="43" rx="9" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="685" y="918" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">409 ใช้สิทธิ์โหวตในรุ่น/นอกรุ่นไปแล้ว</text>
+<path d="M430,913.5 L480,913.5" fill="none" stroke="#e11d48" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="432.75" y="903.5" width="44.5" height="20" rx="6" fill="#ffffff" stroke="#e11d48" stroke-width="1"/>
+<text x="455" y="918.5" text-anchor="middle" font-size="13" font-weight="600" fill="#e11d48">ใช้แล้ว</text>
+<path d="M30,990.5 a200,9 0 0 1 400,0 v100 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,990.5 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="1022.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">TRANSACTION</text>
+<text x="230" y="1043.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">INSERT hof_votes (1 คะแนน)</text>
+<text x="230" y="1064.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">+ ผู้โหวตได้ total_points += 10</text>
+<text x="230" y="1085.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">พังข้อใดข้อหนึ่ง → ROLLBACK ทั้งคู่</text>
+<path d="M230,951.5 L230,981.5" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="204.5" y="956.5" width="51" height="20" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
+<text x="230" y="971.5" text-anchor="middle" font-size="13" font-weight="600" fill="#475569">ยังไม่ใช้</text>
+<rect x="30" y="1129.5" width="400" height="64" rx="26" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+<text x="230" y="1155.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">INSERT point_transactions (hof_vote)</text>
+<text x="230" y="1176.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ตอบ success · pointsAwarded 10</text>
+<path d="M230,1099.5 L230,1129.5" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="1227.5" width="840" height="30" rx="6" fill="#be185d"/>
+<text x="42" y="1248.5" font-size="15" font-weight="700" fill="#ffffff">ประกาศผล &amp; เปิดเผยผ่าน Public API</text>
+<rect x="30" y="1283.5" width="400" height="64" rx="9" fill="#fde7f3" stroke="#db2777" stroke-width="2"/>
+<text x="230" y="1309.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">แอดมิน Finalize</text>
+<text x="230" y="1330.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">POST /api/admin/hof-campaign/finalize</text>
+<path d="M30,1382.5 a200,9 0 0 1 400,0 v79 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,1382.5 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="1414.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">TRANSACTION: นับ TOP 10 (โหวต &gt; แต้ม)</text>
+<text x="230" y="1435.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">snapshot ชื่อ/รูป/ตำแหน่ง/รุ่น → hof_results</text>
+<text x="230" y="1456.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">campaign → closed + finalized_at</text>
+<path d="M230,1347.5 L230,1373.5" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="480" y="1390" width="410" height="64" rx="9" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="685" y="1416" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ไม่มีผู้เข้าชิง → error</text>
+<text x="685" y="1437" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">finalize ซ้ำ: ลบผลเก่าแล้วสร้างใหม่</text>
+<path d="M430,1422 L480,1422" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+<path d="M30,1505.5 a200,9 0 0 1 400,0 v37 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,1505.5 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="1537.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">บันทึก audit_logs (hof_finalize)</text>
+<path d="M230,1470.5 L230,1496.5" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="1577.5" width="400" height="85" rx="26" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+<text x="230" y="1603.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">แสดงที่ /hall-of-fame/results</text>
+<text x="230" y="1624.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">และ GET /api/public/hof/top10 · /history</text>
+<text x="230" y="1645.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ต้องแนบ x-api-key (แอดมินสร้าง/สลับคีย์ได้)</text>
+<path d="M230,1551.5 L230,1577.5" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/></g>
+<g transform="translate(40,4138.5)"><rect width="900" height="1335" rx="16" fill="#ffffff" stroke="#be185d" stroke-width="3"/><path d="M0,16 a16,16 0 0 1 16,-16 h868 a16,16 0 0 1 16,16 v28 h-900 z" fill="#be185d"/><text x="22" y="30" font-size="21" font-weight="800" fill="#ffffff">⑧ แอดมิน  /admin  (/api/admin/*)</text></g>
+<g transform="translate(40,4138.5)"><rect x="30" y="80" width="400" height="43" rx="9" fill="#fde7f3" stroke="#db2777" stroke-width="2"/>
+<text x="230" y="106" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">เข้า /admin หรือเรียก /api/admin/*</text>
+<polygon points="56,151 404,151 430,178.5 404,206 56,206 30,178.5" fill="#fff5cc" stroke="#d97706" stroke-width="2"/>
+<text x="230" y="183" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">user.role = "admin" ?</text>
+<path d="M230,123 L230,151" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="480" y="157" width="360" height="43" rx="9" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+<text x="660" y="183" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">403 ไม่มีสิทธิ์</text>
+<path d="M430,178.5 L480,178.5" fill="none" stroke="#e11d48" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="432.75" y="168.5" width="44.5" height="20" rx="6" fill="#ffffff" stroke="#e11d48" stroke-width="1"/>
+<text x="455" y="183.5" text-anchor="middle" font-size="13" font-weight="600" fill="#e11d48">ไม่ผ่าน</text>
+<rect x="30" y="242" width="840" height="64" rx="9" fill="#fde7f3" stroke="#db2777" stroke-width="2"/>
+<text x="450" y="268" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">ภาพรวม  /api/admin/overview</text>
+<text x="450" y="289" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">จำนวนสมาชิก · รออนุมัติ · โพสต์ · สถิติรวม</text>
+<rect x="30" y="322" width="840" height="85" rx="9" fill="#fde7f3" stroke="#db2777" stroke-width="2"/>
+<text x="450" y="348" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">ตรวจสอบสมาชิก  verifications / verify</text>
+<text x="450" y="369" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">UPDATE users.status = approved | rejected</text>
+<text x="450" y="390" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">บันทึก audit_logs (approve_user / reject_user)</text>
+<rect x="30" y="423" width="840" height="64" rx="9" fill="#fde7f3" stroke="#db2777" stroke-width="2"/>
+<text x="450" y="449" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">จัดการสมาชิก  /api/admin/users</text>
+<text x="450" y="470" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ดูรายชื่อทั้งหมด · ลบผู้ใช้ (บันทึก audit)</text>
+<rect x="30" y="503" width="840" height="85" rx="9" fill="#fde7f3" stroke="#db2777" stroke-width="2"/>
+<text x="450" y="529" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">จัดการโพสต์  post-requests (+ /[id])</text>
+<text x="450" y="550" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">อนุมัติ/ปฏิเสธ/ลบ · ปักหมุด · ประกาศ</text>
+<text x="450" y="571" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">บันทึก audit_logs (approve_post / reject_post)</text>
+<rect x="30" y="604" width="840" height="64" rx="9" fill="#fde7f3" stroke="#db2777" stroke-width="2"/>
+<text x="450" y="630" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">Keyword Filter  /api/admin/keywords</text>
+<text x="450" y="651" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">เพิ่ม/ลบคำต้องห้าม → ใช้ตรวจตอนสร้างโพสต์</text>
+<rect x="30" y="684" width="840" height="64" rx="9" fill="#fde7f3" stroke="#db2777" stroke-width="2"/>
+<text x="450" y="710" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">Wall Widgets  /api/admin/wall-widgets</text>
+<text x="450" y="731" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ข้อความโชคชะตา · วันเกิดวันนี้</text>
+<rect x="30" y="764" width="840" height="85" rx="9" fill="#fde7f3" stroke="#db2777" stroke-width="2"/>
+<text x="450" y="790" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">Hall of Fame  hof-campaign/*</text>
+<text x="450" y="811" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">เปิดรอบใหม่ · finalize · แก้/ลบผล · ประวัติ</text>
+<text x="450" y="832" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">public-api-key: ดู/สลับคีย์ของ Public API</text>
+<rect x="30" y="865" width="840" height="85" rx="9" fill="#fde7f3" stroke="#db2777" stroke-width="2"/>
+<text x="450" y="891" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">Yearbook &amp; Audit Log</text>
+<text x="450" y="912" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">/api/admin/yearbook (จัดการหนังสือรุ่น/เผยแพร่)</text>
+<text x="450" y="933" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">/api/admin/audit-logs (ดูประวัติการกระทำ)</text>
+<rect x="30" y="972" width="840" height="30" rx="6" fill="#be185d"/>
+<text x="42" y="993" font-size="15" font-weight="700" fill="#ffffff">อนุมัติสมาชิกโดยเพื่อนร่วมรุ่น  /member/approvals</text>
+<rect x="30" y="1028" width="840" height="85" rx="9" fill="#e8f1ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="450" y="1054" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">GET/POST /api/member/approvals (member.service)</text>
+<text x="450" y="1075" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">เพื่อนร่วมรุ่นที่อนุมัติแล้วช่วยดู/ตัดสินคำขอของรุ่นเดียวกัน</text>
+<text x="450" y="1096" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ผลกระทบ: users.status เปลี่ยน → ผู้ใช้ล็อกอินได้ตามสถานะ</text></g>
+<g transform="translate(980,4138.5)"><rect width="900" height="1335" rx="16" fill="#ffffff" stroke="#0369a1" stroke-width="3"/><path d="M0,16 a16,16 0 0 1 16,-16 h868 a16,16 0 0 1 16,16 v28 h-900 z" fill="#0369a1"/><text x="22" y="30" font-size="21" font-weight="800" fill="#ffffff">⑨ ค้นหา · โปรไฟล์ · แผนที่ · แจ้งเตือน</text></g>
+<g transform="translate(980,4138.5)"><rect x="30" y="74" width="840" height="30" rx="6" fill="#0369a1"/>
+<text x="42" y="95" font-size="15" font-weight="700" fill="#ffffff">ค้นหาศิษย์เก่า  /search  →  GET /api/alumni</text>
+<rect x="30" y="130" width="400" height="43" rx="9" fill="#e8f1ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="230" y="156" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">กรอกคำค้น/รุ่น/จังหวัด/อาชีพ</text>
+<rect x="30" y="201" width="400" height="85" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="227" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">alumniAggregator.getUnifiedAlumniList</text>
+<text x="230" y="248" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">apimju.searchStudents (ข้อมูลมหาวิทยาลัย)</text>
+<text x="230" y="269" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">+ users ที่ status = approved ใน DB</text>
+<path d="M230,173 L230,201" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="480" y="201" width="410" height="85" rx="9" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="685" y="227" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">merge ด้วย student_id</text>
+<text x="685" y="248" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">DB ทับข้อมูลชื่อ/อาชีพ/รูป/แต้ม</text>
+<text x="685" y="269" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">คนที่มีแต่ใน DB ก็ถูกเพิ่มเข้ารายการ</text>
+<path d="M430,243.5 L480,243.5" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="314" width="400" height="64" rx="26" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+<text x="230" y="340" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">รายการ UnifiedAlumniProfile</text>
+<text x="230" y="361" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">กรอง province / careerType → แสดงการ์ด</text>
+<path d="M230,286 L230,314" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="412" width="840" height="30" rx="6" fill="#0369a1"/>
+<text x="42" y="433" font-size="15" font-weight="700" fill="#ffffff">โปรไฟล์  /profile · /profile/[id] · /settings</text>
+<rect x="30" y="468" width="400" height="64" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="494" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">ดูโปรไฟล์  GET /api/alumni/[id]</text>
+<text x="230" y="515" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">getUnifiedProfileById: DB + apimju</text>
+<rect x="30" y="560" width="400" height="106" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="586" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">แก้ไขข้อมูล  /api/user/profile</text>
+<text x="230" y="607" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ความเป็นส่วนตัว /api/user/privacy</text>
+<text x="230" y="628" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(show_hometown / show_workplace_on_map)</text>
+<text x="230" y="649" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">รูป /api/user/photos · กิจกรรม /api/user/activity</text>
+<path d="M230,532 L230,560" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<path d="M30,703 a200,9 0 0 1 400,0 v37 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,703 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="735" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">UPDATE users / lookup_options อ้างอิง</text>
+<path d="M230,666 L230,694" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="783" width="840" height="30" rx="6" fill="#0369a1"/>
+<text x="42" y="804" font-size="15" font-weight="700" fill="#ffffff">แผนที่ศิษย์เก่า  /map  →  GET /api/map</text>
+<rect x="30" y="839" width="400" height="106" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="865" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">mapDbService</text>
+<text x="230" y="886" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">การกระจายตามบ้านเกิด / ที่ทำงาน</text>
+<text x="230" y="907" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">เฉพาะ show_*_on_map = true AND</text>
+<text x="230" y="928" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">status = approved</text>
+<rect x="480" y="849.5" width="410" height="85" rx="9" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="685" y="875.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">นับตามจังหวัด + พิกัดจังหวัด</text>
+<text x="685" y="896.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(lib/thailand-province-coords)</text>
+<text x="685" y="917.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">รองรับที่ทำงานต่างประเทศ</text>
+<path d="M430,892 L480,892" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="973" width="400" height="64" rx="26" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+<text x="230" y="999" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">หน้า /map แสดงผลด้วย react-globe.gl</text>
+<text x="230" y="1020" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(three.js) globe-panel · จุด/สีตามจำนวน</text>
+<path d="M230,945 L230,973" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="1071" width="840" height="30" rx="6" fill="#0369a1"/>
+<text x="42" y="1092" font-size="15" font-weight="700" fill="#ffffff">การแจ้งเตือน  /api/notifications</text>
+<path d="M30,1136 a200,9 0 0 1 400,0 v58 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,1136 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="1168" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">เหตุการณ์: สมัครสมาชิกใหม่ · ส่งคำอวยพร ฯลฯ</text>
+<text x="230" y="1189" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">createNotification → ตาราง notifications</text>
+<rect x="30" y="1231" width="400" height="64" rx="26" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+<text x="230" y="1257" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">GET /api/notifications · mark as read</text>
+<text x="230" y="1278" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">นับ unread แสดงที่ AppShell</text>
+<path d="M230,1203 L230,1231" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/></g>
+<g transform="translate(1920,4138.5)"><rect width="900" height="1335" rx="16" fill="#ffffff" stroke="#334155" stroke-width="3"/><path d="M0,16 a16,16 0 0 1 16,-16 h868 a16,16 0 0 1 16,16 v28 h-900 z" fill="#334155"/><text x="22" y="30" font-size="21" font-weight="800" fill="#ffffff">⑩ Deploy &amp; Operations (Docker)</text></g>
+<g transform="translate(1920,4138.5)"><rect x="30" y="74" width="840" height="30" rx="6" fill="#334155"/>
+<text x="42" y="95" font-size="15" font-weight="700" fill="#ffffff">Local development</text>
+<rect x="30" y="130" width="400" height="64" rx="9" fill="#e8f1ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="230" y="156" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">ตั้งค่า .env (DATABASE_URL, APIMJU_*, NAS_*)</text>
+<text x="230" y="177" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ไม่ commit ความลับขึ้น git</text>
+<path d="M30,229 a200,9 0 0 1 400,0 v58 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,229 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="261" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">npm run migrate:up</text>
+<text x="230" y="282" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">node-pg-migrate → migrations/*.js (18 ไฟล์)</text>
+<path d="M230,194 L230,220" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="322" width="400" height="64" rx="26" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+<text x="230" y="348" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">npm run dev  (next dev --webpack)</text>
+<text x="230" y="369" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">เปิดที่ http://localhost:3000</text>
+<path d="M230,296 L230,322" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="420" width="840" height="30" rx="6" fill="#334155"/>
+<text x="42" y="441" font-size="15" font-weight="700" fill="#ffffff">Production — เซิร์ฟเวอร์ (deploy/*.sh)</text>
+<rect x="30" y="476" width="400" height="64" rx="9" fill="#e8f1ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="230" y="502" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">01-server-setup.sh</text>
+<text x="230" y="523" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">เตรียมเซิร์ฟเวอร์ (Docker ฯลฯ)</text>
+<rect x="30" y="566" width="400" height="85" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="592" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">02-deploy.sh [--pull] [--build]</text>
+<text x="230" y="613" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">git pull → docker compose -f</text>
+<text x="230" y="634" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">docker-compose.prod.yml up -d</text>
+<path d="M230,540 L230,566" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="677" width="400" height="85" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="703" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">Dockerfile 3 stage</text>
+<text x="230" y="724" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">deps: npm ci → builder: npm run build</text>
+<text x="230" y="745" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">runner: node server.js (standalone)</text>
+<path d="M230,651 L230,677" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<path d="M30,797 a200,9 0 0 1 400,0 v58 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,797 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="829" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">คอนเทนเนอร์ alam-db (postgres:16-alpine)</text>
+<text x="230" y="850" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">volume ./data/db · healthcheck pg_isready</text>
+<path d="M230,762 L230,788" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="480" y="783.5" width="410" height="85" rx="9" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="685" y="809.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">alam-app รอ db healthy ก่อน</text>
+<text x="685" y="830.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">host :4007 → container :3000</text>
+<text x="685" y="851.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">subnet คงที่ 172.30.5.0/24</text>
+<path d="M430,826 L480,826" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="412.66499999999996" y="816" width="84.67000000000002" height="20" rx="6" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/>
+<text x="455" y="831" text-anchor="middle" font-size="13" font-weight="600" fill="#94a3b8">depends_on</text>
+<path d="M30,903.5 a200,9 0 0 1 400,0 v79 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,903.5 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="935.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">รัน migration (service migrate, profile tools)</text>
+<text x="230" y="956.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">docker compose … run --rm migrate</text>
+<text x="230" y="977.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">(ใช้ target builder เพราะ runner ไม่มี migrations)</text>
+<path d="M230,864 L230,894.5" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<path d="M30,1026.5 a200,9 0 0 1 400,0 v58 a200,9 0 0 1 -400,0 z" fill="#f1e8ff" stroke="#7c3aed" stroke-width="2"/>
+<path d="M30,1026.5 a200,9 0 0 0 400,0" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="230" y="1058.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">03-seed-database.sh</text>
+<text x="230" y="1079.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ใส่ข้อมูลตั้งต้น (lookup, seed)</text>
+<path d="M230,991.5 L230,1017.5" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="1119.5" width="400" height="64" rx="9" fill="#e3f6ea" stroke="#16a34a" stroke-width="2"/>
+<text x="230" y="1145.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">04-setup-reverse-proxy.sh</text>
+<text x="230" y="1166.5" text-anchor="middle" font-size="15" font-weight="400" fill="#0f172a">ตั้ง reverse proxy → โดเมน → :4007</text>
+<path d="M230,1093.5 L230,1119.5" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="30" y="1209.5" width="400" height="43" rx="21.5" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+<text x="230" y="1235.5" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">ผู้ใช้เข้าเว็บผ่านโดเมน → กลับไปที่ ① สถาปัตยกรรม</text>
+<path d="M230,1183.5 L230,1209.5" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#ah)"/></g>
+</svg>
