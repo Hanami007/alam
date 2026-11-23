@@ -18,6 +18,8 @@ export async function GET(req: Request) {
         COALESCE(u.company, '') as company,
         COALESCE(u.position, '') as position,
         COALESCE(u.is_available_for_mentorship, false) as "isAvailableForMentorship",
+        u.student_status as "studentStatus",
+        u.expected_graduation_year as "expectedGraduationYear",
         prov.label as province,
         ct.label as "careerType",
         u.created_at
@@ -26,6 +28,7 @@ export async function GET(req: Request) {
       LEFT JOIN lookup_options prov ON prov.id = u.province_option_id
       LEFT JOIN lookup_options ct ON ct.id = u.career_option_id
       WHERE u.yearbook_published = true
+        AND u.status = 'approved'  -- บัญชีที่ยังรออนุมัติ/ถูกปฏิเสธ ไม่แสดงในหนังสือรุ่น
       ORDER BY u.id DESC
     `);
 

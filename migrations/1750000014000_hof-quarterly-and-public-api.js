@@ -6,7 +6,7 @@
  * เพิ่ม:
  * 1. hof_campaigns — คอลัมน์สำหรับระบบรอบ 3 เดือน
  * 2. hof_results — Snapshot TOP 10 เมื่อปิดรอบ (ดูย้อนหลังได้ตลอด)
- * 3. audit_logs  — บันทึกการกระทำของ admin (แก้ bug: โค้ดมีอยู่แล้วแต่ตารางไม่มี)
+ * 3. audit_logs  — index ตาม action (ตัวตารางสร้างใน migration 001)
  * 4. system_settings — เก็บ PUBLIC_API_KEY สำหรับ /api/public/*
  */
 
@@ -45,21 +45,10 @@ exports.up = (pgm) => {
   pgm.createIndex('hof_results', 'campaign_id');
   pgm.createIndex('hof_results', ['campaign_id', 'rank']);
 
-  // ─── 3. audit_logs — แก้ bug: โค้ด admin.service.ts INSERT มานาน แต่ตารางไม่เคยมี ─
-  pgm.createTable('audit_logs', {
-    id:          { type: 'serial',      primaryKey: true },
-    actor_id:    { type: 'integer',     references: 'users(id)', onDelete: 'SET NULL' },
-    action:      { type: 'text',        notNull: true },
-    target_type: { type: 'text' },
-    target_id:   { type: 'integer' },
-    metadata:    { type: 'jsonb',       default: pgm.func("'{}'::jsonb") },
-    created_at:  { type: 'timestamptz', notNull: true, default: pgm.func('now()') },
-  }, { ifNotExists: true });
-
-  // audit_logs ถูกสร้างไปแล้วจริงตั้งแต่ migration 001 (production-hardening) พร้อม index บน
-  // actor_id/created_at อยู่แล้ว — CREATE TABLE ด้านบนใช้ ifNotExists จึงไม่พังตอน table ซ้ำ แต่
-  // createIndex เดิมไม่ได้ guard ไว้ ชนกับ index ชื่อเดียวกันที่มีอยู่แล้ว (audit_logs_actor_id_index,
-  // audit_logs_created_at_index) ทำให้ migration รันไม่ผ่านเลย เพิ่ม ifNotExists ให้ทุกตัว
+  // ─── 3. audit_logs — index เพิ่มเติม ────────────────────────────────────
+  // ตาราง audit_logs สร้างใน migration 1750000001000_production-hardening.js แล้ว
+  // (เดิมไฟล์นี้ createTable ซ้ำอีกรอบแบบ ifNotExists ซึ่งไม่มีผลอะไร จึงตัดออก)
+  // actor_id / created_at มี index จาก migration 001 อยู่แล้ว จึงต้อง ifNotExists
   pgm.createIndex('audit_logs', 'actor_id', { ifNotExists: true });
   pgm.createIndex('audit_logs', 'action', { ifNotExists: true });
   pgm.createIndex('audit_logs', 'created_at', { ifNotExists: true });
@@ -80,7 +69,7 @@ exports.up = (pgm) => {
 };
 
 exports.down = (pgm) => {
-  pgm.dropTable('audit_logs',      { ifExists: true });
+  pgm.dropIndex('audit_logs', 'action', { ifExists: true });
   pgm.dropTable('hof_results',     { ifExists: true });
   pgm.dropTable('system_settings', { ifExists: true });
   pgm.dropColumns('hof_campaigns', [

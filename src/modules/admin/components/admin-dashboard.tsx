@@ -156,6 +156,11 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
     setMembers((prev) => prev.filter((m) => m.id !== userId));
   }
 
+  async function handleChangeStudentStatus(userId: number, studentStatus: 'studying' | 'alumni') {
+    await api.admin.setStudentStatus(userId, studentStatus);
+    setMembers((prev) => prev.map((m) => (m.id === userId ? { ...m, studentStatus } : m)));
+  }
+
   async function handleUserVerification(userId: number, decision: 'approved' | 'rejected') {
     setActionLoadingId(userId);
     setConfirmingRejectId(null);
@@ -411,7 +416,7 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
       )}
 
       {activeTab === 'members' && (
-        <MemberList members={members} onDelete={handleDeleteMember} />
+        <MemberList members={members} onDelete={handleDeleteMember} onChangeStudentStatus={handleChangeStudentStatus} />
       )}
 
       {activeTab === 'hof' && (

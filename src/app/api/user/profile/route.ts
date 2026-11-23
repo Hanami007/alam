@@ -67,6 +67,11 @@ export async function PUT(req: Request) {
     return NextResponse.json({ success: true, userId });
   } catch (err: any) {
     console.error('[API PUT /api/user/profile] Error:', err);
-    return NextResponse.json({ error: publicErrorMessage(err) }, { status: 500 });
+    // ข้อมูลผิดรูปแบบจาก updateProfile (เช่น สถานะ/ปีจบ) = 400 พร้อมข้อความ ที่เหลือซ่อนรายละเอียด
+    const isValidationError = /ไม่ถูกต้อง|ต้องเป็น/.test(err?.message || '');
+    return NextResponse.json(
+      { error: isValidationError ? err.message : publicErrorMessage(err) },
+      { status: isValidationError ? 400 : 500 }
+    );
   }
 }

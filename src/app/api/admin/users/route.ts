@@ -43,3 +43,27 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: publicErrorMessage(err, 'Error deleting member') }, { status: 500 });
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const user = await getCurrentUser();
+    if (!user || user.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const { id, studentStatus } = await request.json();
+    const userId = Number(id);
+    if (!userId) {
+      return NextResponse.json({ error: 'ไม่พบรหัสสมาชิก' }, { status: 400 });
+    }
+
+    const result = await adminDbService.setStudentStatus(userId, studentStatus, user.id);
+    if (!result.success) {
+      return NextResponse.json({ error: result.error || 'เปลี่ยนสถานะไม่สำเร็จ' }, { status: 400 });
+    }
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    console.error('[API /api/admin/users] PATCH Error:', err);
+    return NextResponse.json({ error: err.message || 'Error updating member' }, { status: 500 });
+  }
+}

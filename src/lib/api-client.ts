@@ -168,10 +168,17 @@ export const api = {
       facebookUrl?: string;
       lineId?: string;
       showContactOnMap?: boolean;
+      studentStatus?: 'studying' | 'alumni';
+      graduationYear?: number;
     }) =>
       fetchJson<any>('/api/user/profile', {
         method: 'PUT',
         body: JSON.stringify(data),
+      }),
+    changePassword: (currentPassword: string, newPassword: string) =>
+      fetchJson<{ success: boolean }>('/api/user/password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword }),
       }),
     updatePrivacy: (settings: { showHometownOnMap: boolean; showWorkplaceOnMap: boolean; showContactOnMap: boolean }) =>
       fetchJson<any>('/api/user/privacy', {
@@ -189,6 +196,11 @@ export const api = {
     deleteUser: (userId: number) =>
       fetchJson<any>(`/api/admin/users?id=${encodeURIComponent(String(userId))}`, {
         method: 'DELETE',
+      }),
+    setStudentStatus: (userId: number, studentStatus: 'studying' | 'alumni') =>
+      fetchJson<any>('/api/admin/users', {
+        method: 'PATCH',
+        body: JSON.stringify({ id: userId, studentStatus }),
       }),
     verifyUser: (userId: number, decision: 'approved' | 'rejected', remark?: string) =>
       fetchJson<any>('/api/admin/verify', {

@@ -1,10 +1,9 @@
 import { pool } from '@/lib/db';
 import { notificationDbService } from '@/modules/notifications/services/notification.service';
-import { userDbService } from '@/modules/profile/services/user.service';
 import { hashPassword } from '@/lib/auth';
 import { publicErrorMessage } from '@/lib/api-error';
 import { checkLength } from '@/lib/field-limits';
-import { isAlumniByEntryYear, parseStudentId } from '@/lib/student-id';
+import { parseStudentId } from '@/lib/student-id';
 import { normalizeAvatarInput } from '@/lib/upload-storage';
 import { NextResponse } from 'next/server';
 
@@ -141,12 +140,12 @@ export async function POST(req: Request) {
       resolvedGenerationId = createdGenRows[0].id;
     }
 
-    // ปีเข้าศึกษา/ปีจบ/สถานะ คำนวณจากรุ่น (ไม่ใช่ 2500 + 2 หลักแรก ซึ่งผิดกับรหัส 8 หลัก)
+    // ปีเข้าศึกษา/ปีจบ คำนวณจากรุ่น (ไม่ใช่ 2500 + 2 หลักแรก ซึ่งผิดกับรหัส 8 หลัก) — ใช้แสดงผลเท่านั้น
     const parsedAdmissionYear = parsedId.entryYearBE;
     const expectedGradYear = parsedId.expectedGraduationYearBE;
-    // รหัส 8 หลัก (ระบบเดิม) เป็นศิษย์เก่าเสมอ — ปัจจุบันออกรหัสแค่ 10 หลัก
-    const actualStatus =
-      parsedId.length === 8 || isAlumniByEntryYear(parsedId.entryYearBE) ? 'alumni' : studentStatus;
+    // สถานะใช้ตามที่ผู้ใช้เลือกเอง (บางคนเรียนเกิน 4 ปี — เปลี่ยนภายหลังได้ที่หน้าโปรไฟล์ "ฉันจบการศึกษาแล้ว")
+    // ยกเว้นรหัส 8 หลัก (ระบบเดิม) เป็นศิษย์เก่าเสมอ — ปัจจุบันออกรหัสแค่ 10 หลัก
+    const actualStatus = parsedId.length === 8 || studentStatus === 'alumni' ? 'alumni' : 'studying';
 
     // ข้อมูลศิษย์เก่า (ถ้ามีระบุ)
     const cleanCompany = company ? String(company).trim() : null;
@@ -207,10 +206,11 @@ export async function POST(req: Request) {
         show_facebook,
         show_line_id,
         show_contact_on_map,
+        yearbook_published,
         role,
         status
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21,
-                $22, $23, $24, $25, $26, $27, 'alumni', 'pending')
+                $22, $23, $24, $25, $26, $27, $28, 'alumni', 'pending')
       RETURNING id, student_id, name, email, student_status, generation_option_id, province_option_id, status`,
       [
         trimmedStudentId,
@@ -240,6 +240,8 @@ export async function POST(req: Request) {
         showFacebook,
         showLineId,
         showContactOnMap,
+        // กรอก Bio มาตอนสมัคร = ตั้งใจให้แสดงในหนังสือรุ่น (หนังสือรุ่นแสดงเฉพาะบัญชีที่อนุมัติแล้ว)
+        Boolean(cleanBio),
       ]
     );
 
@@ -296,11 +298,6 @@ export async function POST(req: Request) {
     } catch (e) {
       console.error('[Register] Error recording consent audit log:', e);
     }
-
-    // ตรวจสอบเลื่อนสถานะ 4 ปีระบบรวม
-    try {
-      await userDbService.promoteEligibleStudentsToAlumni();
-    } catch {}
 
     // ไม่สร้าง session ให้อัตโนมัติ — บัญชียัง pending อยู่ ต้องรอเพื่อนร่วมรุ่น/แอดมินยืนยันก่อน
     // แล้วค่อยล็อกอินเองที่หน้า /login (login route ปฏิเสธบัญชี pending อยู่แล้ว)

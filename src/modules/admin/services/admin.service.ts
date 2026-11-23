@@ -179,6 +179,39 @@ export class AdminDbService {
   }
 
   /**
+   * แอดมินแก้สถานะศิษย์เก่า/ศิษย์ปัจจุบันให้สมาชิก (ปกติผู้ใช้ยืนยันเองที่หน้าโปรไฟล์
+   * ใช้กรณีกดผิดหรือแจ้งสถานะไม่ตรงความจริง) พร้อมบันทึก audit log
+   */
+  async setStudentStatus(
+    userId: number,
+    studentStatus: 'studying' | 'alumni',
+    actorId: number
+  ): Promise<{ success: boolean; error?: string }> {
+    if (studentStatus !== 'studying' && studentStatus !== 'alumni') {
+      return { success: false, error: 'สถานะนักศึกษาไม่ถูกต้อง' };
+    }
+    const { rows } = await pool.query(
+      `UPDATE users u SET student_status = $2
+       FROM (SELECT id, student_status AS previous FROM users WHERE id = $1) old
+       WHERE u.id = old.id
+       RETURNING u.name, old.previous`,
+      [userId, studentStatus]
+    );
+    if (rows.length === 0) return { success: false, error: 'ไม่พบสมาชิก' };
+
+    try {
+      await pool.query(
+        `INSERT INTO audit_logs (actor_id, action, target_type, target_id, metadata)
+         VALUES ($1, 'set_student_status', 'user', $2, $3)`,
+        [actorId, userId, JSON.stringify({ name: rows[0].name, from: rows[0].previous, to: studentStatus })]
+      );
+    } catch (e) {
+      console.error('[AdminDbService] setStudentStatus audit log error:', e);
+    }
+    return { success: true };
+  }
+
+  /**
    * ลบสมาชิกออกจากระบบ พร้อมล้างข้อมูลทั้งหมดที่ผูกกับสมาชิกคนนั้น
    * (โพสต์ที่ขอลง, คอมเมนต์/ปฏิกิริยา, โหวตโพล, การเป็นผู้สมัคร/โหวต HOF,
    *  รูปที่อัปโหลด, การถูกแท็ก/แท็กผู้อื่นในรูป, ประวัติปลดล็อกรูป)

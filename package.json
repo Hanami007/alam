@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "migrate:up": "node-pg-migrate up --config .node-pg-migrate.json",
-    "migrate:down": "node-pg-migrate down --config .node-pg-migrate.json"
+    "migrate:down": "node-pg-migrate down --config .node-pg-migrate.json",
+    "sample:seed": "node scripts/sample-data.js",
+    "sample:clean": "node scripts/sample-data.js --clean"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",

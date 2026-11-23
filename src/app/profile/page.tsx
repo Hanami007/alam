@@ -53,6 +53,8 @@ export default function ProfilePage() {
           student_id: u.studentId || u.student_id || '',
           email: u.email || '',
           generation: u.generation || '',
+          student_status: u.studentStatus ?? u.student_status ?? 'studying',
+          expected_graduation_year: u.expectedGraduationYear ?? u.expected_graduation_year ?? null,
           generation_option_id: u.generationOptionId ?? u.generation_option_id ?? null,
           province: u.province || '',
           province_option_id: u.provinceOptionId ?? u.province_option_id ?? null,
