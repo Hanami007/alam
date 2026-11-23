@@ -42,6 +42,7 @@ const ReactGlobe = dynamic(() => import('react-globe.gl').then((m) => m.default 
 });
 
 export type MapMode = 'hometown' | 'workplace';
+type StatusFilter = 'all' | 'alumni' | 'studying';
 export type GlobeTheme = 'satellite' | 'night' | 'clean';
 
 export interface MapPoint {
@@ -775,6 +776,7 @@ function AlumniCard({ alumni, onClick }: { alumni: GlobeAlumni; onClick?: () => 
           {alumni.generation && (
             <span className="shrink-0 px-2 py-0.5 rounded-md bg-indigo-100/80 text-indigo-700 text-[11px] font-black">
               {alumni.generation}
+              {alumni.student_status === 'student' && ' · ศิษย์ปัจจุบัน'}
             </span>
           )}
         </div>
@@ -844,6 +846,9 @@ function AlumniProfileModal({
                   {alumni.generation}
                 </span>
               )}
+              <span className="inline-block bg-slate-100 text-slate-600 px-2.5 py-0.5 text-xs font-bold rounded-full">
+                {alumni.student_status === 'student' ? 'ศิษย์ปัจจุบัน' : 'ศิษย์เก่า'}
+              </span>
               <span className="inline-block bg-slate-100 text-slate-600 px-2.5 py-0.5 text-xs font-bold rounded-full">
                 {alumni.country_name}
               </span>
@@ -929,6 +934,8 @@ export function GlobePanel({
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 720, height: 620 });
   const [mode, setMode] = useState<MapMode>('hometown');
+  // กรองตาม users.student_status — แยกศิษย์เก่ากับศิษย์ปัจจุบันบนแผนที่
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [mapView, setMapView] = useState<'3d' | '2d'>('3d');
   const [globeTheme] = useState<GlobeTheme>('clean');
   const [selectedCluster, setSelectedCluster] = useState<GlobeCountryCluster | null>(null);
@@ -1012,11 +1019,16 @@ export function GlobePanel({
   // ─── Dynamically Build Clusters from Thailand DB + International DB ─────────
   const activeClusters = useMemo(() => {
     const rawIntlClusters = GLOBE_CLUSTERS.filter((c) => c.country_code !== 'TH');
-    const source = mode === 'hometown' ? hometownData : workplaceData;
+    const rawSource = mode === 'hometown' ? hometownData : workplaceData;
 
-    if (!source || source.length === 0) {
+    if (!rawSource || rawSource.length === 0) {
       return GLOBE_CLUSTERS;
     }
+
+    const source =
+      statusFilter === 'all'
+        ? rawSource
+        : rawSource.filter((p) => (p.student_status === 'studying' ? 'studying' : 'alumni') === statusFilter);
 
     const thaiPoints: MapPoint[] = [];
     const intlPoints: MapPoint[] = [];
@@ -1142,7 +1154,7 @@ export function GlobePanel({
 
     thaiClusters.sort((a, b) => b.count - a.count);
     return [...thaiClusters, ...intlClusters];
-  }, [mode, hometownData, workplaceData]);
+  }, [mode, statusFilter, hometownData, workplaceData]);
 
   // Clean light material fallback
   const globeMaterial = useMemo(() => {
@@ -1468,7 +1480,9 @@ export function GlobePanel({
             <div className="rounded-2xl bg-white/10 backdrop-blur-md p-3 border border-white/10 text-center">
               <div className="flex items-center justify-center gap-1 text-amber-400 mb-0.5">
                 <Users className="w-3.5 h-3.5" />
-                <span className="text-[10px] font-bold uppercase tracking-wider">ศิษย์เก่า</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider">
+                  {statusFilter === 'studying' ? 'ศิษย์ปัจจุบัน' : statusFilter === 'alumni' ? 'ศิษย์เก่า' : 'สมาชิก'}
+                </span>
               </div>
               <p className="text-lg sm:text-xl font-black text-white">{totalAlumniInMode}</p>
             </div>
@@ -1493,6 +1507,30 @@ export function GlobePanel({
                 }}
                 className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-200 cursor-pointer ${
                   mode === key
+                    ? 'bg-white text-indigo-700 shadow-md shadow-indigo-100'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Student Status Filter */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl border border-slate-200/80 shadow-xs">
+            {([
+              { key: 'all', label: 'ทั้งหมด' },
+              { key: 'alumni', label: '🎓 ศิษย์เก่า' },
+              { key: 'studying', label: '📚 ศิษย์ปัจจุบัน' },
+            ] as const).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => {
+                  setStatusFilter(key);
+                  setSelectedArea(null);
+                }}
+                className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-200 cursor-pointer ${
+                  statusFilter === key
                     ? 'bg-white text-indigo-700 shadow-md shadow-indigo-100'
                     : 'text-slate-500 hover:text-slate-800'
                 }`}

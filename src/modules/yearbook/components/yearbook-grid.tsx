@@ -37,6 +37,7 @@ export interface YearbookAlumnus {
   generation: string;
   generationNumber: number;
   gradYear: string;
+  studentStatus: 'studying' | 'alumni';
   position: string;
   company: string;
   careerType: string;
@@ -139,13 +140,15 @@ export function YearbookGrid() {
               nickname: item.nickname || item.name.split(' ')[0] || 'เพื่อน',
               generation: generationLabel,
               generationNumber: item.generationNumber || (isNaN(parsedGenNumber) ? 43 : parsedGenNumber),
-              gradYear: item.graduationYear ? `${item.graduationYear + 543} (${item.graduationYear})` : '2564 (2021)',
+              // expected_graduation_year เก็บเป็น พ.ศ. (ดู /api/auth/register)
+              gradYear: item.expectedGraduationYear ? String(item.expectedGraduationYear) : '',
+              studentStatus: item.studentStatus === 'studying' ? 'studying' : 'alumni',
               position: item.position || 'Software Developer',
               company: item.company || 'Tech Company',
               careerType: item.careerType || 'Software & Technology',
               province: item.province || 'เชียงใหม่',
               avatarUrl: item.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80',
-              quote: item.quote && item.quote.length > 3 ? item.quote : fallbackQuote,
+              quote: item.quote ? item.quote : fallbackQuote,
               bio: item.quote || 'ศิษย์เก่าภาควิชาวิทยาการคอมพิวเตอร์ มหาวิทยาลัยแม่โจ้',
               skills: ['CS MJU'],
               likesCount: 15 + idx * 3,
@@ -321,7 +324,8 @@ export function YearbookGrid() {
             nickname: myEntryForm.nickname.trim() || myEntryForm.name.trim().split(' ')[0],
             generation: myEntryForm.generation,
             generationNumber: genNum,
-            gradYear: '2564 (2021)',
+            gradYear: currentUser.expected_graduation_year ? String(currentUser.expected_graduation_year) : '',
+            studentStatus: currentUser.student_status === 'studying' ? 'studying' : 'alumni',
             position: currentUser.position || 'ศิษย์เก่า',
             company: currentUser.company || 'มหาวิทยาลัยแม่โจ้',
             careerType: 'Software & Technology',
@@ -636,10 +640,17 @@ export function YearbookGrid() {
 
                 {/* RIGHT: badge + ชื่อ + คำคม + ปุ่มใจ */}
                 <div className="flex flex-col min-w-0 flex-1 gap-1.5 relative z-10 px-4 py-3.5 justify-center">
-                  {/* 2. รุ่น Badge */}
-                  <span className={`inline-block self-start text-[10px] sm:text-[11px] font-extrabold tracking-wider uppercase px-2.5 py-0.5 rounded-full border ${pastelBadge}`}>
-                    {alumnus.generation}
-                  </span>
+                  {/* 2. รุ่น Badge + สถานะ */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className={`inline-block text-[10px] sm:text-[11px] font-extrabold tracking-wider uppercase px-2.5 py-0.5 rounded-full border ${pastelBadge}`}>
+                      {alumnus.generation}
+                    </span>
+                    {alumnus.studentStatus === 'studying' && (
+                      <span className="inline-block text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-100">
+                        ศิษย์ปัจจุบัน
+                      </span>
+                    )}
+                  </div>
 
                   {/* 3. ชื่อ */}
                   <h3 className="text-sm sm:text-base font-bold text-slate-800 leading-snug truncate">
@@ -986,10 +997,16 @@ export function YearbookGrid() {
                   <span className="inline-block bg-indigo-50 text-indigo-700 px-3 py-0.5 text-xs font-extrabold rounded-full border border-indigo-100">
                     {selectedAlumnus.generation}
                   </span>
-                  {selectedAlumnus.gradYear && (
-                    <span className="inline-block bg-slate-100 text-slate-600 px-2.5 py-0.5 text-xs font-medium rounded-full">
-                      จบปี {selectedAlumnus.gradYear}
+                  {selectedAlumnus.studentStatus === 'studying' ? (
+                    <span className="inline-block bg-sky-50 text-sky-700 px-2.5 py-0.5 text-xs font-medium rounded-full border border-sky-100">
+                      ศิษย์ปัจจุบัน{selectedAlumnus.gradYear ? ` · คาดว่าจบ ${selectedAlumnus.gradYear}` : ''}
                     </span>
+                  ) : (
+                    selectedAlumnus.gradYear && (
+                      <span className="inline-block bg-slate-100 text-slate-600 px-2.5 py-0.5 text-xs font-medium rounded-full">
+                        จบปี {selectedAlumnus.gradYear}
+                      </span>
+                    )
                   )}
                 </div>
                 <h2 className="text-xl font-bold text-slate-900">

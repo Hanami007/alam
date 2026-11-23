@@ -213,7 +213,7 @@ export class HofResultsService {
         JOIN users u ON u.id = hcand.user_id
         LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
         LEFT JOIN hof_votes hv ON hv.candidate_id = hcand.id AND hv.campaign_id = $1
-        WHERE hcand.campaign_id = $1
+        WHERE hcand.campaign_id = $1 AND u.student_status = 'alumni'
         GROUP BY hcand.id, u.id, u.name, u.avatar_url, u.company, u.position, gen.label, hcand.description
         ORDER BY total_votes DESC, total_points DESC
         LIMIT 10

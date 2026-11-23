@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { api } from '@/lib/api-client';
 import {
   MapPin,
   Briefcase,
@@ -33,8 +34,93 @@ const NAV_ITEMS = [
   { id: 'privacy', label: 'ความเป็นส่วนตัว', icon: Shield, active: true },
   { id: 'profile', label: 'โปรไฟล์', icon: User, active: false },
   { id: 'notifications', label: 'การแจ้งเตือน', icon: Bell, active: false },
-  { id: 'security', label: 'ความปลอดภัย', icon: Lock, active: false },
+  { id: 'security', label: 'ความปลอดภัย', icon: Lock, active: true },
 ];
+
+/** เปลี่ยนรหัสผ่าน — ต้องยืนยันรหัสเดิม และกรอกรหัสใหม่ 2 ครั้งให้ตรงกัน */
+function ChangePasswordForm() {
+  const [form, setForm] = useState({ current: '', next: '', confirm: '' });
+  const [status, setStatus] = useState<SaveStatus>('idle');
+  const [message, setMessage] = useState('');
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (form.next.length < 6) {
+      setStatus('error');
+      setMessage('รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 6 ตัวอักษร');
+      return;
+    }
+    if (form.next !== form.confirm) {
+      setStatus('error');
+      setMessage('รหัสผ่านใหม่และการยืนยันไม่ตรงกัน');
+      return;
+    }
+    setStatus('saving');
+    setMessage('');
+    try {
+      await api.user.changePassword(form.current, form.next);
+      setForm({ current: '', next: '', confirm: '' });
+      setStatus('success');
+      setMessage('เปลี่ยนรหัสผ่านแล้ว อุปกรณ์อื่นที่ล็อกอินค้างไว้จะถูกออกจากระบบ');
+    } catch (err: any) {
+      setStatus('error');
+      setMessage(err.message ?? 'เปลี่ยนรหัสผ่านไม่สำเร็จ');
+    }
+  }
+
+  const inputClass =
+    'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100';
+
+  return (
+    <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-50">
+          <Lock className="h-5 w-5 text-indigo-500" />
+        </div>
+        <div>
+          <h2 className="text-base font-bold text-slate-900">เปลี่ยนรหัสผ่าน</h2>
+          <p className="text-xs text-slate-500">ต้องยืนยันรหัสผ่านปัจจุบันก่อนตั้งรหัสใหม่</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4 max-w-sm">
+        {([
+          ['current', 'รหัสผ่านปัจจุบัน', 'current-password'],
+          ['next', 'รหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)', 'new-password'],
+          ['confirm', 'ยืนยันรหัสผ่านใหม่', 'new-password'],
+        ] as const).map(([key, label, autoComplete]) => (
+          <label key={key} className="block">
+            <span className="mb-1.5 block text-xs font-semibold text-slate-600">{label}</span>
+            <input
+              type="password"
+              required
+              autoComplete={autoComplete}
+              value={form[key]}
+              onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+              className={inputClass}
+            />
+          </label>
+        ))}
+
+        {message && (
+          <p className={`flex items-start gap-1.5 text-xs font-medium ${status === 'success' ? 'text-emerald-600' : 'text-rose-600'}`}>
+            {status === 'success' ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <AlertCircle className="h-4 w-4 shrink-0" />}
+            {message}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={status === 'saving'}
+          className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
+        >
+          <Save className="h-4 w-4" />
+          {status === 'saving' ? 'กำลังบันทึก...' : 'เปลี่ยนรหัสผ่าน'}
+        </button>
+      </form>
+    </div>
+  );
+}
 
 function Toggle({
   checked,
@@ -310,9 +396,14 @@ export function SettingsPanel({ userId, userName, initialPrivacy }: SettingsPane
           )}
 
           {/* ═══════════════════════════════════════
+              SECURITY SECTION
+          ═══════════════════════════════════════ */}
+          {activeSection === 'security' && <ChangePasswordForm />}
+
+          {/* ═══════════════════════════════════════
               OTHER SECTIONS (placeholder)
           ═══════════════════════════════════════ */}
-          {activeSection !== 'privacy' && (
+          {activeSection !== 'privacy' && activeSection !== 'security' && (
             <div className="rounded-[28px] border border-slate-200 bg-white p-12 text-center shadow-sm">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100">
                 {activeSection === 'profile' && <User className="h-6 w-6 text-slate-400" />}

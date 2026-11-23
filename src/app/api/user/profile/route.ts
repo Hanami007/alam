@@ -51,6 +51,7 @@ export async function PUT(req: Request) {
     return NextResponse.json({ success: true, userId });
   } catch (err: any) {
     console.error('[API PUT /api/user/profile] Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const isValidationError = /ไม่ถูกต้อง|ต้องเป็น/.test(err.message || '');
+    return NextResponse.json({ error: err.message }, { status: isValidationError ? 400 : 500 });
   }
 }

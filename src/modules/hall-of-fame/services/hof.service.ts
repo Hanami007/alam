@@ -57,19 +57,19 @@ export class HofDbService {
   }
 
   /**
-   * เมื่อแคมเปญเปิดโหวตอยู่ ให้สมาชิกที่ได้รับอนุมัติทุกคนเป็นผู้ถูกเสนอชื่อได้ทันที
-   * (เดิมมีแค่รายชื่อที่ seed ไว้ล่วงหน้าไม่กี่คน, และเดิมจำกัดแค่ student_status = 'alumni'
-   * ทำให้ศิษย์ปัจจุบันค้นหา/โหวตให้ไม่ได้ — ผู้ใช้แจ้งว่าต้องการค้นหา/โหวตให้ "ใครก็ได้ในระบบ"
-   * จึงเปิดกว้างให้ทุกคนที่มี role = 'alumni' และ status = 'approved' โดยไม่จำกัด student_status
-   * ยกเว้นบัญชีแอดมิน) — เติมแถว hof_candidates ให้ครบ เฉพาะคนที่ยังไม่มีในแคมเปญนี้
-   * ไม่แตะแถวเดิมที่มีอยู่แล้ว (คำอธิบายผลงานเดิมไม่หาย)
+   * เมื่อแคมเปญเปิดโหวตอยู่ ให้ศิษย์เก่าที่ได้รับอนุมัติทุกคนเป็นผู้ถูกเสนอชื่อได้ทันที
+   * เติมแถว hof_candidates ให้ครบ เฉพาะคนที่ยังไม่มีในแคมเปญนี้ ไม่แตะแถวเดิม (คำอธิบายผลงานเดิมไม่หาย)
+   *
+   * ผู้ถูกเสนอชื่อต้องเป็นศิษย์เก่า (student_status = 'alumni') — role = 'alumni' แค่แปลว่า
+   * "สมาชิกที่ไม่ใช่แอดมิน" ซึ่งรวมศิษย์ปัจจุบันด้วย ส่วนคนโหวตยังเป็นใครก็ได้ในระบบเหมือนเดิม
+   * ศิษย์ปัจจุบันที่เคยถูกเติมเข้ามาก่อนหน้าจะถูกซ่อนใน query (ไม่ลบแถว) และจะกลับมาเองเมื่อจบการศึกษา
    */
   private async ensureAllAlumniAreCandidates(campaignId: number): Promise<void> {
     await pool.query(
       `INSERT INTO hof_candidates (campaign_id, user_id, description)
        SELECT $1, u.id, ''
        FROM users u
-       WHERE u.status = 'approved' AND u.role = 'alumni'
+       WHERE u.status = 'approved' AND u.role = 'alumni' AND u.student_status = 'alumni'
          AND NOT EXISTS (
            SELECT 1 FROM hof_candidates hc WHERE hc.campaign_id = $1 AND hc.user_id = u.id
          )`,
@@ -112,7 +112,7 @@ export class HofDbService {
         LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
         LEFT JOIN lookup_options ct ON ct.id = u.career_option_id
         LEFT JOIN hof_votes hv ON hv.candidate_id = hc.id AND hv.campaign_id = hc.campaign_id
-        WHERE hc.campaign_id = $1
+        WHERE hc.campaign_id = $1 AND u.student_status = 'alumni'
         GROUP BY hc.id, hc.user_id, hc.description, u.student_id, u.name, u.avatar_url, u.position, u.company, u.generation_option_id, gen.label, ct.label
         ORDER BY hof_points DESC, vote_count DESC
       `, [campaign.id]);
@@ -166,7 +166,7 @@ export class HofDbService {
         LEFT JOIN lookup_options gen ON gen.id = u.generation_option_id
         LEFT JOIN lookup_options ct ON ct.id = u.career_option_id
         LEFT JOIN hof_votes hv ON hv.candidate_id = hc.id AND hv.campaign_id = hc.campaign_id
-        WHERE hc.campaign_id = $1
+        WHERE hc.campaign_id = $1 AND u.student_status = 'alumni'
           AND (
             u.name ILIKE $2
             OR u.company ILIKE $2
@@ -219,12 +219,15 @@ export class HofDbService {
 
     const { rows: voter } = await pool.query(`SELECT generation_option_id FROM users WHERE id = $1`, [voterId]);
     const { rows: candidate } = await pool.query(
-      `SELECT u.generation_option_id
+      `SELECT u.generation_option_id, u.student_status
        FROM hof_candidates hc
        JOIN users u ON u.id = hc.user_id
        WHERE hc.id = $1`,
       [candidateId]
     );
+    if (candidate[0]?.student_status !== 'alumni') {
+      throw new Error('โหวตได้เฉพาะศิษย์เก่าเท่านั้น');
+    }
     const voterGen = voter[0]?.generation_option_id;
     const candidateGen = candidate[0]?.generation_option_id;
     const voteCategory = voterGen && candidateGen && voterGen === candidateGen ? 'same_generation' : 'other_generation';
@@ -285,6 +288,7 @@ export class HofDbService {
       left join lookup_options gen on gen.id = u.generation_option_id
       left join lookup_options ct on ct.id = u.career_option_id
       left join hof_votes hv on hv.candidate_id = hc.id
+      where u.student_status = 'alumni'
       group by u.id, u.name, u.avatar_url, u.position, u.company, ct.label, gen.label, hc.description
       order by hof_points desc
     `);
@@ -302,11 +306,12 @@ export class HofDbService {
       from hof_candidates hc
       join users u on u.id = hc.user_id
       left join lookup_options gen on gen.id = u.generation_option_id
-      where u.name ilike $1
+      where u.student_status = 'alumni'
+        and (u.name ilike $1
          or u.company ilike $1
          or u.position ilike $1
          or hc.description ilike $1
-         or gen.label ilike $1
+         or gen.label ilike $1)
       order by hc.id desc
       limit 50
     `, [searchTerm]);

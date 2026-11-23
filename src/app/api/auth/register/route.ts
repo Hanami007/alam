@@ -124,26 +124,18 @@ export async function POST(req: Request) {
       }
     }
 
-    // คำนวณปีที่คาดว่าจะสำเร็จการศึกษา
+    // คำนวณปีที่คาดว่าจะสำเร็จการศึกษา (พ.ศ.) — ใช้แสดงผลเท่านั้น ไม่ได้ใช้เปลี่ยนสถานะ
+    // สถานะศิษย์เก่า/ศิษย์ปัจจุบันใช้ตามที่ผู้ใช้เลือกเอง เพราะบางคนเรียนเกิน 4 ปี
+    // (เปลี่ยนภายหลังได้เองที่หน้าโปรไฟล์ → "ฉันจบการศึกษาแล้ว")
     let expectedGradYear = null;
-    let actualStatus = studentStatus;
-    const currentYearCE = new Date().getFullYear(); // e.g. 2026
-    const currentYearBE = currentYearCE + 543;       // e.g. 2569
+    const actualStatus = studentStatus === 'alumni' ? 'alumni' : 'studying';
 
     const parsedAdmissionYear = admissionYear ? parseInt(String(admissionYear), 10) : null;
     if (parsedAdmissionYear) {
       expectedGradYear = parsedAdmissionYear + 4;
-      // ถ้าครบ 4 ปีแล้วตามปีปัจจุบัน ให้เป็นศิษย์เก่าอัตโนมัติ
-      if (parsedAdmissionYear <= currentYearCE - 4 || parsedAdmissionYear <= currentYearBE - 4) {
-        actualStatus = 'alumni';
-      }
     } else if (matchPrefix) {
-      // ตรวจสอบจากรหัสนักศึกษา 2 หลักแรก เช่น 65 -> 2565 -> 2569 ครบ 4 ปี
-      const prefixYearBE = 2500 + parseInt(matchPrefix[1], 10);
-      expectedGradYear = prefixYearBE + 4;
-      if (prefixYearBE + 4 <= currentYearBE) {
-        actualStatus = 'alumni';
-      }
+      // รหัสนักศึกษา 2 หลักแรก = ปีเข้า พ.ศ. เช่น 65 -> 2565 -> คาดว่าจบ 2569
+      expectedGradYear = 2500 + parseInt(matchPrefix[1], 10) + 4;
     }
 
     // ข้อมูลศิษย์เก่า (ถ้ามีระบุ)
@@ -185,9 +177,10 @@ export async function POST(req: Request) {
         birth_date,
         facebook_url,
         line_id,
+        yearbook_published,
         role,
         status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, 'alumni', 'approved')
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, 'alumni', 'approved')
       RETURNING id, student_id, name, email, student_status, generation_option_id, province_option_id, status`,
       [
         trimmedStudentId,
@@ -211,6 +204,8 @@ export async function POST(req: Request) {
         cleanBirthDate,
         cleanFacebookUrl,
         cleanLineId,
+        // กรอก Bio มาตอนสมัคร = ตั้งใจให้แสดงในหนังสือรุ่น (หน้าหนังสือรุ่นก็บังคับต้องมีคำคมก่อนเผยแพร่)
+        Boolean(cleanBio),
       ]
     );
 
@@ -267,11 +262,6 @@ export async function POST(req: Request) {
     } catch (e) {
       console.error('[Register] Error recording consent audit log:', e);
     }
-
-    // ตรวจสอบเลื่อนสถานะ 4 ปีระบบรวม
-    try {
-      await userDbService.promoteEligibleStudentsToAlumni();
-    } catch {}
 
     // สร้าง Session และตั้งค่า Cookie ทันทีเพื่อให้ผู้ใช้สามารถเข้าสู่ระบบและใช้งานหน้าเว็บได้ทันที
     let sessionId: string | null = null;

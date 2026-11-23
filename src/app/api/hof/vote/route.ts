@@ -48,12 +48,15 @@ export async function POST(req: Request) {
     // กติกา: โหวตได้ในรุ่นตัวเอง 1 ครั้ง และนอกรุ่นตัวเอง 1 ครั้ง (รวมสูงสุด 2 โหวตต่อแคมเปญ)
     const { rows: voter } = await pool.query(`SELECT generation_option_id FROM users WHERE id = $1`, [voterId]);
     const { rows: candidate } = await pool.query(
-      `SELECT u.generation_option_id
+      `SELECT u.generation_option_id, u.student_status
        FROM hof_candidates hc
        JOIN users u ON u.id = hc.user_id
        WHERE hc.id = $1`,
       [candidateId]
     );
+    if (candidate[0]?.student_status !== 'alumni') {
+      return NextResponse.json({ success: false, error: 'โหวตได้เฉพาะศิษย์เก่าเท่านั้น' }, { status: 400 });
+    }
     const voterGen = voter[0]?.generation_option_id;
     const candidateGen = candidate[0]?.generation_option_id;
     const voteCategory = voterGen && candidateGen && voterGen === candidateGen ? 'same_generation' : 'other_generation';

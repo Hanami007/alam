@@ -89,6 +89,10 @@ export function ProfileCard({
     isAvailableForMentorship: false, facebookUrl: '', lineId: '', showContactOnMap: false,
   });
   const [isUntagging, setIsUntagging] = useState<boolean>(false);
+  const currentYearBE = new Date().getFullYear() + 543;
+  const [isConfirmingGraduation, setIsConfirmingGraduation] = useState<boolean>(false);
+  const [graduationYear, setGraduationYear] = useState<number>(currentYearBE);
+  const [isSavingStatus, setIsSavingStatus] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const [showHometownOnMap, setShowHometownOnMap] = useState<boolean>(
@@ -218,6 +222,25 @@ export function ProfileCard({
       setTimeout(() => setToastMessage(null), 3500);
     } finally {
       setIsSavingProfile(false);
+    }
+  }
+
+  async function handleChangeStudentStatus(next: 'studying' | 'alumni') {
+    if (!onSaveProfile) return;
+    setIsSavingStatus(true);
+    try {
+      await onSaveProfile(next === 'alumni' ? { studentStatus: 'alumni', graduationYear } : { studentStatus: 'studying' });
+      setIsConfirmingGraduation(false);
+      setToastMessage({
+        message: next === 'alumni' ? 'ยินดีด้วยกับการสำเร็จการศึกษา 🎓' : 'เปลี่ยนเป็นนักศึกษาปัจจุบันแล้ว',
+        type: 'success',
+      });
+      setTimeout(() => setToastMessage(null), 3000);
+    } catch (err: any) {
+      setToastMessage({ message: err.message || 'บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', type: 'error' });
+      setTimeout(() => setToastMessage(null), 3500);
+    } finally {
+      setIsSavingStatus(false);
     }
   }
 
@@ -397,8 +420,76 @@ export function ProfileCard({
                     <div className="min-w-0 flex-1">
                       <dt className="text-xs font-bold text-slate-500 uppercase tracking-wider">รุ่นการศึกษา & สถานะ</dt>
                       <dd className="text-slate-800 font-medium text-xs sm:text-sm mt-0.5">
-                        {user.generation ?? 'ยังไม่ระบุ'} • {user.student_status === 'alumni' ? 'ศิษย์เก่า' : 'นักศึกษาปัจจุบัน'}
+                        {user.generation || 'ยังไม่ระบุ'} • {user.student_status === 'alumni' ? 'ศิษย์เก่า' : 'นักศึกษาปัจจุบัน'}
+                        {user.student_status === 'alumni' && user.expected_graduation_year ? ` (จบปี ${user.expected_graduation_year})` : ''}
                       </dd>
+
+                      {/* เจ้าของโปรไฟล์ยืนยันสถานะเอง — ระบบไม่เปลี่ยนให้อัตโนมัติ */}
+                      {isOwner && onSaveProfile && user.student_status !== 'alumni' && !isConfirmingGraduation && (
+                        <div className="mt-2">
+                          {user.expected_graduation_year && user.expected_graduation_year <= currentYearBE && (
+                            <p className="text-xs text-slate-500 mb-1.5">
+                              ถึงปีที่คาดว่าจะจบ ({user.expected_graduation_year}) แล้ว ถ้าสำเร็จการศึกษาแล้วกดยืนยันได้เลย
+                            </p>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setIsConfirmingGraduation(true)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                          >
+                            <GraduationCap className="h-3.5 w-3.5" /> ฉันจบการศึกษาแล้ว
+                          </button>
+                        </div>
+                      )}
+
+                      {isOwner && onSaveProfile && isConfirmingGraduation && (
+                        <div className="mt-2 rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 space-y-2">
+                          <label className="block text-xs font-bold text-slate-600">
+                            จบการศึกษาปี พ.ศ.
+                            <select
+                              value={graduationYear}
+                              onChange={(e) => setGraduationYear(Number(e.target.value))}
+                              className="ml-2 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-800"
+                            >
+                              {Array.from({ length: 10 }, (_, i) => currentYearBE - i).map((y) => (
+                                <option key={y} value={y}>{y}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <p className="text-[11px] text-slate-500">
+                            เมื่อเป็นศิษย์เก่า คุณจะถูกเสนอชื่อใน Hall of Fame และแสดงเป็นศิษย์เก่าบนแผนที่และหนังสือรุ่น
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              disabled={isSavingStatus}
+                              onClick={() => handleChangeStudentStatus('alumni')}
+                              className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
+                            >
+                              {isSavingStatus ? 'กำลังบันทึก...' : 'ยืนยัน'}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isSavingStatus}
+                              onClick={() => setIsConfirmingGraduation(false)}
+                              className="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-500 hover:bg-white"
+                            >
+                              ยกเลิก
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {isOwner && onSaveProfile && user.student_status === 'alumni' && (
+                        <button
+                          type="button"
+                          disabled={isSavingStatus}
+                          onClick={() => handleChangeStudentStatus('studying')}
+                          className="mt-1.5 text-[11px] text-slate-400 underline underline-offset-2 hover:text-slate-600 disabled:opacity-50"
+                        >
+                          ยังไม่จบ? เปลี่ยนกลับเป็นนักศึกษาปัจจุบัน
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="py-3 flex items-start gap-3">
@@ -1355,4 +1446,4 @@ export function ProfileCard({
       )}
     </div>
   );
-}
+}

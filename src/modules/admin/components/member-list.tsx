@@ -38,10 +38,24 @@ export interface AdminMember {
 interface MemberListProps {
   members: AdminMember[];
   onDelete?: (userId: number) => Promise<void> | void;
+  onChangeStudentStatus?: (userId: number, studentStatus: 'studying' | 'alumni') => Promise<void> | void;
 }
 
 type StatusFilter = 'all' | 'approved' | 'pending' | 'rejected';
-type RoleFilter = 'all' | 'admin' | 'alumni';
+// role = 'alumni' แปลว่า "สมาชิกทั่วไป" (รวมศิษย์ปัจจุบัน) — แยกศิษย์เก่า/ปัจจุบันด้วย studentStatus แทน
+type RoleFilter = 'all' | 'admin' | 'alumni' | 'studying';
+
+function memberTypeLabel(m: AdminMember): string {
+  if (m.role === 'admin') return 'แอดมิน';
+  return m.studentStatus === 'studying' ? 'ศิษย์ปัจจุบัน' : 'ศิษย์เก่า';
+}
+
+function memberTypeStyle(m: AdminMember): string {
+  if (m.role === 'admin') return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+  return m.studentStatus === 'studying'
+    ? 'bg-sky-50 text-sky-700 border-sky-200'
+    : 'bg-slate-50 text-slate-600 border-slate-200';
+}
 
 const STATUS_STYLE: Record<string, string> = {
   approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -55,7 +69,7 @@ const STATUS_LABEL: Record<string, string> = {
   rejected: 'ปฏิเสธแล้ว',
 };
 
-export function MemberList({ members, onDelete }: MemberListProps) {
+export function MemberList({ members, onDelete, onChangeStudentStatus }: MemberListProps) {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
@@ -63,6 +77,8 @@ export function MemberList({ members, onDelete }: MemberListProps) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [statusError, setStatusError] = useState('');
 
   // ลบเร็วจากแถวในรายชื่อโดยตรง ไม่ต้องเปิด modal รายละเอียดก่อน — ยังคงต้องกดยืนยันซ้ำ
   // เพราะเป็นการลบถาวร ไม่ใช่แค่เปลี่ยนสถานะ
@@ -87,6 +103,21 @@ export function MemberList({ members, onDelete }: MemberListProps) {
     setSelectedMember(null);
     setConfirmingDelete(false);
     setDeleteError('');
+    setStatusError('');
+  }
+
+  async function handleChangeStudentStatus(next: 'studying' | 'alumni') {
+    if (!selectedMember || !onChangeStudentStatus) return;
+    setSavingStatus(true);
+    setStatusError('');
+    try {
+      await onChangeStudentStatus(selectedMember.id, next);
+      setSelectedMember({ ...selectedMember, studentStatus: next });
+    } catch (err: any) {
+      setStatusError(err?.message || 'เปลี่ยนสถานะไม่สำเร็จ');
+    } finally {
+      setSavingStatus(false);
+    }
   }
 
   async function handleConfirmDelete() {
@@ -108,7 +139,9 @@ export function MemberList({ members, onDelete }: MemberListProps) {
     const q = query.trim().toLowerCase();
     return members.filter((m) => {
       if (statusFilter !== 'all' && m.status !== statusFilter) return false;
-      if (roleFilter !== 'all' && m.role !== roleFilter) return false;
+      if (roleFilter === 'admin' && m.role !== 'admin') return false;
+      if ((roleFilter === 'alumni' || roleFilter === 'studying') &&
+          (m.role === 'admin' || (m.studentStatus === 'studying' ? 'studying' : 'alumni') !== roleFilter)) return false;
       if (!q) return true;
       return (
         m.name.toLowerCase().includes(q) ||
@@ -160,8 +193,9 @@ export function MemberList({ members, onDelete }: MemberListProps) {
           onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
           className="h-10 rounded-2xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 focus:border-indigo-400 focus:outline-none cursor-pointer"
         >
-          <option value="all">ทุกบทบาท</option>
+          <option value="all">ทุกประเภท</option>
           <option value="alumni">ศิษย์เก่า</option>
+          <option value="studying">ศิษย์ปัจจุบัน</option>
           <option value="admin">แอดมิน</option>
         </select>
       </div>
@@ -171,7 +205,7 @@ export function MemberList({ members, onDelete }: MemberListProps) {
         <div className="grid grid-cols-12 gap-3 px-4 py-3 bg-slate-50/90 border-b border-slate-200/70 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
           <div className="col-span-4">สมาชิก</div>
           <div className="col-span-2">รุ่น</div>
-          <div className="col-span-2">บทบาท</div>
+          <div className="col-span-2">ประเภท</div>
           <div className="col-span-2">สถานะ</div>
           <div className="col-span-1 text-right">แต้ม</div>
           <div className="col-span-1 text-right">ลบ</div>
@@ -233,14 +267,8 @@ export function MemberList({ members, onDelete }: MemberListProps) {
                   </div>
                   <div className="col-span-2 text-xs text-slate-600 truncate">{m.generation || '-'}</div>
                   <div className="col-span-2">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
-                        m.role === 'admin'
-                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                          : 'bg-slate-50 text-slate-600 border-slate-200'
-                      }`}
-                    >
-                      {m.role === 'admin' ? 'แอดมิน' : 'ศิษย์เก่า'}
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${memberTypeStyle(m)}`}>
+                      {memberTypeLabel(m)}
                     </span>
                   </div>
                   <div className="col-span-2">
@@ -344,14 +372,8 @@ export function MemberList({ members, onDelete }: MemberListProps) {
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
-                      m.role === 'admin'
-                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                        : 'bg-slate-50 text-slate-600 border-slate-200'
-                    }`}
-                  >
-                    {m.role === 'admin' ? 'แอดมิน' : 'ศิษย์เก่า'}
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${memberTypeStyle(m)}`}>
+                    {memberTypeLabel(m)}
                   </span>
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
@@ -409,14 +431,8 @@ export function MemberList({ members, onDelete }: MemberListProps) {
 
               <div>
                 <div className="flex flex-wrap items-center justify-center gap-1.5 mb-1">
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-bold border ${
-                      selectedMember.role === 'admin'
-                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                        : 'bg-slate-50 text-slate-600 border-slate-200'
-                    }`}
-                  >
-                    {selectedMember.role === 'admin' ? 'แอดมิน' : 'ศิษย์เก่า'}
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold border ${memberTypeStyle(selectedMember)}`}>
+                    {memberTypeLabel(selectedMember)}
                   </span>
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-xs font-bold border ${
@@ -532,6 +548,38 @@ export function MemberList({ members, onDelete }: MemberListProps) {
                 </div>
               </div>
             </div>
+
+            {onChangeStudentStatus && selectedMember.role !== 'admin' && (
+              <div className="rounded-2xl border border-slate-100 p-3.5 space-y-2">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">สถานะการศึกษา</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    ['studying', 'ศิษย์ปัจจุบัน'],
+                    ['alumni', 'ศิษย์เก่า'],
+                  ] as const).map(([value, label]) => {
+                    const isCurrent = (selectedMember.studentStatus === 'studying' ? 'studying' : 'alumni') === value;
+                    return (
+                      <button
+                        key={value}
+                        disabled={savingStatus || isCurrent}
+                        onClick={() => handleChangeStudentStatus(value)}
+                        className={`py-2 rounded-xl text-xs font-extrabold border transition-colors cursor-pointer disabled:cursor-default ${
+                          isCurrent
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 disabled:opacity-50'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  ปกติสมาชิกยืนยันเองที่หน้าโปรไฟล์ ใช้แก้กรณีสถานะไม่ตรงความจริง (บันทึกใน Audit Log)
+                </p>
+                {statusError && <p className="text-[11px] font-semibold text-rose-600">{statusError}</p>}
+              </div>
+            )}
 
             {onDelete && (
               <div className="pt-1">

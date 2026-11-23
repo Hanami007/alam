@@ -689,10 +689,10 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
                   {/* Alumni Info with Circular Avatar */}
                   <div className="flex items-center gap-2.5 min-w-0 md:w-[185px] md:shrink-0">
                     <div className="relative shrink-0">
-                      <img
+                      <CandidateAvatar
                         src={c.avatar_url}
-                        alt={c.name}
-                        className="h-9 w-9 sm:h-10 sm:w-10 rounded-full object-cover ring-2 ring-violet-100 group-hover:ring-violet-300 transition-all shadow-2xs"
+                        name={c.name}
+                        className="h-9 w-9 sm:h-10 sm:w-10 rounded-full object-cover ring-2 ring-violet-100 group-hover:ring-violet-300 transition-all shadow-2xs text-sm"
                       />
                       {voted && (
                         <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white rounded-full p-0.5 shadow-xs">
@@ -775,10 +775,10 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
             {/* ── Profile Header (Photo square-rounded, Gen badge, Name, studentId) ── */}
             <div className="text-center space-y-3">
               <div className="relative inline-block">
-                <img
+                <CandidateAvatar
                   src={selectedCandidate.avatar_url}
-                  alt={selectedCandidate.name}
-                  className="h-32 w-32 rounded-3xl object-cover mx-auto ring-4 ring-indigo-100 shadow-md"
+                  name={selectedCandidate.name}
+                  className="h-32 w-32 rounded-3xl object-cover mx-auto ring-4 ring-indigo-100 shadow-md text-4xl"
                 />
               </div>
 
@@ -1032,10 +1032,10 @@ function FloatingTopCard({
             className={`absolute -inset-2 rounded-full ${THEME_CONFIG.glowBg} blur-lg group-hover:scale-110 transition-transform duration-300 pointer-events-none`}
           />
 
-          <img
+          <CandidateAvatar
             src={candidate.avatar_url}
-            alt={candidate.name}
-            className={`relative h-full w-full rounded-full object-cover shadow-lg ${THEME_CONFIG.ringColor} transition-transform duration-300 group-hover:scale-105`}
+            name={candidate.name}
+            className={`relative h-full w-full rounded-full object-cover shadow-lg ${THEME_CONFIG.ringColor} transition-transform duration-300 group-hover:scale-105 text-3xl`}
           />
 
           {/* Floating Circular Medal Badge */}
@@ -1094,6 +1094,22 @@ function FloatingTopCard({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** รูปผู้เข้าชิง — ถ้ายังไม่มีรูปโปรไฟล์ แสดงตัวอักษรแรกของชื่อแทน (ห้ามส่ง src ว่างให้ <img>) */
+function CandidateAvatar({ src, name, className }: { src?: string | null; name: string; className: string }) {
+  if (src) {
+    return <img src={src} alt={name} className={className} />;
+  }
+  return (
+    <div
+      role="img"
+      aria-label={name}
+      className={`${className} flex items-center justify-center bg-gradient-to-tr from-violet-500 to-indigo-500 font-black text-white`}
+    >
+      {name?.trim().charAt(0) || '?'}
     </div>
   );
 }

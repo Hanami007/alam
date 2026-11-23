@@ -16,6 +16,8 @@ export async function GET(req: Request) {
         COALESCE(u.company, '') as company,
         COALESCE(u.position, '') as position,
         COALESCE(u.is_available_for_mentorship, false) as "isAvailableForMentorship",
+        u.student_status as "studentStatus",
+        u.expected_graduation_year as "expectedGraduationYear",
         prov.label as province,
         ct.label as "careerType",
         u.created_at

@@ -9,6 +9,7 @@ export interface UserProfileData {
   role: string;
   status: string;
   studentStatus: string;
+  expectedGraduationYear?: number | null;
   totalPoints: number;
   avatarUrl: string | null;
   company: string | null;
@@ -48,7 +49,7 @@ export class UserDbService {
     const { rows } = await pool.query(`
       SELECT
         u.id, u.student_id, u.email, u.name, u.nickname, u.role, u.status, u.student_status,
-        u.total_points, u.avatar_url, u.company, u.position, u.bio,
+        u.expected_graduation_year, u.total_points, u.avatar_url, u.company, u.position, u.bio,
         u.show_hometown_on_map, u.show_workplace_on_map, u.is_available_for_mentorship, u.birth_date, u.created_at,
         u.generation_option_id, u.province_option_id, u.work_province_id, u.career_option_id,
         u.facebook_url, u.line_id, u.show_contact_on_map,
@@ -76,6 +77,7 @@ export class UserDbService {
       role: r.role,
       status: r.status,
       studentStatus: r.student_status,
+      expectedGraduationYear: r.expected_graduation_year,
       totalPoints: r.total_points,
       avatarUrl: r.avatar_url,
       company: r.company,
@@ -171,6 +173,8 @@ export class UserDbService {
       facebookUrl?: string;
       lineId?: string;
       showContactOnMap?: boolean;
+      studentStatus?: 'studying' | 'alumni';
+      graduationYear?: number | string;
     }
   ) {
     const updates: string[] = [];
@@ -257,6 +261,25 @@ export class UserDbService {
     if (data.careerOptionId !== undefined) {
       updates.push(`career_option_id = $${idx++}`);
       values.push(Number(data.careerOptionId));
+    }
+
+    // สถานะนักศึกษา: ผู้ใช้ยืนยันเองว่าจบการศึกษาแล้ว (ไม่เดาจากรหัสนักศึกษา เพราะบางคนเรียนเกิน 4 ปี)
+    if (data.studentStatus !== undefined) {
+      if (data.studentStatus !== 'studying' && data.studentStatus !== 'alumni') {
+        throw new Error('สถานะนักศึกษาไม่ถูกต้อง');
+      }
+      updates.push(`student_status = $${idx++}`);
+      values.push(data.studentStatus);
+    }
+    if (data.graduationYear !== undefined) {
+      // ปีจบเป็น พ.ศ. เท่านั้น (ตรงกับ expected_graduation_year ที่หน้าสมัครบันทึกไว้)
+      const year = Number(data.graduationYear);
+      const currentYearBE = new Date().getFullYear() + 543;
+      if (!Number.isInteger(year) || year < 2500 || year > currentYearBE) {
+        throw new Error('ปีที่จบการศึกษาต้องเป็น พ.ศ. และไม่เกินปีปัจจุบัน');
+      }
+      updates.push(`expected_graduation_year = $${idx++}`);
+      values.push(year);
     }
 
     if (updates.length === 0) return { success: true };
@@ -372,39 +395,6 @@ export class UserDbService {
     }));
   }
 
-  /**
-   * เลื่อนสถานะนักศึกษาปัจจุบัน (studying) เป็นศิษย์เก่า (alumni) อัตโนมัติ
-   * ถ้าครบ 4 ปีตามปีปัจจุบัน (ใช้ใน auth/register และ member.service หลังอนุมัติผู้ใช้)
-   */
-  async promoteEligibleStudentsToAlumni(): Promise<number> {
-    const currentYearCE = new Date().getFullYear();
-    const currentYearBE = currentYearCE + 543;
-
-    const { rowCount } = await pool.query(
-      `UPDATE users
-       SET student_status = 'alumni'
-       WHERE student_status = 'studying'
-         AND (
-           (expected_graduation_year IS NOT NULL AND (expected_graduation_year <= $1 OR expected_graduation_year <= $2))
-           OR
-           (admission_year IS NOT NULL AND (admission_year <= ($1 - 4) OR admission_year <= ($2 - 4)))
-           OR
-           (
-             student_id ~ '^[0-9]{2}' AND
-             (2500 + substring(student_id from 1 for 2)::int + 4) <= $2
-           )
-         )`,
-      [currentYearCE, currentYearBE]
-    );
-
-    return rowCount ?? 0;
-  }
-
-  // ---------------------------------------------------------------
-  // ฟังก์ชันด้านล่างย้ายมาจาก src/lib/db.ts (god-file) — ปัจจุบันไม่มี route ใดเรียกใช้
-  // คงไว้เพื่อรักษาพฤติกรรมเดิมทั้งหมด ไม่ได้ผูกกับ route ใดในตอนนี้
-  // ---------------------------------------------------------------
-
   /** ดึงโปรไฟล์ตามรหัสนักศึกษา พร้อม gallery 3 รูปแรก (legacy, ยังไม่ได้ใช้งาน) */
   async getUserProfileByStudentIdLegacy(studentId: string) {
     const { rows } = await pool.query(
@@ -472,22 +462,6 @@ export class UserDbService {
       order by pvv.verified_at desc
     `, [userId]);
     return rows;
-  }
-
-  /** เลื่อนสถานะผู้ใช้รายเดียวเมื่อครบ 4 ปี (legacy, ยังไม่ได้ใช้งาน — ถูกแทนที่ด้วย promoteEligibleStudentsToAlumni) */
-  async checkAndPromoteToAlumniLegacy(userId: number) {
-    const currentYear = new Date().getFullYear();
-    const { rows } = await pool.query(
-      `update users
-       set student_status = 'alumni'
-       where id = $1
-         and student_status = 'studying'
-         and expected_graduation_year is not null
-         and expected_graduation_year <= $2
-       returning id, student_status`,
-      [userId, currentYear]
-    );
-    return rows[0] ?? null;
   }
 
   /** ดึงผู้ใช้ pending ทั้งหมด (legacy, ยังไม่ได้ใช้งาน — ถูกแทนที่ด้วย adminDbService.getPendingVerifications) */
@@ -651,9 +625,6 @@ export class UserDbService {
          VALUES ($1, 'approve_user', 'user', $2)`,
         [adminId, userId]
       );
-      try {
-        await this.promoteEligibleStudentsToAlumni();
-      } catch {}
     }
     return rows[0] ?? null;
   }
