@@ -38,6 +38,8 @@ cat > "$CONF_PATH" <<EOF
 server {
     listen 80;
     server_name ${DOMAIN};
+    # ค่า default ของ nginx คือ 1MB — รูปโปรไฟล์/หนังสือรุ่นที่ส่งเป็น base64 อาจเกินได้ (ได้ 413 บันทึกไม่ติด)
+    client_max_body_size 5m;
 
     location / {
         proxy_pass http://127.0.0.1:${APP_PORT};

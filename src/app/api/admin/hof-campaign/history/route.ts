@@ -1,4 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
+import { publicErrorMessage } from '@/lib/api-error';
 import { hofResultsService } from '@/modules/hall-of-fame/services/hof-results.service';
 import { NextResponse } from 'next/server';
 
@@ -20,6 +21,6 @@ export async function GET() {
     const history = await hofResultsService.getAllCycleHistory();
     return NextResponse.json({ success: true, history });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err) }, { status: 500 });
   }
 }

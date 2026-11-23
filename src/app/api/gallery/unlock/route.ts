@@ -1,4 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
+import { publicErrorMessage } from '@/lib/api-error';
 import { galleryDbService } from '@/modules/gallery/services/gallery.service';
 import { NextResponse } from 'next/server';
 
@@ -25,6 +26,6 @@ export async function POST(req: Request) {
     });
   } catch (err: any) {
     console.error('Gallery unlock error:', err);
-    return NextResponse.json({ error: err.message || 'เกิดข้อผิดพลาดในการปลดล็อก' }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err, 'เกิดข้อผิดพลาดในการปลดล็อก') }, { status: 500 });
   }
 }

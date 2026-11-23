@@ -22,6 +22,16 @@ const imageBufferCache = new LRUCache<string, { buffer: ArrayBuffer; contentType
   ttl: 1000 * 60 * 60 * 2,                       // 2 ชั่วโมง
 });
 
+/**
+ * path ที่ client ส่งมา (?path=, ?sub=, album) ต้องอยู่ใต้โฟลเดอร์ธรรมเนียบรุ่นเท่านั้น —
+ * ปฏิเสธ segment ".." / "." / backslash / control char ที่ใช้ไต่ออกไปโฟลเดอร์อื่นบน NAS
+ * (บัญชี NAS ของแอปเห็นทั้ง share /studio ไม่ใช่แค่โฟลเดอร์ธรรมเนียบ)
+ */
+export function isSafeNasRelativePath(relativePath: string): boolean {
+  if (/[\\\u0000-\u001f]/.test(relativePath)) return false;
+  return relativePath.split('/').every((seg) => seg !== '..' && seg !== '.');
+}
+
 export class SynologyApiService {
   /**
    * เข้าสู่ระบบ Synology DSM WebAPI เพื่อรับ _sid (Single-flight mutex)
@@ -76,6 +86,7 @@ export class SynologyApiService {
    */
   async downloadFile(relativePath: string): Promise<{ buffer: ArrayBuffer; contentType: string } | null> {
     const cleanRelPath = relativePath.replace(/^\/+/, '');
+    if (!isSafeNasRelativePath(cleanRelPath)) return null;
     const cacheKey = cleanRelPath;
 
     // 1. ตรวจสอบ In-Memory Cache ก่อน
@@ -153,6 +164,7 @@ export class SynologyApiService {
    * สแกนอ่านรายการไฟล์จริงจากโฟลเดอร์บน NAS
    */
   async listFiles(subfolder: string = ''): Promise<{ name: string; path: string; isdir: boolean }[]> {
+    if (!isSafeNasRelativePath(subfolder)) return [];
     const sid = await this.getSessionId();
     if (!sid) return [];
 

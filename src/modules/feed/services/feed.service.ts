@@ -1,4 +1,5 @@
 import { pool } from '@/lib/db';
+import { checkLength } from '@/lib/field-limits';
 
 export interface FeedComment {
   id: number;
@@ -72,7 +73,7 @@ export class FeedDbService {
           COALESCE(comment_stat.comment_count, 0)::int as comment_count,
           ${currentUserId ? `EXISTS(SELECT 1 FROM post_interactions WHERE post_id = p.id AND user_id = ${Number(currentUserId)} AND type = 'reaction') as is_liked` : 'false as is_liked'}
         FROM posts p
-        LEFT JOIN users admin ON admin.id = p.admin_id
+        LEFT JOIN users admin ON admin.id = p.published_by
         LEFT JOIN users req ON req.id = p.requested_by
         LEFT JOIN (
           SELECT post_id, COUNT(*) as like_count
@@ -83,10 +84,10 @@ export class FeedDbService {
         LEFT JOIN (
           SELECT post_id, COUNT(*) as comment_count
           FROM post_interactions
-          WHERE type = 'comment'
+          WHERE type = 'comment' AND NOT is_hidden
           GROUP BY post_id
         ) comment_stat ON comment_stat.post_id = p.id
-        WHERE p.status IN ('published', 'approved')
+        WHERE p.status IN ('published', 'approved') AND NOT p.is_hidden
         ORDER BY p.pinned DESC, COALESCE(p.published_at, p.created_at) DESC, p.created_at DESC
         LIMIT 50
       `);
@@ -99,7 +100,7 @@ export class FeedDbService {
                 u.name as user_name, u.avatar_url as user_avatar, u.is_available_for_mentorship
          FROM post_interactions pi
          JOIN users u ON u.id = pi.user_id
-         WHERE pi.post_id = ANY($1::int[]) AND pi.type = 'comment'
+         WHERE pi.post_id = ANY($1::int[]) AND pi.type = 'comment' AND NOT pi.is_hidden
          ORDER BY pi.created_at ASC`,
         [postIds]
       );
@@ -221,7 +222,7 @@ export class FeedDbService {
               p.status, p.post_type, p.created_at, p.published_at,
               COALESCE(a.name, r.name) AS author
        FROM posts p
-       LEFT JOIN users a ON a.id = p.admin_id
+       LEFT JOIN users a ON a.id = p.published_by
        LEFT JOIN users r ON r.id = p.requested_by
        WHERE p.id = $1`,
       [postId]
@@ -405,22 +406,16 @@ export class FeedDbService {
     if (!title || title.trim().length === 0) {
       throw new Error('กรุณาระบุหัวข้อโพสต์');
     }
-    if (title.trim().length > 100) {
-      throw new Error('หัวข้อโพสต์ต้องไม่เกิน 100 ตัวอักษร');
-    }
-    if (content && content.trim().length > 1000) {
-      throw new Error('เนื้อหาโพสต์ต้องไม่เกิน 1000 ตัวอักษร');
-    }
-    if (postType === 'poll' && pollData) {
-      if (pollData.question && pollData.question.trim().length > 100) {
-        throw new Error('คำถามโพลต้องไม่เกิน 100 ตัวอักษร');
-      }
-      for (const opt of pollData.options || []) {
-        if (opt && opt.trim().length > 60) {
-          throw new Error('ตัวเลือกโพลแต่ละข้อต้องไม่เกิน 60 ตัวอักษร');
-        }
-      }
-    }
+    const lengthError =
+      checkLength(title, 'postTitle', 'หัวข้อโพสต์') ||
+      checkLength(content, 'postContent', 'เนื้อหาโพสต์') ||
+      checkLength(category, 'postCategory', 'หมวดหมู่') ||
+      (postType === 'poll' && pollData
+        ? checkLength(pollData.question, 'pollQuestion', 'คำถามโพล') ||
+          (pollData.options || []).map((opt) => checkLength(opt, 'pollOption', 'ตัวเลือกโพลแต่ละข้อ')).find(Boolean) ||
+          null
+        : null);
+    if (lengthError) throw new Error(lengthError);
 
     // ผู้ใช้ที่ authenticated แล้ว (getCurrentUser ตรวจแล้วก่อนเรียกฟังก์ชันนี้) ต้องมีอยู่จริง
     // ใน DB เสมอ — เดิมถ้าไม่เจอ (เช่น user ถูกลบไปกลางที่ session ยังไม่หมดอายุ) จะเงียบๆ
@@ -460,7 +455,7 @@ export class FeedDbService {
   /** สร้างโพสต์โดยตรง (admin only) */
   async createAdminPost(adminId: number, data: { category: string; title: string; content: string; pinned?: boolean }) {
     const { rows } = await pool.query(
-      `INSERT INTO posts (admin_id, category, title, content, post_type, status, pinned, published_at)
+      `INSERT INTO posts (published_by, category, title, content, post_type, status, pinned, published_at)
        VALUES ($1, $2, $3, $4, 'normal', 'published', $5, now())
        RETURNING *`,
       [adminId, data.category, data.title, data.content, data.pinned ?? false]
@@ -479,7 +474,7 @@ export class FeedDbService {
     data: { title: string; body: string; category?: string; pinned?: boolean }
   ) {
     const { rows } = await pool.query(
-      `INSERT INTO posts (admin_id, title, content, category, status, pinned, published_at, created_at)
+      `INSERT INTO posts (published_by, title, content, category, status, pinned, published_at, created_at)
        VALUES ($1, $2, $3, $4, 'published', $5, NOW(), NOW())
        RETURNING id, title, content, category, pinned, created_at`,
       [adminUserId, data.title, data.body, data.category || 'ประกาศทางการ', data.pinned ? true : false]
@@ -567,7 +562,7 @@ export class FeedDbService {
   async approvePostRequest(postId: number, adminId: number) {
     const { rows } = await pool.query(
       `update posts
-       set status = 'published', admin_id = $2, published_at = now()
+       set status = 'published', published_by = $2, published_at = now()
        where id = $1 and status = 'pending_request'
        returning *`,
       [postId, adminId]

@@ -1,4 +1,5 @@
 import { mapDbService } from '@/modules/map/services/map.service';
+import { publicErrorMessage } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
@@ -14,6 +15,6 @@ export async function GET() {
     });
   } catch (err: any) {
     console.error('[API /api/map] Error:', err);
-    return NextResponse.json({ error: err.message || 'ไม่สามารถโหลดข้อมูลแผนที่ได้' }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err, 'ไม่สามารถโหลดข้อมูลแผนที่ได้') }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { feedDbService } from '@/modules/feed/services/feed.service';
+import { publicErrorMessage } from '@/lib/api-error';
 import { getCurrentUser } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 
@@ -17,6 +18,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, ...result, pointsAwarded: result.alreadySent ? 0 : 1 });
   } catch (err: any) {
     console.error('Error sending birthday wish:', err);
-    return NextResponse.json({ error: err.message || 'เกิดข้อผิดพลาดในการส่งคำอวยพร' }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err, 'เกิดข้อผิดพลาดในการส่งคำอวยพร') }, { status: 500 });
   }
 }

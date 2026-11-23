@@ -96,6 +96,7 @@ interface NavItem {
 
 const ACCOUNT_NAV: NavItem[] = [
   { href: '/profile', label: 'โปรไฟล์', icon: User },
+  { href: '/member/approvals', label: 'ยืนยันสมาชิกใหม่', icon: Shield },
   { href: '/admin', label: 'จัดการระบบ', icon: Settings, adminOnly: true },
 ];
 

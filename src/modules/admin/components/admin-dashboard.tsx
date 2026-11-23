@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
+  Flag,
   CheckCircle2,
   Image as ImageIcon,
   MessageSquare,
@@ -29,6 +30,7 @@ import { MemberList, type AdminMember } from './member-list';
 import { WallWidgetManager } from './wall-widget-manager';
 import { HofCampaignManager } from './hof-campaign-manager';
 import { AuditLog } from './audit-log';
+import { ContentReportQueue } from './content-report-queue';
 import { api } from '@/lib/api-client';
 
 interface AdminDashboardProps {
@@ -36,7 +38,17 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'posts' | 'announcement' | 'users' | 'members' | 'widgets' | 'keywords' | 'hof' | 'audit'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'announcement' | 'users' | 'reports' | 'members' | 'widgets' | 'keywords' | 'hof' | 'audit'>('posts');
+  const [pendingReportCount, setPendingReportCount] = useState(0);
+  const handleReportCount = useCallback((count: number) => setPendingReportCount(count), []);
+
+  // จำนวนรายงานเนื้อหาที่รอตรวจ แสดงบนปุ่มแท็บ (ก่อนเปิดแท็บ)
+  useEffect(() => {
+    fetch('/api/admin/reports')
+      .then((r) => r.json())
+      .then((d) => setPendingReportCount(d.pendingCount ?? 0))
+      .catch(() => {});
+  }, []);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>({
     totalAlumni: 0,
@@ -330,6 +342,7 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
           <div className="flex flex-wrap items-center gap-2">
             {[
               { id: 'users' as const, label: 'อนุมัติสมาชิกศิษย์เก่า', icon: UserCheck, count: pendingUsers.length },
+              { id: 'reports' as const, label: 'รายงานเนื้อหา', icon: Flag, count: pendingReportCount },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -396,6 +409,10 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
 
       {activeTab === 'keywords' && (
         <KeywordFilterManager />
+      )}
+
+      {activeTab === 'reports' && (
+        <ContentReportQueue onCountChange={handleReportCount} />
       )}
 
       {activeTab === 'members' && (

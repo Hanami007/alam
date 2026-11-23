@@ -1,8 +1,10 @@
 import { pool } from '@/lib/db';
 import { notificationDbService } from '@/modules/notifications/services/notification.service';
-import { userDbService } from '@/modules/profile/services/user.service';
-import { hashPassword, createSession, SESSION_MAX_AGE_SECONDS } from '@/lib/auth';
-import { cookies } from 'next/headers';
+import { hashPassword } from '@/lib/auth';
+import { publicErrorMessage } from '@/lib/api-error';
+import { checkLength } from '@/lib/field-limits';
+import { parseStudentId } from '@/lib/student-id';
+import { normalizeAvatarInput } from '@/lib/upload-storage';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
@@ -13,10 +15,9 @@ export async function POST(req: Request) {
       name,
       email,
       password,
-      generationOptionId,
+      // generationOptionId / admissionYear จาก client ไม่ใช้แล้ว — คำนวณจากรหัสนักศึกษาฝั่ง server เสมอ
       provinceOptionId,
       studentStatus = 'studying',
-      admissionYear,
       showHometownOnMap = true,
       company,
       position,
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
     }
 
     // ตรวจสอบฟิลด์ที่จำเป็น
-    if (!studentId || !name || !email || !password || !generationOptionId || !provinceOptionId) {
+    if (!studentId || !name || !email || !password || !provinceOptionId) {
       return NextResponse.json(
         { error: 'กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน' },
         { status: 400 }
@@ -57,6 +58,27 @@ export async function POST(req: Request) {
 
     const trimmedStudentId = String(studentId).trim();
     const trimmedEmail = String(email).trim().toLowerCase();
+
+    // รับรหัสนักศึกษาได้ทั้ง 8 หลัก (ระบบเดิม) และ 10 หลัก — สูตรคำนวณรุ่นต่างกัน ดู src/lib/student-id.ts
+    const parsedId = parseStudentId(trimmedStudentId);
+    if (!parsedId) {
+      return NextResponse.json(
+        { error: 'รหัสนักศึกษาต้องเป็นตัวเลข 8 หรือ 10 หลัก' },
+        { status: 400 }
+      );
+    }
+
+    const lengthError =
+      checkLength(name, 'name', 'ชื่อ-นามสกุล') ||
+      checkLength(email, 'email', 'อีเมล') ||
+      checkLength(company, 'company', 'ชื่อบริษัท/องค์กร') ||
+      checkLength(position, 'position', 'ตำแหน่งงาน') ||
+      checkLength(bio, 'bio', 'คำแนะนำตัว') ||
+      checkLength(body.facebookUrl, 'facebookUrl', 'Facebook') ||
+      checkLength(body.lineId, 'lineId', 'LINE ID');
+    if (lengthError) {
+      return NextResponse.json({ error: lengthError }, { status: 400 });
+    }
 
     // ตรวจสอบความซ้ำซ้อนของ student_id และ email
     const { rows: existing } = await pool.query(
@@ -83,60 +105,47 @@ export async function POST(req: Request) {
     // เข้ารหัสรหัสผ่าน
     const passwordHash = await hashPassword(password);
 
-    // ตรวจสอบรุ่นอัตโนมัติจากรหัสนักศึกษา 2 หลักแรก (เช่น 66 -> 66 - 37 = รุ่น 29)
-    let resolvedGenerationId = parseInt(generationOptionId, 10);
-    const matchPrefix = trimmedStudentId.match(/^([0-9]{2})/);
-    if (matchPrefix) {
-      const prefixNum = parseInt(matchPrefix[1], 10);
-      const calculatedGen = prefixNum - 37;
-      if (calculatedGen >= 1) {
-        const genCode = `gen-${calculatedGen}`;
-        const { rows: autoGenRows } = await pool.query(
-          `SELECT id FROM lookup_options WHERE category = 'generation' AND code = $1 LIMIT 1`,
-          [genCode]
-        );
-        if (autoGenRows.length > 0) {
-          resolvedGenerationId = autoGenRows[0].id;
-        } else {
-          // ยังไม่มีตัวเลือกรุ่นนี้ในระบบ (เช่นรุ่นใหม่ที่ยังไม่เคยมีใครสมัครมาก่อน) — สร้างให้เองทันที
-          // แทนที่จะปล่อยให้สมัครไม่ได้แล้วต้องรอโปรแกรมเมอร์มา insert เพิ่มด้วยมือทุกปีไปตลอดกาล
-          // ON CONFLICT กันแถวซ้ำกรณีมีคนรุ่นเดียวกันสมัครพร้อมกันหลายคน (race condition)
-          const entryYearBE = 2500 + prefixNum;
-          const { rows: createdGenRows } = await pool.query(
-            `INSERT INTO lookup_options (category, code, label, extra)
-             VALUES ('generation', $1, $2, $3::jsonb)
-             ON CONFLICT (category, code) DO UPDATE SET category = EXCLUDED.category
-             RETURNING id`,
-            [
-              genCode,
-              `รุ่น ${calculatedGen}`,
-              JSON.stringify({
-                prefix: String(prefixNum),
-                gen_number: calculatedGen,
-                entry_year_be: entryYearBE,
-                year_start: entryYearBE - 543,
-                year_end: entryYearBE - 543 + 4,
-              }),
-            ]
-          );
-          resolvedGenerationId = createdGenRows[0].id;
-        }
-      }
+    // คำนวณรุ่นอัตโนมัติจากรหัสนักศึกษา — เซิร์ฟเวอร์คำนวณเองเสมอ ไม่เชื่อ generationOptionId จาก client
+    // (10 หลัก: 66xxxxxxxx → รุ่น 29, 8 หลัก: 47xxxxxx → รุ่น 30)
+    const genNumber = parsedId.generationNumber;
+    const genCode = `gen-${genNumber}`;
+    let resolvedGenerationId: number;
+    const { rows: autoGenRows } = await pool.query(
+      `SELECT id FROM lookup_options WHERE category = 'generation' AND code = $1 LIMIT 1`,
+      [genCode]
+    );
+    if (autoGenRows.length > 0) {
+      resolvedGenerationId = autoGenRows[0].id;
+    } else {
+      // ยังไม่มีตัวเลือกรุ่นนี้ในระบบ (เช่นรุ่นใหม่ที่ยังไม่เคยมีใครสมัครมาก่อน) — สร้างให้เองทันที
+      // แทนที่จะปล่อยให้สมัครไม่ได้แล้วต้องรอโปรแกรมเมอร์มา insert เพิ่มด้วยมือทุกปีไปตลอดกาล
+      // ON CONFLICT กันแถวซ้ำกรณีมีคนรุ่นเดียวกันสมัครพร้อมกันหลายคน (race condition)
+      const { rows: createdGenRows } = await pool.query(
+        `INSERT INTO lookup_options (category, code, label, extra)
+         VALUES ('generation', $1, $2, $3::jsonb)
+         ON CONFLICT (category, code) DO UPDATE SET category = EXCLUDED.category
+         RETURNING id`,
+        [
+          genCode,
+          `รุ่น ${genNumber}`,
+          JSON.stringify({
+            prefix: String(genNumber + 37),
+            gen_number: genNumber,
+            entry_year_be: parsedId.entryYearBE,
+            year_start: parsedId.entryYearBE - 543,
+            year_end: parsedId.entryYearBE - 543 + 4,
+          }),
+        ]
+      );
+      resolvedGenerationId = createdGenRows[0].id;
     }
 
-    // คำนวณปีที่คาดว่าจะสำเร็จการศึกษา (พ.ศ.) — ใช้แสดงผลเท่านั้น ไม่ได้ใช้เปลี่ยนสถานะ
-    // สถานะศิษย์เก่า/ศิษย์ปัจจุบันใช้ตามที่ผู้ใช้เลือกเอง เพราะบางคนเรียนเกิน 4 ปี
-    // (เปลี่ยนภายหลังได้เองที่หน้าโปรไฟล์ → "ฉันจบการศึกษาแล้ว")
-    let expectedGradYear = null;
-    const actualStatus = studentStatus === 'alumni' ? 'alumni' : 'studying';
-
-    const parsedAdmissionYear = admissionYear ? parseInt(String(admissionYear), 10) : null;
-    if (parsedAdmissionYear) {
-      expectedGradYear = parsedAdmissionYear + 4;
-    } else if (matchPrefix) {
-      // รหัสนักศึกษา 2 หลักแรก = ปีเข้า พ.ศ. เช่น 65 -> 2565 -> คาดว่าจบ 2569
-      expectedGradYear = 2500 + parseInt(matchPrefix[1], 10) + 4;
-    }
+    // ปีเข้าศึกษา/ปีจบ คำนวณจากรุ่น (ไม่ใช่ 2500 + 2 หลักแรก ซึ่งผิดกับรหัส 8 หลัก) — ใช้แสดงผลเท่านั้น
+    const parsedAdmissionYear = parsedId.entryYearBE;
+    const expectedGradYear = parsedId.expectedGraduationYearBE;
+    // สถานะใช้ตามที่ผู้ใช้เลือกเอง (บางคนเรียนเกิน 4 ปี — เปลี่ยนภายหลังได้ที่หน้าโปรไฟล์ "ฉันจบการศึกษาแล้ว")
+    // ยกเว้นรหัส 8 หลัก (ระบบเดิม) เป็นศิษย์เก่าเสมอ — ปัจจุบันออกรหัสแค่ 10 หลัก
+    const actualStatus = parsedId.length === 8 || studentStatus === 'alumni' ? 'alumni' : 'studying';
 
     // ข้อมูลศิษย์เก่า (ถ้ามีระบุ)
     const cleanCompany = company ? String(company).trim() : null;
@@ -144,15 +153,29 @@ export async function POST(req: Request) {
     const parsedCareerId = careerOptionId ? parseInt(String(careerOptionId), 10) : null;
     const parsedWorkProvinceId = workProvinceId ? parseInt(String(workProvinceId), 10) : parseInt(provinceOptionId, 10);
     const cleanBio = bio ? String(bio).trim() : null;
-    const cleanAvatarUrl = body.avatarUrl || body.avatar_url || null;
+    // รูปที่อัปโหลด (data URL) → บันทึกเป็นไฟล์ แล้วเก็บแค่ path ลง DB
+    let cleanAvatarUrl: string | null;
+    try {
+      cleanAvatarUrl = await normalizeAvatarInput(body.avatarUrl || body.avatar_url);
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
     const cleanBirthDate = birthDate ? String(birthDate).trim() : null;
     const cleanFacebookUrl = body.facebookUrl ? String(body.facebookUrl).trim() : null;
     const cleanLineId = body.lineId ? String(body.lineId).trim() : null;
     const isMentorship = Boolean(body.isAvailableForMentorship || body.is_available_for_mentorship);
     const showHometown = body.showHometownOnMap !== undefined ? Boolean(body.showHometownOnMap) : true;
     const showWorkplace = body.showWorkplaceOnMap !== undefined ? Boolean(body.showWorkplaceOnMap) : true;
+    // การแสดงข้อมูลส่วนตัวรายฟิลด์ (ไอคอนเขียว/แดงในหน้าสมัคร) — ไม่ส่งมา = ปิด
+    const showEmail = Boolean(body.showEmail);
+    const showBirthDate = Boolean(body.showBirthDate);
+    const showStudentIdFlag = Boolean(body.showStudentId);
+    const showFacebook = Boolean(body.showFacebook);
+    const showLineId = Boolean(body.showLineId);
+    const showContactOnMap = showFacebook || showLineId;
 
-    // บันทึกลงฐานข้อมูล users ด้วยสถานะ approved เพื่อให้พร้อมใช้งานทันที
+    // บันทึกลงฐานข้อมูล users ด้วยสถานะ pending — ต้องให้เพื่อนร่วมรุ่นหรือแอดมินยืนยันตัวตนก่อน
+    // (เดิมให้ approved ทันที ใครก็กรอกรหัสนักศึกษาของคนอื่นแล้วเข้าระบบได้เลย)
     const { rows: newUserRows } = await pool.query(
       `INSERT INTO users (
         student_id,
@@ -177,10 +200,17 @@ export async function POST(req: Request) {
         birth_date,
         facebook_url,
         line_id,
+        show_email,
+        show_birth_date,
+        show_student_id,
+        show_facebook,
+        show_line_id,
+        show_contact_on_map,
         yearbook_published,
         role,
         status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, 'alumni', 'approved')
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21,
+                $22, $23, $24, $25, $26, $27, $28, 'alumni', 'pending')
       RETURNING id, student_id, name, email, student_status, generation_option_id, province_option_id, status`,
       [
         trimmedStudentId,
@@ -192,7 +222,7 @@ export async function POST(req: Request) {
         parseInt(provinceOptionId, 10),
         showHometown,
         actualStatus,
-        parsedAdmissionYear || (matchPrefix ? 2500 + parseInt(matchPrefix[1], 10) : null),
+        parsedAdmissionYear,
         expectedGradYear,
         cleanCompany,
         cleanPosition,
@@ -204,7 +234,13 @@ export async function POST(req: Request) {
         cleanBirthDate,
         cleanFacebookUrl,
         cleanLineId,
-        // กรอก Bio มาตอนสมัคร = ตั้งใจให้แสดงในหนังสือรุ่น (หน้าหนังสือรุ่นก็บังคับต้องมีคำคมก่อนเผยแพร่)
+        showEmail,
+        showBirthDate,
+        showStudentIdFlag,
+        showFacebook,
+        showLineId,
+        showContactOnMap,
+        // กรอก Bio มาตอนสมัคร = ตั้งใจให้แสดงในหนังสือรุ่น (หนังสือรุ่นแสดงเฉพาะบัญชีที่อนุมัติแล้ว)
         Boolean(cleanBio),
       ]
     );
@@ -263,26 +299,11 @@ export async function POST(req: Request) {
       console.error('[Register] Error recording consent audit log:', e);
     }
 
-    // สร้าง Session และตั้งค่า Cookie ทันทีเพื่อให้ผู้ใช้สามารถเข้าสู่ระบบและใช้งานหน้าเว็บได้ทันที
-    let sessionId: string | null = null;
-    try {
-      sessionId = await createSession(newUser.id);
-      const cookieStore = await cookies();
-      cookieStore.set('session_id', sessionId, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-        maxAge: SESSION_MAX_AGE_SECONDS, // ต้องตรงกับอายุ session จริงใน DB (createSession) และกับ /api/auth/login — เดิมตั้งไว้ 7 วันทั้งที่ DB คำนวณ 30 วันเสมอ ทำให้ cookie หลุดก่อน session จริงหมดอายุ
-      });
-    } catch (sessionErr) {
-      console.error('[Register] Error setting auto-session cookie:', sessionErr);
-    }
-
+    // ไม่สร้าง session ให้อัตโนมัติ — บัญชียัง pending อยู่ ต้องรอเพื่อนร่วมรุ่น/แอดมินยืนยันก่อน
+    // แล้วค่อยล็อกอินเองที่หน้า /login (login route ปฏิเสธบัญชี pending อยู่แล้ว)
     return NextResponse.json({
       success: true,
-      message: 'สมัครสมาชิกสำเร็จ! บัญชีของคุณได้รับการอนุมัติและพร้อมเข้าใช้งานระบบทันที',
-      sessionId,
+      message: 'สมัครสมาชิกสำเร็จ! กรุณารอเพื่อนร่วมรุ่นหรือผู้ดูแลระบบยืนยันตัวตน แล้วจึงเข้าสู่ระบบ',
       user: {
         id: newUser.id,
         name: newUser.name,
@@ -295,7 +316,7 @@ export async function POST(req: Request) {
   } catch (err: any) {
     console.error('[API /api/auth/register] Error:', err);
     return NextResponse.json(
-      { error: err.message || 'เกิดข้อผิดพลาดในการลงทะเบียน' },
+      { error: publicErrorMessage(err, 'เกิดข้อผิดพลาดในการลงทะเบียน') },
       { status: 500 }
     );
   }

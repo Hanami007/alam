@@ -1,4 +1,5 @@
 import { deleteSession } from '@/lib/auth';
+import { publicErrorMessage } from '@/lib/api-error';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
@@ -16,6 +17,6 @@ export async function POST() {
     return NextResponse.json({ success: true, message: 'ออกจากระบบสำเร็จ' });
   } catch (err: any) {
     console.error('Logout error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err) }, { status: 500 });
   }
 }

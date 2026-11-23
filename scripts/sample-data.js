@@ -138,7 +138,7 @@ async function seed(db) {
     [u5, null, 'admin_manual', 'pending', 'รอแอดมินตรวจสอบ'],
   ]) {
     await db.query(
-      `INSERT INTO user_verifications (user_id, admin_id, source, status, remark) VALUES ($1, $2, $3, $4, $5)`,
+      `INSERT INTO user_verifications (user_id, verified_by, source, status, remark) VALUES ($1, $2, $3, $4, $5)`,
       [userId, approver, source, status, remark]
     );
   }
@@ -146,10 +146,11 @@ async function seed(db) {
   // ─── posts (5): ประกาศแอดมิน, โพสต์ที่สมาชิกขอ, โพล, คำขอที่รออนุมัติ ──────────
   const post = async (adminId, requestedBy, category, title, content, type, status, pinned) =>
     (await insert(db,
-      `INSERT INTO posts (admin_id, requested_by, category, title, content, post_type, status, pinned, published_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $7 = 'published' THEN now() END)
+      `INSERT INTO posts (published_by, requested_by, category, title, content, post_type, status, pinned, published_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING id`,
-      [adminId, requestedBy, category, `${TAG} ${title}`, content, type, status, pinned]
+      [adminId, requestedBy, category, `${TAG} ${title}`, content, type, status, pinned,
+       status === 'published' ? new Date() : null]
     )).id;
   const p1 = await post(admin.id, null, 'ประกาศ', 'เปิดรับพี่เลี้ยง Mentorship รอบใหม่',
     'ศิษย์เก่าที่สนใจเป็นพี่เลี้ยงให้น้องปี 4 เปิดสถานะ "รับให้คำปรึกษา" ในโปรไฟล์ได้เลย', 'normal', 'published', true);

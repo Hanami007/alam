@@ -1,4 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
+import { publicErrorMessage } from '@/lib/api-error';
 import { hofResultsService } from '@/modules/hall-of-fame/services/hof-results.service';
 import { NextResponse } from 'next/server';
 
@@ -35,7 +36,7 @@ export async function PUT(req: Request, { params }: RouteParams) {
     });
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err) }, { status: 500 });
   }
 }
 
@@ -55,6 +56,6 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
     await hofResultsService.deleteResult(id);
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err) }, { status: 500 });
   }
 }

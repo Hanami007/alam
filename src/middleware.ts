@@ -15,8 +15,11 @@ const PUBLIC_PATHS = ['/login', '/register', '/api/auth/login', '/api/auth/logou
 async function hasValidSession(sessionId: string | undefined): Promise<boolean> {
   if (!sessionId) return false;
   try {
+    // ต้องเป็นบัญชีที่ยัง approved อยู่ด้วย — ไม่งั้นคนที่ถูกแอดมินปฏิเสธ/ระงับภายหลัง
+    // จะยังใช้ session เดิมต่อได้อีกจนกว่า session จะหมดอายุ (สูงสุด 30 วัน)
     const { rows } = await pool.query(
-      `SELECT 1 FROM sessions WHERE id = $1 AND expires_at > now() LIMIT 1`,
+      `SELECT 1 FROM sessions s JOIN users u ON u.id = s.user_id
+       WHERE s.id = $1 AND s.expires_at > now() AND u.status = 'approved' LIMIT 1`,
       [sessionId]
     );
     return rows.length > 0;
@@ -26,19 +29,59 @@ async function hasValidSession(sessionId: string | undefined): Promise<boolean> 
   }
 }
 
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+/**
+ * กัน CSRF: request ที่เปลี่ยนแปลงข้อมูล (POST/PUT/PATCH/DELETE) ต้องมาจากหน้าเว็บของเราเองเท่านั้น
+ *
+ * cookie ตั้ง sameSite: 'lax' ไว้แล้ว ซึ่งกันเว็บต่างโดเมนได้ แต่ยังไม่กัน subdomain อื่นใต้
+ * csmju.com (ถือเป็น "same-site") — ถ้า subdomain ใดโดนยึดหรือมีช่อง XSS ก็ยิง POST มาพร้อม
+ * cookie ของผู้ใช้ได้ จึงเช็กเพิ่มว่าเป็น same-origin จริง
+ *
+ * 1) Sec-Fetch-Site (browser สมัยใหม่ส่งเองทุก request แก้ไม่ได้จาก JS) ต้องเป็น same-origin/none
+ * 2) ถ้าไม่มี ให้เทียบ Origin กับ Host (nginx ส่ง Host เดิมต่อมา — ดู deploy/04-setup-reverse-proxy.sh)
+ * 3) ไม่มีทั้งคู่ = ไม่ใช่ browser (curl/script) ซึ่งไม่มี cookie ของเหยื่อติดมาอยู่แล้ว → อนุญาต
+ */
+function isCrossOriginMutation(req: NextRequest): boolean {
+  if (SAFE_METHODS.has(req.method)) return false;
+
+  const fetchSite = req.headers.get('sec-fetch-site');
+  if (fetchSite) return fetchSite !== 'same-origin' && fetchSite !== 'none';
+
+  const origin = req.headers.get('origin');
+  if (!origin) return false;
+  if (origin === 'null') return true;
+  try {
+    const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? req.nextUrl.host;
+    return new URL(origin).host !== host;
+  } catch {
+    return true;
+  }
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // ข้ามไฟล์ static และ Next.js internal รวมถึง API รูปภาพ NAS
+  // /api/public/* เปิดให้เว็บภายนอกเรียกแบบ GET ด้วย API key (ไม่ใช้ cookie) จึงไม่ต้องเช็ก
+  if (pathname.startsWith('/api/') && !pathname.startsWith('/api/public') && isCrossOriginMutation(req)) {
+    return NextResponse.json({ error: 'คำขอถูกปฏิเสธ (cross-origin)' }, { status: 403 });
+  }
+
+  // ข้ามไฟล์ static และ Next.js internal
   // และ /api/public/* ซึ่งเปิดให้เว็บภายนอกเรียกได้ (ป้องกันด้วย API Key แทน session)
+  //
+  // ห้ามยกเว้น /api/nas อีก — เดิมยกเว้นไว้ทำให้ใครก็ได้บนอินเทอร์เน็ตดึงรายชื่อ/รหัสนักศึกษา
+  // และรูปถ่ายนักศึกษาจาก NAS ได้โดยไม่ต้องล็อกอิน (<img> ในหน้าเว็บส่ง cookie ไปเองอยู่แล้ว)
+  //
+  // เงื่อนไข "มีจุดใน path = ไฟล์ static" ใช้เฉพาะ path ที่ไม่ใช่ /api/ เท่านั้น — เดิมใช้กับทุก path
+  // ทำให้ dynamic API route ข้าม auth ได้แค่เติมจุด เช่น GET /api/alumni/5. (Number("5.") === 5)
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/lookup') ||
-    pathname.startsWith('/api/nas') ||
     pathname.startsWith('/api/public') ||
     pathname === '/favicon.ico' ||
-    pathname.includes('.')
+    (!pathname.startsWith('/api/') && pathname.includes('.'))
   ) {
     return NextResponse.next();
   }

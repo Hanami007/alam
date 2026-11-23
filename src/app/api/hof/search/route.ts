@@ -1,4 +1,5 @@
 import { hofDbService } from '@/modules/hall-of-fame/services/hof.service';
+import { publicErrorMessage } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 
 export async function GET(req: Request) {
@@ -36,6 +37,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ results });
   } catch (err: any) {
     console.error('Error in /api/hof/search:', err);
-    return NextResponse.json({ error: err.message, results: [] }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err), results: [] }, { status: 500 });
   }
 }

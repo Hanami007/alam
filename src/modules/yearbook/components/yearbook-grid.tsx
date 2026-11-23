@@ -28,6 +28,7 @@ import {
   CalendarDays,
 } from 'lucide-react';
 import { api } from '@/lib/api-client';
+import { resizeImageToDataUrl } from '@/lib/image-resize';
 
 export interface YearbookAlumnus {
   id: number | string;
@@ -272,17 +273,17 @@ export function YearbookGrid() {
       setIsSaving(true);
       setStatusAlert(null);
 
-      // Save user profile changes directly to Database
+      // บันทึกลง DB — ห้าม .catch กลืน error ทิ้ง (เดิมทำแบบนั้น ถ้าบันทึกไม่ติดหน้าจอก็ยังขึ้นว่า
+      // "บันทึกเรียบร้อย" และอัปเดตรายการในหน้าเว็บ แต่พอรีเฟรชข้อมูลหายหมด) ให้ error ไหลไปที่ catch ด้านล่าง
       await api.user.updateProfile({
         name: myEntryForm.name.trim(),
+        nickname: myEntryForm.nickname.trim(),
         bio: myEntryForm.quote.trim(),
         avatarUrl: myEntryForm.avatarUrl.trim(),
         generation: myEntryForm.generation,
         isAvailableForMentorship: myEntryForm.isAvailableForMentorship,
         birthDate: myEntryForm.birthDate || undefined,
         yearbookPublished: true,
-      }).catch((err) => {
-        console.error('Error updating profile to Database:', err);
       });
 
       setCurrentUser((prev: any) => ({
@@ -893,16 +894,16 @@ export function YearbookGrid() {
                         type="file"
                         accept="image/*"
                         className="hidden"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onload = (evt) => {
-                              if (evt.target?.result) {
-                                setMyEntryForm({ ...myEntryForm, avatarUrl: evt.target.result as string });
-                              }
-                            };
-                            reader.readAsDataURL(file);
+                          e.target.value = '';
+                          if (!file) return;
+                          try {
+                            // ย่อรูปก่อน — รูปเต็มขนาดเกินเพดาน body ของ server ทำให้บันทึกไม่ติด
+                            const dataUrl = await resizeImageToDataUrl(file);
+                            setMyEntryForm((prev) => ({ ...prev, avatarUrl: dataUrl }));
+                          } catch (err: any) {
+                            setStatusAlert({ type: 'error', message: err?.message || 'ไม่สามารถอ่านไฟล์รูปภาพได้' });
                           }
                         }}
                       />

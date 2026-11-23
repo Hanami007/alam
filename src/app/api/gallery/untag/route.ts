@@ -1,4 +1,5 @@
 import { galleryDbService } from '@/modules/gallery/services/gallery.service';
+import { publicErrorMessage } from '@/lib/api-error';
 import { getCurrentUser } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
   } catch (err: any) {
     console.error('Error removing tag:', err);
     return NextResponse.json(
-      { success: false, error: err.message || 'เกิดข้อผิดพลาดในการลบแท็ก' },
+      { success: false, error: publicErrorMessage(err, 'เกิดข้อผิดพลาดในการลบแท็ก') },
       { status: 500 }
     );
   }

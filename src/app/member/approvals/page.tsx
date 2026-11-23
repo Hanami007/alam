@@ -21,6 +21,7 @@ export default function MemberApprovalsPage() {
   const [loading, setLoading] = useState(true);
   const [batchmates, setBatchmates] = useState<any[]>([]);
   const [userGen, setUserGen] = useState<string>('');
+  const [isAdmin, setIsAdmin] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -32,6 +33,7 @@ export default function MemberApprovalsPage() {
       if (res.ok) {
         setBatchmates(data.pendingBatchmates || []);
         if (data.userGeneration) setUserGen(data.userGeneration);
+        setIsAdmin(Boolean(data.isAdmin));
       } else {
         setToast({ message: data.error || 'ไม่สามารถโหลดข้อมูลได้', type: 'error' });
       }
@@ -47,20 +49,24 @@ export default function MemberApprovalsPage() {
     loadData();
   }, []);
 
-  async function handleApprove(applicantId: number, applicantName: string) {
+  async function handleApprove(applicantId: number, applicantName: string, action: 'approve' | 'reject' = 'approve') {
+    if (action === 'reject' && !window.confirm(`ยืนยันการปฏิเสธผู้สมัคร ${applicantName}?`)) return;
     setActionLoadingId(applicantId);
     try {
       const res = await fetch('/api/member/approvals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ applicantId }),
+        body: JSON.stringify({ applicantId, action }),
       });
 
       const data = await res.json();
       if (res.ok) {
         setBatchmates((prev) => prev.filter((b) => b.id !== applicantId));
         setToast({
-          message: `ยืนยันตัวตนให้ ${applicantName} สำเร็จแล้ว ✨ เพื่อนสามารถเข้าสู่ระบบได้ทันที`,
+          message:
+            action === 'reject'
+              ? `ปฏิเสธผู้สมัคร ${applicantName} แล้ว`
+              : `ยืนยันตัวตนให้ ${applicantName} สำเร็จแล้ว ✨ เพื่อนสามารถเข้าสู่ระบบได้ทันที`,
           type: 'success',
         });
         setTimeout(() => setToast(null), 4000);
@@ -216,7 +222,17 @@ export default function MemberApprovalsPage() {
                     </div>
                   </div>
 
-                  <div className="shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200">
+                  <div className="shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200 flex flex-col sm:flex-row gap-2">
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleApprove(b.id, b.name, 'reject')}
+                        disabled={actionLoadingId === b.id}
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-white px-5 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                      >
+                        <AlertCircle className="h-4 w-4" />
+                        <span>ปฏิเสธ</span>
+                      </button>
+                    )}
                     <button
                       onClick={() => handleApprove(b.id, b.name)}
                       disabled={actionLoadingId === b.id}
@@ -230,7 +246,7 @@ export default function MemberApprovalsPage() {
                       ) : (
                         <>
                           <CheckCircle2 className="h-4 w-4" />
-                          <span>ยืนยันตัวตนเพื่อนร่วมรุ่น</span>
+                          <span>{isAdmin ? 'ยืนยันตัวตน' : 'ยืนยันตัวตนเพื่อนร่วมรุ่น'}</span>
                         </>
                       )}
                     </button>

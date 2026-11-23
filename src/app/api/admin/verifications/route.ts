@@ -1,4 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
+import { publicErrorMessage } from '@/lib/api-error';
 import { adminDbService } from '@/modules/admin/services/admin.service';
 import { NextResponse } from 'next/server';
 
@@ -13,6 +14,6 @@ export async function GET() {
     return NextResponse.json(pending);
   } catch (err: any) {
     console.error('[API /api/admin/verifications] Error:', err);
-    return NextResponse.json({ error: err.message || 'Error loading verifications' }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(err, 'Error loading verifications') }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { feedDbService } from '@/modules/feed/services/feed.service';
+import { publicErrorMessage } from '@/lib/api-error';
 import { getCurrentUser } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
   } catch (err: any) {
     console.error('Error deleting post:', err);
     return NextResponse.json(
-      { success: false, error: err.message || 'เกิดข้อผิดพลาดในการลบโพสต์' },
+      { success: false, error: publicErrorMessage(err, 'เกิดข้อผิดพลาดในการลบโพสต์') },
       { status: 500 }
     );
   }
