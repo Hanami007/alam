@@ -58,7 +58,8 @@ import {
   X,
   UserCheck,
   Edit3,
-  Flag
+  Flag,
+  ChevronDown
 } from 'lucide-react';
 
 interface Comment {
@@ -802,7 +803,7 @@ export function FeedList({
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_380px] max-w-7xl mx-auto font-sans items-start px-2 sm:px-4 relative">
+    <div className="grid gap-8 xl:gap-x-16 xl:grid-cols-[1fr_380px] min-[90rem]:grid-cols-[1fr_420px] max-w-[1600px] mx-auto font-sans items-start px-2 sm:px-4 lg:pl-7 lg:pr-8 relative">
 
       {/* 360 Explosion & Gravity Fall Particle Overlay */}
       {floatingHearts.map((particle) => (
@@ -825,24 +826,26 @@ export function FeedList({
       ))}
 
       {/* ===== LEFT COLUMN: ENLARGED & SPACIOUS CUTE FEED ===== */}
-      <div className="space-y-7 min-w-0">
+      <div className="space-y-4 min-w-0">
 
         {/* ===== POST REQUEST FORM CARD ===== */}
-        <div className="rounded-[24px] sm:rounded-[32px] border border-indigo-200/80 bg-white shadow-card overflow-hidden">
+        {/* พื้นหลังของกรอบ sticky ปิดช่องเหนือการ์ด ไม่ให้โพสต์ที่เลื่อนผ่านโผล่ขึ้นมา; มือถือค้างใต้ header (สูง 57px) */}
+        <div className="sticky top-[57px] lg:top-0 z-20 -mt-2 pt-2 lg:-mt-4 lg:pt-4 bg-background after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-8 after:bg-gradient-to-b after:from-background after:to-transparent">
+        <div className="max-h-[calc(100vh-150px)] lg:max-h-[calc(100vh-32px)] overflow-y-auto rounded-[24px] sm:rounded-[32px] border border-indigo-200/80 bg-white shadow-card">
           <button
             onClick={() => setShowRequestForm((v) => !v)}
-            className="w-full flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 text-left hover:bg-indigo-50/40 transition-colors"
+            className="w-full flex items-center justify-between px-4 sm:px-5 py-2.5 sm:py-3 text-left hover:bg-indigo-50/40 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-400 to-purple-500 shadow-sm">
-                <Send className="h-4 w-4 text-white" />
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-400 to-purple-500 shadow-sm">
+                <Send className="h-5 w-5 text-white" />
               </div>
               <div>
                 <p className="text-sm font-bold text-slate-800">ร้องขอสร้างโพสต์</p>
                 <p className="text-xs text-slate-400">แอดมินจะรีวิวและอนุมัติให้ภายหลัง</p>
               </div>
             </div>
-            <span className={`text-slate-400 transition-transform duration-200 ${showRequestForm ? 'rotate-180' : ''}`}>▾</span>
+            <ChevronDown className={`h-5 w-5 shrink-0 text-slate-400 transition-transform duration-200 ${showRequestForm ? 'rotate-180' : ''}`} />
           </button>
 
           {showRequestForm && (
@@ -1096,6 +1099,7 @@ export function FeedList({
               </div>
             </form>
           )}
+        </div>
         </div>
 
         {/* ===== POST CARDS ===== */}
@@ -1659,7 +1663,7 @@ export function FeedList({
       </div>
 
       {/* ===== RIGHT SIDEBAR: INDEPENDENTLY SCROLLABLE WITH MOUSE ===== */}
-      <aside className="space-y-4 sticky top-[80px] max-h-[calc(100vh-100px)] overflow-y-auto pr-1 hover:pr-0.5 transition-all">
+      <aside className="space-y-4 sticky top-4 max-h-[calc(100vh-32px)] overflow-y-auto pr-1">
         <FortuneWidget
           fortuneText={fortuneMessages[fortuneIndex % fortuneMessages.length]}
           isSpinning={isSpinningFortune}

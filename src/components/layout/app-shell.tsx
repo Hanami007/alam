@@ -842,7 +842,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Main Content Area */}
-      <div className={`flex min-h-screen flex-col transition-[padding] duration-200 ${contentOffset}`}>
+      <div
+        data-sidebar={collapsed ? 'collapsed' : 'expanded'}
+        className={`group/shell flex min-h-screen flex-col transition-[padding] duration-200 ${contentOffset}`}
+      >
         <main className="flex-1 px-3.5 py-4 sm:px-6 lg:px-8 pb-24 lg:pb-8">{children}</main>
       </div>
 

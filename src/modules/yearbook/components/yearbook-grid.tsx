@@ -443,7 +443,7 @@ export function YearbookGrid() {
   ];
 
   return (
-    <div className="space-y-5 max-w-7xl mx-auto px-2 sm:px-4 py-2">
+    <div className="space-y-5 max-w-7xl lg:group-data-[sidebar=collapsed]/shell:max-w-[1600px] mx-auto px-2 sm:px-4 py-2">
       {/* ─── HERO HEADER BANNER — Soft Pastel ─────────────────────────── */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-100 via-pink-50 to-sky-100 border border-pink-200/60 p-6 sm:p-8 shadow-sm">
         {/* Decorative blobs */}

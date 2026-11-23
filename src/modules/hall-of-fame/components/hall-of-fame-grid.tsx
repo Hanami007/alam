@@ -274,7 +274,7 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
      RENDER
   ═══════════════════════════════════════════ */
   return (
-    <div className="space-y-6 sm:space-y-8 max-w-6xl mx-auto px-2 sm:px-4 py-2">
+    <div className="space-y-6 sm:space-y-8 max-w-6xl lg:group-data-[sidebar=collapsed]/shell:max-w-[1600px] mx-auto px-2 sm:px-4 py-2">
 
       {/* แจ้งเตือนตอนโหวตไม่สำเร็จ (เช่น ใช้สิทธิ์โควตาในรุ่น/นอกรุ่นไปแล้ว) */}
       {voteError && (
@@ -408,7 +408,7 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
       {/* ╔══════════════════════════════════════════╗
           ║  2+4. TOP 3 (ซ้าย) วางข้างลิสต์อันดับ 4-10 (ขวา)  ║
           ╚══════════════════════════════════════════╝ */}
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_365px] gap-6 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-6 items-start">
 
       {/* ╔══════════════════════════════════════════╗
           ║  2. TOP 3 - FLOATING CIRCULAR AVATARS    ║
@@ -493,7 +493,7 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
       {/* ╔══════════════════════════════════════════╗
           ║  3. SEARCH & FILTER TOOLBAR              ║
           ╚══════════════════════════════════════════╝ */}
-      <section className="bg-white rounded-3xl border border-slate-200/70 shadow-xs p-4 sm:p-5 md:max-w-[365px] md:ml-auto xl:max-w-none xl:ml-0 xl:w-full xl:shrink-0">
+      <section className="bg-white rounded-3xl border border-slate-200/70 shadow-xs p-4 sm:p-5 md:max-w-[400px] md:ml-auto xl:max-w-none xl:ml-0 xl:w-full xl:shrink-0">
         <div className="flex flex-col gap-3">
           <div>
             <h3 className="text-sm sm:text-base font-extrabold text-slate-800 flex items-center gap-2 flex-wrap">
@@ -597,7 +597,7 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
           ║  4. LEADERBOARD TABLE / LIST (RANK 4+)   ║
           ╚══════════════════════════════════════════╝ */}
       {remainingCandidates.length === 0 && !isSearchLoading ? (
-        <div className="bg-white rounded-3xl border border-slate-100 p-12 text-center shadow-xs md:max-w-[365px] md:ml-auto xl:max-w-none xl:ml-0 xl:w-full">
+        <div className="bg-white rounded-3xl border border-slate-100 p-12 text-center shadow-xs md:max-w-[400px] md:ml-auto xl:max-w-none xl:ml-0 xl:w-full">
           <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-500 mb-3">
             <Trophy className="h-7 w-7" />
           </div>
@@ -628,12 +628,12 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
         </div>
       ) : (
         /* ── TABLE / ROW LIST VIEW (Minimal & Clean) ── */
-        <div className="bg-white rounded-[28px] border border-slate-200/80 shadow-xs overflow-hidden md:max-w-[365px] md:ml-auto xl:max-w-none xl:ml-0 xl:w-full xl:flex-1 xl:min-h-0 xl:flex xl:flex-col">
+        <div className="bg-white rounded-[28px] border border-slate-200/80 shadow-xs overflow-hidden md:max-w-[400px] md:ml-auto xl:max-w-none xl:ml-0 xl:w-full xl:flex-1 xl:min-h-0 xl:flex xl:flex-col">
           {/* Desktop Table Header */}
           <div className="hidden md:flex items-center gap-2 px-3.5 py-2.5 bg-slate-50/90 border-b border-slate-200/70 text-xs font-extrabold text-slate-500 uppercase tracking-wider xl:shrink-0">
             <div className="w-8 shrink-0 text-center whitespace-nowrap">อันดับ</div>
-            <div className="w-[185px] shrink-0 min-w-0">ศิษย์เก่า</div>
-            <div className="w-[80px] shrink-0 text-right pr-1 whitespace-nowrap">คะแนนโหวต</div>
+            <div className="flex-1 min-w-0">ศิษย์เก่า</div>
+            <div className="shrink-0 text-right pr-1 whitespace-nowrap">คะแนนโหวต</div>
           </div>
 
           {/* List Rows — เลื่อนดูภายในการ์ดได้เอง เมื่อการ์ดถูกจำกัดความสูงเท่า Top 3 (จอกว้าง) */}
@@ -687,7 +687,7 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
                   </div>
 
                   {/* Alumni Info with Circular Avatar */}
-                  <div className="flex items-center gap-2.5 min-w-0 md:w-[185px] md:shrink-0">
+                  <div className="flex items-center gap-2.5 min-w-0 md:flex-1">
                     <div className="relative shrink-0">
                       <img
                         src={c.avatar_url}
@@ -702,18 +702,14 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
                     </div>
 
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-extrabold text-slate-800 text-sm leading-snug group-hover:text-violet-700 transition-colors truncate">
-                          {c.name}
-                        </h4>
-                        <span className="shrink-0 text-[10px] font-bold bg-violet-50 text-violet-700 px-2 py-0.5 rounded-md border border-violet-200/70">
-                          {c.generation_label}
-                        </span>
-                      </div>
+                      <h4 className="font-extrabold text-slate-800 text-sm leading-snug group-hover:text-violet-700 transition-colors truncate">
+                        {c.name}
+                      </h4>
 
-                      {c.studentId && (
-                        <p className="text-[11px] font-mono text-slate-400 mt-0.5">
-                          รหัส: {c.studentId}
+                      {(c.generation_label || c.studentId) && (
+                        <p className="flex gap-1.5 text-[11px] font-mono text-slate-400 mt-0.5 truncate">
+                          {c.generation_label && <span>{c.generation_label}</span>}
+                          {c.studentId && <span>รหัส: {c.studentId}</span>}
                         </p>
                       )}
                     </div>
@@ -1054,7 +1050,7 @@ function FloatingTopCard({
       >
         {/* Name */}
         <h3
-          className={`font-black text-slate-800 leading-tight truncate group-hover:text-violet-700 transition-colors ${
+          className={`font-black text-slate-800 leading-tight line-clamp-2 break-words group-hover:text-violet-700 transition-colors ${
             isChampion ? 'text-base sm:text-xl' : 'text-sm sm:text-lg'
           }`}
           title={candidate.name}
