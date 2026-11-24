@@ -1,6 +1,7 @@
 import { pool } from '@/lib/db';
 import { checkLength } from '@/lib/field-limits';
 import { DEFAULT_COMMENT_EMOJI } from '@/lib/reactions';
+import { MAX_POST_IMAGES, deletePostImageFile, savePostImageFromDataUrl } from '@/lib/upload-storage';
 
 export interface FeedComment {
   id: number;
@@ -50,7 +51,8 @@ export interface FeedPostItem {
   pinned: boolean;
   createdAt: string;
   created_at: string;
-  imageUrl?: string;
+  /** รูปในโพสต์ (post_images) เรียงตาม sort_order สูงสุด 4 รูป */
+  images: string[];
   likes: number;
   likeCount: number;
   comments: number;
@@ -132,6 +134,20 @@ export class FeedDbService {
         } catch (err) {
           console.error('[FeedDbService] comment reactions error:', err);
         }
+      }
+
+      // รูปในโพสต์ — แยก try ไว้ ถ้ายังไม่ได้รัน migration post_images ฟีดต้องยังโหลดได้
+      const imagesByPost = new Map<number, string[]>();
+      try {
+        const { rows: images } = await pool.query(
+          `SELECT post_id, image_url FROM post_images WHERE post_id = ANY($1::int[]) ORDER BY post_id, sort_order`,
+          [postIds]
+        );
+        for (const img of images) {
+          imagesByPost.set(img.post_id, [...(imagesByPost.get(img.post_id) ?? []), img.image_url]);
+        }
+      } catch (err) {
+        console.error('[FeedDbService] post images error:', err);
       }
 
       const { rows: polls } = await pool.query(
@@ -229,7 +245,7 @@ export class FeedDbService {
           pinned: p.pinned,
           createdAt: p.created_at,
           created_at: p.created_at,
-          imageUrl: p.image_url,
+          images: imagesByPost.get(p.id) ?? [],
           likes: p.like_count || 0,
           likeCount: p.like_count || 0,
           comments: p.comment_count || postComments.length || 0,
@@ -488,8 +504,12 @@ export class FeedDbService {
     content: string,
     category: string,
     postType: 'normal' | 'poll' = 'normal',
-    pollData?: { question: string; options: string[]; pointsPerVote?: number }
+    pollData?: { question: string; options: string[]; pointsPerVote?: number },
+    imageDataUrls: string[] = []
   ) {
+    if (imageDataUrls.length > MAX_POST_IMAGES) {
+      throw new Error(`แนบรูปได้ไม่เกิน ${MAX_POST_IMAGES} รูปต่อโพสต์`);
+    }
     await this.assertNotRateLimited(requestedBy);
 
     // จำกัดความยาวฝั่ง server ให้ตรงกับ maxLength ของฟอร์มจริง (feed-list.tsx: title/question
@@ -517,31 +537,60 @@ export class FeedDbService {
       throw new Error('ไม่พบบัญชีผู้ใช้ กรุณาเข้าสู่ระบบใหม่อีกครั้ง');
     }
 
-    const { rows } = await pool.query(
-      `insert into posts (requested_by, category, title, content, post_type, status, published_at)
-       values ($1, $2, $3, $4, $5, 'published', now())
-       returning *`,
-      [requestedBy, category, title, content, postType]
-    );
-    const newPost = rows[0];
-
-    if (postType === 'poll' && pollData && pollData.question) {
-      const pointsPerVote = pollData.pointsPerVote || 5;
-      const { rows: pollRows } = await pool.query(
-        `insert into polls (post_id, question, points_per_vote, status)
-         values ($1, $2, $3, 'active')
-         returning *`,
-        [newPost.id, pollData.question, pointsPerVote]
-      );
-      const newPoll = pollRows[0];
-
-      const validOptions = (pollData.options || []).filter((opt) => opt && opt.trim().length > 0);
-      for (const opt of validOptions) {
-        await pool.query(`insert into poll_options (poll_id, option_text) values ($1, $2)`, [newPoll.id, opt.trim()]);
-      }
+    // เขียนไฟล์รูปก่อน (sharp ตรวจว่าเป็นรูปจริง) — ถ้ารูปไหนเสีย จะไม่มีโพสต์ครึ่งๆ กลางๆ ค้างใน DB
+    const imageUrls: string[] = [];
+    try {
+      for (const dataUrl of imageDataUrls) imageUrls.push(await savePostImageFromDataUrl(dataUrl));
+    } catch (err) {
+      await Promise.all(imageUrls.map((url) => deletePostImageFile(url)));
+      throw err;
     }
 
-    return newPost;
+    // โพสต์ + โพล + รูป อยู่ใน transaction เดียว พังขั้นไหนย้อนกลับทั้งหมด
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { rows } = await client.query(
+        `insert into posts (requested_by, category, title, content, post_type, status, published_at)
+         values ($1, $2, $3, $4, $5, 'published', now())
+         returning *`,
+        [requestedBy, category, title, content, postType]
+      );
+      const newPost = rows[0];
+
+      if (postType === 'poll' && pollData && pollData.question) {
+        const pointsPerVote = pollData.pointsPerVote || 5;
+        const { rows: pollRows } = await client.query(
+          `insert into polls (post_id, question, points_per_vote, status)
+           values ($1, $2, $3, 'active')
+           returning *`,
+          [newPost.id, pollData.question, pointsPerVote]
+        );
+        const newPoll = pollRows[0];
+
+        const validOptions = (pollData.options || []).filter((opt) => opt && opt.trim().length > 0);
+        for (const opt of validOptions) {
+          await client.query(`insert into poll_options (poll_id, option_text) values ($1, $2)`, [newPoll.id, opt.trim()]);
+        }
+      }
+
+      for (const [i, url] of imageUrls.entries()) {
+        await client.query(`insert into post_images (post_id, image_url, sort_order) values ($1, $2, $3)`, [
+          newPost.id,
+          url,
+          i + 1,
+        ]);
+      }
+
+      await client.query('COMMIT');
+      return { ...newPost, images: imageUrls };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      await Promise.all(imageUrls.map((url) => deletePostImageFile(url)));
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   /** สร้างโพสต์โดยตรง (admin only) */
@@ -615,9 +664,11 @@ export class FeedDbService {
     await pool.query(`delete from poll_votes where poll_id in (select id from polls where post_id = $1)`, [postId]);
     await pool.query(`delete from poll_options where poll_id in (select id from polls where post_id = $1)`, [postId]);
     await pool.query(`delete from polls where post_id = $1`, [postId]);
-    await pool.query(`delete from media_assets where owner_type = 'post' and owner_id = $1`, [postId]);
+    // แถว post_images ลบตาม cascade — เก็บ path ไว้ลบไฟล์บนดิสก์หลังลบโพสต์สำเร็จ
+    const { rows: imageRows } = await pool.query(`select image_url from post_images where post_id = $1`, [postId]);
 
     const { rows } = await pool.query(`delete from posts where id = $1 returning id, title`, [postId]);
+    if (rows.length > 0) await Promise.all(imageRows.map((r) => deletePostImageFile(r.image_url)));
 
     if (rows.length > 0) {
       try {

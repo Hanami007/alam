@@ -19,6 +19,11 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const { title, content, category, postType, poll } = body;
+    // รูปในโพสต์: data URL (หน้าเว็บย่อรูปก่อนส่ง) — ตรวจชนิด/ขนาด/จำนวนจริงใน feed.service
+    const images: unknown = body.images ?? [];
+    if (!Array.isArray(images) || images.some((img) => typeof img !== 'string')) {
+      return NextResponse.json({ success: false, error: 'รูปแบบรูปภาพไม่ถูกต้อง' }, { status: 400 });
+    }
 
     if (!title || !title.trim()) {
       return NextResponse.json(
@@ -84,7 +89,8 @@ export async function POST(req: Request) {
       content ? content.trim() : (pollData?.question || ''),
       category ? category.trim() : (type === 'poll' ? 'โพลสำรวจความเห็น' : 'ทั่วไป'),
       type,
-      pollData
+      pollData,
+      images as string[]
     );
 
     return NextResponse.json({
@@ -94,9 +100,11 @@ export async function POST(req: Request) {
     });
   } catch (err: any) {
     console.error('Error creating post request:', err);
+    const message = publicErrorMessage(err, '');
+    // ข้อความที่ตั้งใจให้ผู้ใช้อ่าน (เช่น รูปใหญ่เกิน, เกินโควตาโพสต์) = ข้อมูลไม่ผ่าน → 400 ไม่ใช่ 500
     return NextResponse.json(
-      { success: false, error: publicErrorMessage(err, 'เกิดข้อผิดพลาดในการส่งคำขอ') },
-      { status: 500 }
+      { success: false, error: message || 'เกิดข้อผิดพลาดในการส่งคำขอ' },
+      { status: message ? 400 : 500 }
     );
   }
 }
