@@ -89,7 +89,7 @@ function ResultCard({ entry, isTop3 }: { entry: HofResultEntry; isTop3: boolean 
           </p>
         )}
         {entry.achievement && (
-          <p className="mt-1 text-xs text-slate-400 italic line-clamp-2">"{entry.achievement}"</p>
+          <p className="mt-1 text-xs text-slate-400 italic line-clamp-2">&ldquo;{entry.achievement}&rdquo;</p>
         )}
       </div>
       <div className="shrink-0 text-right">

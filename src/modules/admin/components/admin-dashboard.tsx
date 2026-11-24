@@ -22,6 +22,7 @@ import {
   AlertTriangle,
   ArrowRight,
   History,
+  BarChart3,
 } from 'lucide-react';
 import { PostRequestQueue } from './post-request-queue';
 import { AdminAnnouncementForm } from './admin-announcement-form';
@@ -31,6 +32,7 @@ import { WallWidgetManager } from './wall-widget-manager';
 import { HofCampaignManager } from './hof-campaign-manager';
 import { AuditLog } from './audit-log';
 import { ContentReportQueue } from './content-report-queue';
+import { AdminStats } from './admin-stats';
 import { api } from '@/lib/api-client';
 
 interface AdminDashboardProps {
@@ -38,7 +40,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'posts' | 'announcement' | 'users' | 'reports' | 'members' | 'widgets' | 'keywords' | 'hof' | 'audit'>('posts');
+  const [activeTab, setActiveTab] = useState<'stats' | 'posts' | 'announcement' | 'users' | 'reports' | 'members' | 'widgets' | 'keywords' | 'hof' | 'audit'>('stats');
   const [pendingReportCount, setPendingReportCount] = useState(0);
   const handleReportCount = useCallback((count: number) => setPendingReportCount(count), []);
 
@@ -154,6 +156,22 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
   async function handleDeleteMember(userId: number) {
     await api.admin.deleteUser(userId);
     setMembers((prev) => prev.filter((m) => m.id !== userId));
+  }
+
+  // หัวหน้ารุ่น: รุ่นละ 1 คน — แต่งตั้งคนใหม่ = คนเดิมของรุ่นนั้นหลุดตำแหน่ง
+  async function handleToggleGenerationLeader(userId: number, makeLeader: boolean) {
+    if (makeLeader) {
+      await api.admin.appointGenerationLeader(userId);
+      setMembers((prev) => {
+        const generation = prev.find((m) => m.id === userId)?.generation;
+        return prev.map((m) =>
+          m.id === userId ? { ...m, isGenerationLeader: true } : m.generation === generation ? { ...m, isGenerationLeader: false } : m
+        );
+      });
+    } else {
+      await api.admin.removeGenerationLeader(userId);
+      setMembers((prev) => prev.map((m) => (m.id === userId ? { ...m, isGenerationLeader: false } : m)));
+    }
   }
 
   async function handleChangeStudentStatus(userId: number, studentStatus: 'studying' | 'alumni') {
@@ -373,6 +391,7 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
           <p className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider mb-2 px-1">เครื่องมือจัดการ</p>
           <div className="flex flex-wrap items-center gap-2">
             {[
+              { id: 'stats' as const, label: 'สถิติระบบ', icon: BarChart3 },
               { id: 'posts' as const, label: `จัดการโพสต์บนวอลล์ (${postRequests.length})`, icon: Layers },
               { id: 'announcement' as const, label: 'สร้างประกาศทางการ', icon: Megaphone },
               { id: 'members' as const, label: `รายชื่อสมาชิกทั้งหมด (${members.length})`, icon: Users },
@@ -399,6 +418,8 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
       </div>
 
       {/* TAB CONTENT */}
+      {activeTab === 'stats' && <AdminStats onNavigate={setActiveTab} />}
+
       {activeTab === 'posts' && (
         <PostRequestQueue requests={postRequests} adminId={adminId} onRefresh={() => loadAdminData()} />
       )}
@@ -416,7 +437,7 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
       )}
 
       {activeTab === 'members' && (
-        <MemberList members={members} onDelete={handleDeleteMember} onChangeStudentStatus={handleChangeStudentStatus} />
+        <MemberList members={members} onDelete={handleDeleteMember} onChangeStudentStatus={handleChangeStudentStatus} onToggleGenerationLeader={handleToggleGenerationLeader} />
       )}
 
       {activeTab === 'hof' && (

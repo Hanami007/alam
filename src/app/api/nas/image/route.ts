@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { synologyApi } from '@/services/nas/synology-api.service';
+import { checkNasImageAccess } from '@/modules/gallery/services/nas-access.service';
 
 /**
  * สร้างภาพ SVG ชุดครุยแม่โจ้ (พื้นหลังสีฟ้า แถบเขียว-ส้ม) เสมือนจริง
@@ -93,6 +94,9 @@ export async function GET(req: Request) {
     const explicitPath = searchParams.get('path');
     if (explicitPath) {
       const decodedPath = decodeURIComponent(explicitPath);
+      // ตรวจสิทธิ์ก่อนดาวน์โหลดจาก NAS (ดู nas-access.service)
+      const deniedByPath = await checkNasImageAccess({ path: decodedPath });
+      if (deniedByPath) return deniedByPath;
       const result = await synologyApi.downloadFile(decodedPath);
       if (result) {
         return new NextResponse(result.buffer, {
@@ -131,6 +135,8 @@ export async function GET(req: Request) {
     const cleanCode = codeInput.replace(/[^0-9]/g, '');
     const code3 = cleanCode.length >= 3 ? cleanCode.slice(-3) : cleanCode.padStart(3, '0');
     const fullStudentId = cleanCode.length === 10 ? cleanCode : `${yearPrefix}04101${code3}`;
+    const deniedByStudent = await checkNasImageAccess({ generationNumber: genNumber, studentId: fullStudentId });
+    if (deniedByStudent) return deniedByStudent;
 
     const candidatePaths: string[] = [];
     const extensions = ['jpg', 'JPG', 'jpeg', 'JPEG', 'png', 'PNG'];

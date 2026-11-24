@@ -25,6 +25,7 @@ import {
   type GlobeAlumni,
 } from '@/lib/globe-data';
 import { getProvinceCoords } from '@/lib/thailand-province-coords';
+import { ModalPortal } from '@/components/ui/modal-portal';
 
 // ─── Dynamic import (ssr: false) สำหรับ react-globe.gl ───────────────────────
 const ReactGlobe = dynamic(() => import('react-globe.gl').then((m) => m.default ?? m), {
@@ -805,124 +806,126 @@ function AlumniProfileModal({
   onClose: () => void;
 }) {
   return (
-    <div
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md animate-fade-in"
-    >
+    <ModalPortal>
       <div
-        onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-md bg-white p-6 sm:p-7 shadow-2xl rounded-[32px] border border-slate-100 space-y-4 animate-scale-up max-h-[90vh] overflow-y-auto"
+        onClick={onClose}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md animate-fade-in"
       >
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors cursor-pointer z-10"
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="relative w-full max-w-md bg-white p-6 sm:p-7 shadow-2xl rounded-[32px] border border-slate-100 space-y-4 animate-scale-up max-h-[90vh] overflow-y-auto"
         >
-          <X className="h-4 w-4" />
-        </button>
+          <button
+            onClick={onClose}
+            className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors cursor-pointer z-10"
+          >
+            <X className="h-4 w-4" />
+          </button>
 
-        {/* Profile Header */}
-        <div className="text-center space-y-3">
-          <div className="relative inline-block">
-            {alumni.avatar_url ? (
-              <img
-                src={alumni.avatar_url}
-                alt={alumni.name}
-                className="h-28 w-28 rounded-3xl object-cover mx-auto ring-4 ring-indigo-100 shadow-md"
-              />
-            ) : (
-              <div className="h-28 w-28 rounded-3xl bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-black text-4xl flex items-center justify-center mx-auto ring-4 ring-indigo-100 shadow-md">
-                {alumni.name.charAt(0)}
+          {/* Profile Header */}
+          <div className="text-center space-y-3">
+            <div className="relative inline-block">
+              {alumni.avatar_url ? (
+                <img
+                  src={alumni.avatar_url}
+                  alt={alumni.name}
+                  className="h-28 w-28 rounded-3xl object-cover mx-auto ring-4 ring-indigo-100 shadow-md"
+                />
+              ) : (
+                <div className="h-28 w-28 rounded-3xl bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-black text-4xl flex items-center justify-center mx-auto ring-4 ring-indigo-100 shadow-md">
+                  {alumni.name.charAt(0)}
+                </div>
+              )}
+              <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-emerald-500 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full shadow-sm flex items-center gap-1 border-2 border-white">
+                <GraduationCap className="h-3 w-3" /> ศิษย์เก่า CSMJU
+              </span>
+            </div>
+
+            <div className="pt-1">
+              <div className="flex flex-wrap items-center justify-center gap-1.5 mb-1">
+                {alumni.generation && (
+                  <span className="inline-block bg-indigo-50 text-indigo-700 px-3 py-0.5 text-xs font-black rounded-full border border-indigo-100">
+                    {alumni.generation}
+                  </span>
+                )}
+                <span className="inline-block bg-slate-100 text-slate-600 px-2.5 py-0.5 text-xs font-bold rounded-full">
+                  {alumni.student_status === 'student' ? 'ศิษย์ปัจจุบัน' : 'ศิษย์เก่า'}
+                </span>
+                <span className="inline-block bg-slate-100 text-slate-600 px-2.5 py-0.5 text-xs font-bold rounded-full">
+                  {alumni.country_name}
+                </span>
               </div>
-            )}
-            <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-emerald-500 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full shadow-sm flex items-center gap-1 border-2 border-white">
-              <GraduationCap className="h-3 w-3" /> ศิษย์เก่า CSMJU
-            </span>
+              <h2 className="text-xl font-extrabold text-slate-900">{alumni.name}</h2>
+              <p className="text-xs text-indigo-600 font-bold mt-0.5 flex items-center justify-center gap-1">
+                <MapPin className="h-3.5 w-3.5" />
+                <span>{alumni.city} • {alumni.country_name}</span>
+              </p>
+            </div>
           </div>
 
-          <div className="pt-1">
-            <div className="flex flex-wrap items-center justify-center gap-1.5 mb-1">
-              {alumni.generation && (
-                <span className="inline-block bg-indigo-50 text-indigo-700 px-3 py-0.5 text-xs font-black rounded-full border border-indigo-100">
-                  {alumni.generation}
+          {/* Job & Location Details */}
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 space-y-3 text-left">
+            {alumni.position && (
+              <div className="flex items-start gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 mt-0.5">
+                  <Briefcase className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">ตำแหน่งงาน</p>
+                  <p className="text-sm font-extrabold text-slate-800 break-words">{alumni.position}</p>
+                </div>
+              </div>
+            )}
+
+            {alumni.company && (
+              <div className="flex items-start gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-teal-100 text-teal-600 mt-0.5">
+                  <Building2 className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">บริษัท / หน่วยงาน</p>
+                  <p className="text-sm font-extrabold text-slate-800 break-words">{alumni.company}</p>
+                </div>
+              </div>
+            )}
+
+            {alumni.career_type && (
+              <div className="flex items-start gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-600 mt-0.5">
+                  <Sparkles className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">กลุ่มสายอาชีพ</p>
+                  <p className="text-sm font-extrabold text-slate-800 break-words">{alumni.career_type}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {(alumni.facebook_url || alumni.line_id) && (
+            <div className="flex items-center justify-center gap-2.5">
+              {alumni.facebook_url && (
+                <span className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100">
+                  <Link2 className="h-3.5 w-3.5" /> Facebook: {alumni.facebook_url}
                 </span>
               )}
-              <span className="inline-block bg-slate-100 text-slate-600 px-2.5 py-0.5 text-xs font-bold rounded-full">
-                {alumni.student_status === 'student' ? 'ศิษย์ปัจจุบัน' : 'ศิษย์เก่า'}
-              </span>
-              <span className="inline-block bg-slate-100 text-slate-600 px-2.5 py-0.5 text-xs font-bold rounded-full">
-                {alumni.country_name}
-              </span>
+              {alumni.line_id && (
+                <span className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
+                  <MessageCircle className="h-3.5 w-3.5" /> LINE: {alumni.line_id}
+                </span>
+              )}
             </div>
-            <h2 className="text-xl font-extrabold text-slate-900">{alumni.name}</h2>
-            <p className="text-xs text-indigo-600 font-bold mt-0.5 flex items-center justify-center gap-1">
-              <MapPin className="h-3.5 w-3.5" />
-              <span>{alumni.city} • {alumni.country_name}</span>
-            </p>
-          </div>
+          )}
+
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-sm shadow-md shadow-indigo-200 transition-all cursor-pointer"
+          >
+            ปิดหน้าต่าง
+          </button>
         </div>
-
-        {/* Job & Location Details */}
-        <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 space-y-3 text-left">
-          {alumni.position && (
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 mt-0.5">
-                <Briefcase className="h-4 w-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">ตำแหน่งงาน</p>
-                <p className="text-sm font-extrabold text-slate-800 break-words">{alumni.position}</p>
-              </div>
-            </div>
-          )}
-
-          {alumni.company && (
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-teal-100 text-teal-600 mt-0.5">
-                <Building2 className="h-4 w-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">บริษัท / หน่วยงาน</p>
-                <p className="text-sm font-extrabold text-slate-800 break-words">{alumni.company}</p>
-              </div>
-            </div>
-          )}
-
-          {alumni.career_type && (
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-600 mt-0.5">
-                <Sparkles className="h-4 w-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">กลุ่มสายอาชีพ</p>
-                <p className="text-sm font-extrabold text-slate-800 break-words">{alumni.career_type}</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {(alumni.facebook_url || alumni.line_id) && (
-          <div className="flex items-center justify-center gap-2.5">
-            {alumni.facebook_url && (
-              <span className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100">
-                <Link2 className="h-3.5 w-3.5" /> Facebook: {alumni.facebook_url}
-              </span>
-            )}
-            {alumni.line_id && (
-              <span className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
-                <MessageCircle className="h-3.5 w-3.5" /> LINE: {alumni.line_id}
-              </span>
-            )}
-          </div>
-        )}
-
-        <button
-          onClick={onClose}
-          className="w-full py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-sm shadow-md shadow-indigo-200 transition-all cursor-pointer"
-        >
-          ปิดหน้าต่าง
-        </button>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
@@ -1103,7 +1106,7 @@ export function GlobePanel({
     }));
 
     for (const p of intlPoints) {
-      let cluster = intlClusters.find(
+      const cluster = intlClusters.find(
         (c) =>
           (p.country_code && c.country_code === p.country_code) ||
           (p.province_name && (p.province_name.includes(c.country_name) || c.country_name.includes(p.province_name)))
@@ -1569,7 +1572,7 @@ export function GlobePanel({
       </div>
 
       {/* ─── Globe + Side Panel ──────────────────────────────────────────────── */}
-      <div className="grid gap-6 lg:grid-cols-[1fr_390px] items-start">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,30%)] items-start">
 
         {/* Globe Canvas Container */}
         <div

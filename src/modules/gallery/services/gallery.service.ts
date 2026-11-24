@@ -1,4 +1,5 @@
 import { pool } from '@/lib/db';
+import { leaderService } from '@/modules/member/services/leader.service';
 
 export interface PhotoTagDbRecord {
   id: number;
@@ -164,8 +165,13 @@ export class GalleryDbService {
 
   /**
    * ปลดล็อกทำเนียบรุ่นเมื่อตอบคำถามประจำรุ่นถูกต้อง (+10 แต้ม)
+   * คำถาม/คำตอบตั้งโดยหัวหน้ารุ่น (generation_unlock_questions) — รุ่นที่ยังไม่มีคำถามปลดล็อกได้เลย
    */
-  async unlockGeneration(userId: number, generation: string, answer: string) {
+  async unlockGeneration(
+    userId: number,
+    generation: string,
+    answer: string
+  ): Promise<{ success: boolean; pointsEarned: number; alreadyUnlocked: boolean; error?: string }> {
     try {
       const { rows: existing } = await pool.query(
         `SELECT id FROM point_transactions WHERE user_id = $1 AND reason = 'unlock_generation' AND reference_id = $2`,
@@ -173,6 +179,10 @@ export class GalleryDbService {
       );
       if (existing.length > 0) {
         return { success: true, pointsEarned: 0, alreadyUnlocked: true };
+      }
+
+      if (!(await leaderService.checkUnlockAnswer(generation, answer))) {
+        return { success: false, pointsEarned: 0, alreadyUnlocked: false, error: 'คำตอบไม่ถูกต้อง ลองใหม่อีกครั้ง' };
       }
 
       const points = 10;
@@ -186,8 +196,9 @@ export class GalleryDbService {
 
       return { success: true, pointsEarned: points, alreadyUnlocked: false };
     } catch (err) {
+      // เดิมตอบ success: true แม้บันทึกไม่สำเร็จ (ผู้ใช้เห็นว่าปลดล็อกแล้วแต่ไม่ได้แต้มจริง)
       console.error('[GalleryDbService] unlockGeneration error:', err);
-      return { success: true, pointsEarned: 10, alreadyUnlocked: false };
+      return { success: false, pointsEarned: 0, alreadyUnlocked: false, error: 'ปลดล็อกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' };
     }
   }
 

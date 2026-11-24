@@ -1,4 +1,5 @@
 import { pool } from '@/lib/db';
+import { leaderService } from '@/modules/member/services/leader.service';
 
 export interface AdminOverviewStats {
   totalAlumni: number;
@@ -24,6 +25,8 @@ export interface AdminMemberSummary {
   studentId: string | null;
   name: string;
   email: string;
+  /** เบอร์โทร — ส่งให้หน้าแอดมินเท่านั้น */
+  phone: string | null;
   role: string;
   status: string;
   studentStatus: string | null;
@@ -35,6 +38,8 @@ export interface AdminMemberSummary {
   avatarUrl: string | null;
   totalPoints: number;
   createdAt: string;
+  /** เป็นหัวหน้ารุ่นของรุ่นตัวเองอยู่ (generation_leaders) */
+  isGenerationLeader: boolean;
 }
 
 export interface PendingPostRequest {
@@ -145,7 +150,7 @@ export class AdminDbService {
     try {
       const { rows } = await pool.query(`
         SELECT
-          u.id, u.student_id, u.name, u.email, u.role, u.status, u.student_status,
+          u.id, u.student_id, u.name, u.email, u.phone, u.role, u.status, u.student_status,
           u.company, u.position, u.avatar_url, u.total_points, u.created_at,
           gen.label as generation, prov.label as province, ct.label as career_type
         FROM users u
@@ -154,12 +159,15 @@ export class AdminDbService {
         LEFT JOIN lookup_options ct ON ct.id = u.career_option_id
         ORDER BY u.created_at DESC
       `);
+      const leaderIds = new Set((await leaderService.listLeaders()).map((l) => l.userId));
 
       return rows.map((r) => ({
         id: r.id,
         studentId: r.student_id,
+        isGenerationLeader: leaderIds.has(r.id),
         name: r.name,
         email: r.email,
+        phone: r.phone,
         role: r.role,
         status: r.status,
         studentStatus: r.student_status,

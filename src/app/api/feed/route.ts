@@ -1,12 +1,13 @@
 import { getCurrentUser } from '@/lib/auth';
 import { publicErrorMessage } from '@/lib/api-error';
 import { feedDbService } from '@/modules/feed/services/feed.service';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    const posts = await feedDbService.getPosts(user?.id);
+    const category = request.nextUrl.searchParams.get('category') || undefined;
+    const posts = await feedDbService.getPosts(user?.id, category);
     return NextResponse.json(posts);
   } catch (err: any) {
     console.error('[API /api/feed] Error:', err);

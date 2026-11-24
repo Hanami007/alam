@@ -41,7 +41,7 @@ export default function MapPage() {
               <div key={i} className="h-10 w-32 rounded-full bg-slate-200/70" />
             ))}
           </div>
-          <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,30%)]">
             <div className="h-[620px] rounded-[32px] bg-slate-200/70" />
             <div className="h-[620px] rounded-[32px] bg-slate-200/70" />
           </div>

@@ -43,8 +43,11 @@ import {
   HeartHandshake,
   Link2,
   MessageCircle,
+  Phone,
+  ChevronDown,
   Image as ImageIcon,
 } from 'lucide-react';
+import { ModalPortal } from '@/components/ui/modal-portal';
 
 const PRESET_AVATARS = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
@@ -88,6 +91,7 @@ export default function RegisterPage() {
   const [bio, setBio] = useState('');
   const [facebookUrl, setFacebookUrl] = useState('');
   const [lineId, setLineId] = useState('');
+  const [phone, setPhone] = useState('');
 
   // Profile & Mentorship (ข้อมูลจำเป็นสำหรับแสดงในหน้าเว็บ)
   const [avatarUrl, setAvatarUrl] = useState<string>(
@@ -350,6 +354,7 @@ export default function RegisterPage() {
           birthDate: birthDate || undefined,
           facebookUrl: facebookUrl.trim() || undefined,
           lineId: lineId.trim() || undefined,
+          phone: phone.trim() || undefined,
           ...fieldVisibility,
           // Consents (4 ตัวเลือกเดิมรวมเป็น 1 ตัวเลือก ส่งครบถ้วนเข้าสู่ระบบ)
           consentPdpa,
@@ -857,22 +862,45 @@ export default function RegisterPage() {
                       />
                     </div>
                   </div>
+
+                  {/* เบอร์โทร — ไม่มี toggle เปิดเผย แอดมินเห็นเท่านั้น (ดู src/lib/phone.ts) */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-300 flex flex-wrap items-center gap-1.5">
+                      <Phone className="h-3.5 w-3.5 text-indigo-400" /> เบอร์โทรศัพท์ (ไม่บังคับ)
+                      <span className="font-normal text-slate-400">(เห็นเฉพาะแอดมินเท่านั้น ไม่เปิดเผยต่อสมาชิกคนอื่น)</span>
+                    </label>
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      maxLength={FIELD_LIMITS.phone}
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="เช่น 081-234-5678"
+                      className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-indigo-500 focus:bg-slate-950 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all"
+                    />
+                  </div>
                 </div>
 
-                {/* 3. Alumni Specific Details (แสดงเมื่อเป็นศิษย์เก่า) */}
-                {studentStatus === 'alumni' && (
+                {/* 3. ที่ทำงาน — ศิษย์เก่าต้องกรอก, ศิษย์ปัจจุบันกรอกได้ถ้ามี (ฝึกงาน/พาร์ทไทม์) ไม่บังคับ */}
                   <div className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-slate-950/70 to-orange-500/10 p-5 sm:p-6 space-y-4 shadow-xl animate-slide-up">
                     <div className="flex items-start justify-between border-b border-amber-500/20 pb-3">
                       <div>
                         <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 px-3 py-1 text-xs font-bold mb-1">
                           <Briefcase className="h-3.5 w-3.5 text-amber-400" />
-                          <span>ข้อมูลเฉพาะสำหรับศิษย์เก่า (Alumni Profile)</span>
+                          <span>
+                            {studentStatus === 'alumni' ? 'ข้อมูลเฉพาะสำหรับศิษย์เก่า (Alumni Profile)' : 'ที่ทำงาน (ไม่บังคับ)'}
+                          </span>
                         </div>
                         <h4 className="text-sm font-bold text-white">
-                          ประวัติการทำงานและสายอาชีพปัจจุบัน
+                          {studentStatus === 'alumni'
+                            ? 'ประวัติการทำงานและสายอาชีพปัจจุบัน'
+                            : 'กำลังฝึกงาน ทำงานพาร์ทไทม์ หรือทำงานควบคู่กับการเรียนอยู่ไหม?'}
                         </h4>
                         <p className="text-[11px] text-slate-400 mt-0.5">
-                          ข้อมูลนี้จะถูกนำไปแสดงในทำเนียบรุ่น (Yearbook), แผนที่สถานที่ทำงาน (Workplace Map) และหน้าโปรไฟล์
+                          {studentStatus === 'alumni'
+                            ? 'ข้อมูลนี้จะถูกนำไปแสดงในทำเนียบรุ่น (Yearbook), แผนที่สถานที่ทำงาน (Workplace Map) และหน้าโปรไฟล์'
+                            : 'ถ้ามี กรอกได้เลย ไม่มีก็ข้ามไปได้ — ถ้าไม่กรอก จะไม่แสดงบนแผนที่สถานที่ทำงาน'}
                         </p>
                       </div>
                     </div>
@@ -880,7 +908,7 @@ export default function RegisterPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                          <Building2 className="h-3.5 w-3.5 text-amber-400" /> บริษัท / องค์กรที่ทำงาน <span className="text-rose-400">*</span>
+                          <Building2 className="h-3.5 w-3.5 text-amber-400" /> บริษัท / องค์กรที่ทำงาน {studentStatus === 'alumni' && <span className="text-rose-400">*</span>}
                         </label>
                         <input
                           type="text"
@@ -888,14 +916,14 @@ export default function RegisterPage() {
                           maxLength={FIELD_LIMITS.company}
                           value={company}
                           onChange={(e) => setCompany(e.target.value)}
-                          placeholder="เช่น Agoda, SCB TechX, ม.แม่โจ้..."
+                          placeholder={studentStatus === 'alumni' ? 'เช่น Agoda, SCB TechX, ม.แม่โจ้...' : 'เช่น บริษัทที่ฝึกงาน, ร้านที่ทำพาร์ทไทม์'}
                           className="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none focus:ring-4 focus:ring-amber-500/20 transition-all"
                         />
                       </div>
 
                       <div className="space-y-1.5">
                         <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                          <Briefcase className="h-3.5 w-3.5 text-amber-400" /> ตำแหน่งงานปัจจุบัน <span className="text-rose-400">*</span>
+                          <Briefcase className="h-3.5 w-3.5 text-amber-400" /> ตำแหน่งงานปัจจุบัน {studentStatus === 'alumni' && <span className="text-rose-400">*</span>}
                         </label>
                         <input
                           type="text"
@@ -903,7 +931,7 @@ export default function RegisterPage() {
                           maxLength={FIELD_LIMITS.position}
                           value={position}
                           onChange={(e) => setPosition(e.target.value)}
-                          placeholder="เช่น Senior Software Engineer, ครู..."
+                          placeholder={studentStatus === 'alumni' ? 'เช่น Senior Software Engineer, ครู...' : 'เช่น นักศึกษาฝึกงาน, Part-time Developer'}
                           className="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none focus:ring-4 focus:ring-amber-500/20 transition-all"
                         />
                       </div>
@@ -914,25 +942,26 @@ export default function RegisterPage() {
                         <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                           <Layers className="h-3.5 w-3.5 text-amber-400" /> ประเภทสายงาน / ภาคส่วน
                         </label>
-                        <select
-                          value={careerOptionId}
-                          onChange={(e) => setCareerOptionId(e.target.value)}
-                          className="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-2.5 text-sm text-white focus:border-amber-400 focus:outline-none focus:ring-4 focus:ring-amber-500/20 transition-all"
-                        >
-                          {careerTypes.map((ct) => (
-                            <option key={ct.id} value={ct.id} className="bg-slate-900 text-white">
-                              {ct.label}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="relative">
+                          <select
+                            value={careerOptionId}
+                            onChange={(e) => setCareerOptionId(e.target.value)}
+                            className="w-full appearance-none rounded-2xl border border-white/10 bg-slate-950/80 pl-4 pr-10 py-2.5 text-sm text-white focus:border-amber-400 focus:outline-none focus:ring-4 focus:ring-amber-500/20 transition-all"
+                          >
+                            {careerTypes.map((ct) => (
+                              <option key={ct.id} value={ct.id} className="bg-slate-900 text-white">
+                                {ct.label}
+                              </option>
+                            ))}
+                          </select>
+                          {/* ลูกศรเดียวกับ LocationPicker (ลูกศรของ <select> เบราว์เซอร์วาดเอง สีไม่ตรงกัน) */}
+                          <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        </div>
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-                          <span className="flex items-center gap-1.5">
-                            <MapPin className="h-3.5 w-3.5 text-amber-400" /> ที่ตั้งสถานที่ทำงาน (จังหวัด / ต่างประเทศ) <span className="text-rose-400">*</span>
-                          </span>
-                          <span className="text-[10px] text-amber-300">แสดงหมุดบนแผนที่ศิษย์เก่า</span>
+                        <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                          <MapPin className="h-3.5 w-3.5 text-amber-400" /> สถานที่ทำงาน (จังหวัด / ประเทศ) {studentStatus === 'alumni' && <span className="text-rose-400">*</span>}
                         </label>
                         <LocationPicker
                           value={workProvinceId}
@@ -942,9 +971,11 @@ export default function RegisterPage() {
                           accentColor="amber"
                           placeholder="เลือกจังหวัดในไทย หรือ ประเทศที่ทำงาน"
                         />
+                        <p className="text-[10px] text-amber-300/80 pl-1">แสดงหมุดบนแผนที่ศิษย์เก่า</p>
                       </div>
                     </div>
 
+                    {studentStatus === 'alumni' && (
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                         <Quote className="h-3.5 w-3.5 text-amber-400" /> คำแนะนำตัวสั้นๆ / ประสบการณ์ / คติประจำใจ
@@ -958,8 +989,8 @@ export default function RegisterPage() {
                         className="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none focus:ring-4 focus:ring-amber-500/20 transition-all resize-none"
                       />
                     </div>
+                    )}
                   </div>
-                )}
 
                 {/* 4. ข้อกำหนด ความยินยอม และนโยบายความเป็นส่วนตัว (PDPA & Consents) */}
                 <div className="rounded-3xl border border-indigo-500/30 bg-gradient-to-br from-indigo-950/40 via-slate-950/60 to-purple-950/30 p-5 sm:p-6 space-y-4 shadow-xl">
@@ -1245,126 +1276,128 @@ export default function RegisterPage() {
 
       {/* Policy & Terms Modal */}
       {activeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-          <div className="relative w-full max-w-2xl rounded-3xl border border-white/15 bg-slate-900 p-6 sm:p-8 shadow-2xl space-y-5 max-h-[85vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-400">
-                  {activeModal === 'pdpa' && <ShieldCheck className="h-5 w-5" />}
-                  {activeModal === 'terms' && <BookOpen className="h-5 w-5" />}
-                  {activeModal === 'verification' && <Users className="h-5 w-5" />}
+        <ModalPortal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+            <div className="relative w-full max-w-2xl rounded-3xl border border-white/15 bg-slate-900 p-6 sm:p-8 shadow-2xl space-y-5 max-h-[85vh] flex flex-col">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-9 w-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-400">
+                    {activeModal === 'pdpa' && <ShieldCheck className="h-5 w-5" />}
+                    {activeModal === 'terms' && <BookOpen className="h-5 w-5" />}
+                    {activeModal === 'verification' && <Users className="h-5 w-5" />}
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">
+                      {activeModal === 'pdpa' && 'นโยบายคุ้มครองข้อมูลส่วนบุคคล (PDPA Privacy Policy)'}
+                      {activeModal === 'terms' && 'ข้อกำหนดและเงื่อนไขการใช้งาน (Terms of Service)'}
+                      {activeModal === 'verification' && 'ขั้นตอนและกลไกการยืนยันตัวตน (Verification Protocol)'}
+                    </h3>
+                    <p className="text-xs text-slate-400">ระบบเครือข่าย CS MJU CONNECT</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-white">
-                    {activeModal === 'pdpa' && 'นโยบายคุ้มครองข้อมูลส่วนบุคคล (PDPA Privacy Policy)'}
-                    {activeModal === 'terms' && 'ข้อกำหนดและเงื่อนไขการใช้งาน (Terms of Service)'}
-                    {activeModal === 'verification' && 'ขั้นตอนและกลไกการยืนยันตัวตน (Verification Protocol)'}
-                  </h3>
-                  <p className="text-xs text-slate-400">ระบบเครือข่าย CS MJU CONNECT</p>
-                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveModal(null)}
+                  className="h-8 w-8 rounded-xl bg-white/10 text-slate-400 hover:text-white hover:bg-white/20 flex items-center justify-center transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setActiveModal(null)}
-                className="h-8 w-8 rounded-xl bg-white/10 text-slate-400 hover:text-white hover:bg-white/20 flex items-center justify-center transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+              {/* Modal Content (Scrollable) */}
+              <div className="flex-1 overflow-y-auto pr-2 space-y-4 text-xs sm:text-sm text-slate-300 leading-relaxed custom-scrollbar">
+                {activeModal === 'pdpa' && (
+                  <>
+                    <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-200 text-xs">
+                      ประกาศตาม พระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 (PDPA) เพื่อแจ้งวัตถุประสงค์และสิทธิของท่านในฐานะเจ้าของข้อมูลส่วนบุคคล
+                    </div>
 
-            {/* Modal Content (Scrollable) */}
-            <div className="flex-1 overflow-y-auto pr-2 space-y-4 text-xs sm:text-sm text-slate-300 leading-relaxed custom-scrollbar">
-              {activeModal === 'pdpa' && (
-                <>
-                  <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-200 text-xs">
-                    ประกาศตาม พระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 (PDPA) เพื่อแจ้งวัตถุประสงค์และสิทธิของท่านในฐานะเจ้าของข้อมูลส่วนบุคคล
-                  </div>
+                    <h4 className="font-bold text-white text-sm">1. วัตถุประสงค์ในการเก็บรวบรวมข้อมูล</h4>
+                    <p>
+                      ระบบจะทำการจัดเก็บข้อมูล เช่น ชื่อ-นามสกุล, รหัสนักศึกษา, อีเมล, ประวัติการศึกษา, ที่ทำงาน และตำแหน่งงาน เพื่อวัตถุประสงค์ในการสร้างเครือข่ายศิษย์เก่า การตรวจสอบสิทธิ์การเข้าใช้งาน การให้บริการทำเนียบรุ่น (Yearbook) แผนที่ศิษย์เก่า และการติดต่อประสานงานทางวิชาการเท่านั้น
+                    </p>
 
-                  <h4 className="font-bold text-white text-sm">1. วัตถุประสงค์ในการเก็บรวบรวมข้อมูล</h4>
-                  <p>
-                    ระบบจะทำการจัดเก็บข้อมูล เช่น ชื่อ-นามสกุล, รหัสนักศึกษา, อีเมล, ประวัติการศึกษา, ที่ทำงาน และตำแหน่งงาน เพื่อวัตถุประสงค์ในการสร้างเครือข่ายศิษย์เก่า การตรวจสอบสิทธิ์การเข้าใช้งาน การให้บริการทำเนียบรุ่น (Yearbook) แผนที่ศิษย์เก่า และการติดต่อประสานงานทางวิชาการเท่านั้น
-                  </p>
+                    <h4 className="font-bold text-white text-sm">2. การรักษาความปลอดภัยของข้อมูล</h4>
+                    <p>
+                      ข้อมูลรหัสผ่านจะถูกเข้ารหัสทางเดียว (Bcrypt Hash) อย่างปลอดภัย ข้อมูลการยืนยันตัวตนและหนังสือยินยอมจะถูกจัดเก็บบันทึกประวัติ (Audit Trail) ในระบบฐานข้อมูลที่มีการจำกัดสิทธิ์เข้าถึงเฉพาะผู้ดูแลระบบที่ได้รับมอบหมาย
+                    </p>
 
-                  <h4 className="font-bold text-white text-sm">2. การรักษาความปลอดภัยของข้อมูล</h4>
-                  <p>
-                    ข้อมูลรหัสผ่านจะถูกเข้ารหัสทางเดียว (Bcrypt Hash) อย่างปลอดภัย ข้อมูลการยืนยันตัวตนและหนังสือยินยอมจะถูกจัดเก็บบันทึกประวัติ (Audit Trail) ในระบบฐานข้อมูลที่มีการจำกัดสิทธิ์เข้าถึงเฉพาะผู้ดูแลระบบที่ได้รับมอบหมาย
-                  </p>
+                    <h4 className="font-bold text-white text-sm">3. สิทธิของเจ้าของข้อมูลส่วนบุคคล</h4>
+                    <p>
+                      ท่านมีสิทธิ์ในการเข้าถึง ขอสำเนา แก้ไขข้อมูลส่วนบุคคลให้ถูกต้อง ขอระงับการใช้งาน หรือถอนความยินยอมในการแสดงข้อมูลบนแผนที่หรือทำเนียบรุ่นได้ตลอดเวลาผ่านทางหน้าตั้งค่าโปรไฟล์ส่วนตัว
+                    </p>
+                  </>
+                )}
 
-                  <h4 className="font-bold text-white text-sm">3. สิทธิของเจ้าของข้อมูลส่วนบุคคล</h4>
-                  <p>
-                    ท่านมีสิทธิ์ในการเข้าถึง ขอสำเนา แก้ไขข้อมูลส่วนบุคคลให้ถูกต้อง ขอระงับการใช้งาน หรือถอนความยินยอมในการแสดงข้อมูลบนแผนที่หรือทำเนียบรุ่นได้ตลอดเวลาผ่านทางหน้าตั้งค่าโปรไฟล์ส่วนตัว
-                  </p>
-                </>
-              )}
+                {activeModal === 'terms' && (
+                  <>
+                    <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-200 text-xs">
+                      ข้อตกลงและกติกาการใช้งานร่วมกันสำหรับนักศึกษาและศิษย์เก่า วิทยาการคอมพิวเตอร์ มหาวิทยาลัยแม่โจ้
+                    </div>
 
-              {activeModal === 'terms' && (
-                <>
-                  <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-200 text-xs">
-                    ข้อตกลงและกติกาการใช้งานร่วมกันสำหรับนักศึกษาและศิษย์เก่า วิทยาการคอมพิวเตอร์ มหาวิทยาลัยแม่โจ้
-                  </div>
+                    <h4 className="font-bold text-white text-sm">1. ความถูกต้องของข้อมูล</h4>
+                    <p>
+                      ผู้สมัครต้องกรอกข้อมูลที่เป็นความจริงและตรงกับประวัติการศึกษาในมหาวิทยาลัยแม่โจ้ การแอบอ้างตัวตนหรือนำข้อมูลของผู้อื่นมาลงทะเบียนถือเป็นความผิดและจะถูกระงับสิทธิ์ทันที
+                    </p>
 
-                  <h4 className="font-bold text-white text-sm">1. ความถูกต้องของข้อมูล</h4>
-                  <p>
-                    ผู้สมัครต้องกรอกข้อมูลที่เป็นความจริงและตรงกับประวัติการศึกษาในมหาวิทยาลัยแม่โจ้ การแอบอ้างตัวตนหรือนำข้อมูลของผู้อื่นมาลงทะเบียนถือเป็นความผิดและจะถูกระงับสิทธิ์ทันที
-                  </p>
+                    <h4 className="font-bold text-white text-sm">2. มารยาทและการใช้งานในระบบ</h4>
+                    <p>
+                      ห้ามนำข้อมูลติดต่อ รูปภาพ หรือข้อมูลส่วนบุคคลของเพื่อนสมาชิกในระบบไปเผยแพร่ในเชิงพาณิชย์ ส่งสแปม หรือใช้งานในลักษณะที่ก่อให้เกิดความเดือดร้อนรำคาญแก่ผู้อื่นโดยไม่ได้รับอนุญาต
+                    </p>
 
-                  <h4 className="font-bold text-white text-sm">2. มารยาทและการใช้งานในระบบ</h4>
-                  <p>
-                    ห้ามนำข้อมูลติดต่อ รูปภาพ หรือข้อมูลส่วนบุคคลของเพื่อนสมาชิกในระบบไปเผยแพร่ในเชิงพาณิชย์ ส่งสแปม หรือใช้งานในลักษณะที่ก่อให้เกิดความเดือดร้อนรำคาญแก่ผู้อื่นโดยไม่ได้รับอนุญาต
-                  </p>
+                    <h4 className="font-bold text-white text-sm">3. สิทธิ์ของผู้ดูแลระบบ</h4>
+                    <p>
+                      ผู้ดูแลระบบขอสงวนสิทธิ์ในการตรวจสอบ อนุมัติ หรือระงับบัญชีผู้ใช้ที่ไม่ปฏิบัติตามข้อกำหนด เพื่อรักษาความปลอดภัยและความสงบเรียบร้อยของเครือข่าย
+                    </p>
+                  </>
+                )}
 
-                  <h4 className="font-bold text-white text-sm">3. สิทธิ์ของผู้ดูแลระบบ</h4>
-                  <p>
-                    ผู้ดูแลระบบขอสงวนสิทธิ์ในการตรวจสอบ อนุมัติ หรือระงับบัญชีผู้ใช้ที่ไม่ปฏิบัติตามข้อกำหนด เพื่อรักษาความปลอดภัยและความสงบเรียบร้อยของเครือข่าย
-                  </p>
-                </>
-              )}
+                {activeModal === 'verification' && (
+                  <>
+                    <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-200 text-xs">
+                      กลไกการยืนยันตัวตนแบบตรวจสอบร่วมกัน (Peer & Admin Verification Mechanism)
+                    </div>
 
-              {activeModal === 'verification' && (
-                <>
-                  <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-200 text-xs">
-                    กลไกการยืนยันตัวตนแบบตรวจสอบร่วมกัน (Peer & Admin Verification Mechanism)
-                  </div>
+                    <h4 className="font-bold text-white text-sm">1. เหตุใดจึงต้องมีการยืนยันตัวตน?</h4>
+                    <p>
+                      เนื่องจากแพลตฟอร์มนี้เป็นเครือข่ายเฉพาะของนักศึกษาและศิษย์เก่า วิทยาการคอมพิวเตอร์ มหาวิทยาลัยแม่โจ้ จึงจำเป็นต้องมีกระบวนการตรวจสอบเพื่อป้องกันบุคคลภายนอกหรือผู้ไม่ประสงค์ดีเข้ามาแอบอ้าง
+                    </p>
 
-                  <h4 className="font-bold text-white text-sm">1. เหตุใดจึงต้องมีการยืนยันตัวตน?</h4>
-                  <p>
-                    เนื่องจากแพลตฟอร์มนี้เป็นเครือข่ายเฉพาะของนักศึกษาและศิษย์เก่า วิทยาการคอมพิวเตอร์ มหาวิทยาลัยแม่โจ้ จึงจำเป็นต้องมีกระบวนการตรวจสอบเพื่อป้องกันบุคคลภายนอกหรือผู้ไม่ประสงค์ดีเข้ามาแอบอ้าง
-                  </p>
+                    <h4 className="font-bold text-white text-sm">2. ใครเป็นผู้มีสิทธิ์ยืนยันตัวตนให้คุณ?</h4>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li><strong className="text-white">ผู้ดูแลระบบ (Admin):</strong> สามารถตรวจสอบประวัติกับระบบและกดอนุมัติได้ทันทีผ่านหน้า Admin Dashboard</li>
+                      <li><strong className="text-white">เพื่อนร่วมรุ่น (Batchmates):</strong> สมาชิกในรุ่นเดียวกันที่ได้รับอนุมัติแล้ว จะได้รับการแจ้งเตือนและสามารถกดยืนยันว่าคุณเป็นเพื่อนร่วมรุ่นจริงได้</li>
+                    </ul>
 
-                  <h4 className="font-bold text-white text-sm">2. ใครเป็นผู้มีสิทธิ์ยืนยันตัวตนให้คุณ?</h4>
-                  <ul className="list-disc list-inside space-y-1">
-                    <li><strong className="text-white">ผู้ดูแลระบบ (Admin):</strong> สามารถตรวจสอบประวัติกับระบบและกดอนุมัติได้ทันทีผ่านหน้า Admin Dashboard</li>
-                    <li><strong className="text-white">เพื่อนร่วมรุ่น (Batchmates):</strong> สมาชิกในรุ่นเดียวกันที่ได้รับอนุมัติแล้ว จะได้รับการแจ้งเตือนและสามารถกดยืนยันว่าคุณเป็นเพื่อนร่วมรุ่นจริงได้</li>
-                  </ul>
+                    <h4 className="font-bold text-white text-sm">3. หลังจากได้รับการอนุมัติ</h4>
+                    <p>
+                      สถานะของคุณจะเปลี่ยนจาก &quot;รอการตรวจสอบ (Pending)&quot; เป็น &quot;อนุมัติแล้ว (Approved)&quot; ทันที และสามารถเข้าสู่ระบบเพื่อใช้งานทุกฟังก์ชันได้อย่างเต็มรูปแบบ
+                    </p>
+                  </>
+                )}
+              </div>
 
-                  <h4 className="font-bold text-white text-sm">3. หลังจากได้รับการอนุมัติ</h4>
-                  <p>
-                    สถานะของคุณจะเปลี่ยนจาก &quot;รอการตรวจสอบ (Pending)&quot; เป็น &quot;อนุมัติแล้ว (Approved)&quot; ทันที และสามารถเข้าสู่ระบบเพื่อใช้งานทุกฟังก์ชันได้อย่างเต็มรูปแบบ
-                  </p>
-                </>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="border-t border-white/10 pt-4 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  if (activeModal === 'pdpa') setConsentPdpa(true);
-                  if (activeModal === 'terms') setConsentTerms(true);
-                  if (activeModal === 'verification') setConsentVerification(true);
-                  setActiveModal(null);
-                }}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-indigo-600 text-white text-xs font-bold hover:brightness-110 transition-all cursor-pointer flex items-center gap-1.5"
-              >
-                <Check className="h-3.5 w-3.5" />
-                <span>เข้าใจและยอมรับข้อนี้ทันที</span>
-              </button>
+              {/* Modal Footer */}
+              <div className="border-t border-white/10 pt-4 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeModal === 'pdpa') setConsentPdpa(true);
+                    if (activeModal === 'terms') setConsentTerms(true);
+                    if (activeModal === 'verification') setConsentVerification(true);
+                    setActiveModal(null);
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-indigo-600 text-white text-xs font-bold hover:brightness-110 transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  <span>เข้าใจและยอมรับข้อนี้ทันที</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </div>
   );

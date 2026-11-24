@@ -1,16 +1,17 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
-  Briefcase, GraduationCap, ImageIcon, MessageSquareText, Sparkles,
-  Mail, MapPin, BadgeCheck, Vote, MessageCircle, Star, Lock, Clock,
-  X, Tag, UserMinus, AlertTriangle, CheckCircle2, Eye, Calendar, User as UserIcon,
-  Shield, Globe, EyeOff, Edit3, Camera, Upload, Building2, Layers, HeartHandshake,
-  Loader2, Quote, Link2
+  Briefcase, GraduationCap, ImageIcon, Sparkles, Mail, MapPin, BadgeCheck, Vote,
+  MessageCircle, Star, Lock, Clock, X, AlertTriangle, CheckCircle2, Eye, User as UserIcon,
+  Shield, Globe, EyeOff, Edit3, Camera, Upload, Building2, Layers, HeartHandshake, Loader2,
+  Quote, Link2, Phone, ChevronDown
 } from 'lucide-react';
 import { LocationPicker } from '@/components/ui/location-picker';
 import { resizeImageToDataUrl } from '@/lib/image-resize';
 import { PrivacyToggle } from '@/components/ui/privacy-toggle';
 import { ChangePasswordCard } from './change-password-card';
+import { MyAlbum } from '@/modules/profile/components/my-album';
+import { ModalPortal } from '@/components/ui/modal-portal';
 
 const PRESET_AVATARS = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
@@ -21,15 +22,6 @@ const PRESET_AVATARS = [
   'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop&q=80',
 ];
 
-interface Photo {
-  id: number;
-  image_url: string;
-  original_image_url?: string | null;
-  caption: string;
-  created_at?: string;
-  tagged_by_name?: string;
-}
-
 interface ActivityItem {
   description: string;
   points: number;
@@ -38,8 +30,8 @@ interface ActivityItem {
 
 interface ProfileCardProps {
   user: any;
-  taggedPhotos: Photo[];
-  unlockedPhotos: Photo[];
+  /** จำนวนรูปที่มีฉัน / รุ่นที่ปลดล็อก (จาก /api/user/photos) — แท็บอัลบั้มโหลดรายละเอียดเอง (MyAlbum) */
+  albumCounts?: { tagged: number; unlocked: number };
   activityLog: ActivityItem[];
   isOwner?: boolean;
   lookupOptions?: { generations: any[]; provinces: any[]; careerTypes: any[] };
@@ -60,6 +52,7 @@ interface EditProfileForm {
   isAvailableForMentorship: boolean;
   facebookUrl: string;
   lineId: string;
+  phone: string;
   showContactOnMap: boolean;
 }
 
@@ -88,22 +81,23 @@ function activityIcon(description: string) {
 export type ProfileTab = 'overview' | 'privacy' | 'gallery' | 'activity';
 
 export function ProfileCard({
-  user, taggedPhotos = [], unlockedPhotos = [], activityLog = [], isOwner = false,
+  user, albumCounts: initialAlbumCounts, activityLog = [], isOwner = false,
   lookupOptions, onSaveProfile,
 }: ProfileCardProps) {
   const [activeTab, setActiveTab] = useState<ProfileTab>('overview');
-  const [activeAlbum, setActiveAlbum] = useState<'tagged' | 'unlocked'>('tagged');
-  const [taggedPhotosList, setTaggedPhotosList] = useState<Photo[]>(taggedPhotos);
-  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
-  const [photoToUntag, setPhotoToUntag] = useState<Photo | null>(null);
+  const [albumCounts, setAlbumCounts] = useState(initialAlbumCounts ?? { tagged: 0, unlocked: 0 });
+  const handleAlbumCounts = useCallback((tagged: number, unlocked: number) => setAlbumCounts({ tagged, unlocked }), []);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- ตามค่าที่หน้าโปรไฟล์โหลดมาใหม่
+    if (initialAlbumCounts) setAlbumCounts(initialAlbumCounts);
+  }, [initialAlbumCounts]);
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
   const [isSavingProfile, setIsSavingProfile] = useState<boolean>(false);
   const [editForm, setEditForm] = useState<EditProfileForm>({
     name: '', nickname: '', avatarUrl: '', position: '', company: '', bio: '',
     generationOptionId: '', provinceOptionId: '', workProvinceId: '', careerOptionId: '',
-    isAvailableForMentorship: false, facebookUrl: '', lineId: '', showContactOnMap: false,
+    isAvailableForMentorship: false, facebookUrl: '', lineId: '', phone: '', showContactOnMap: false,
   });
-  const [isUntagging, setIsUntagging] = useState<boolean>(false);
   const currentYearBE = new Date().getFullYear() + 543;
   const [isConfirmingGraduation, setIsConfirmingGraduation] = useState<boolean>(false);
   const [graduationYear, setGraduationYear] = useState<number>(currentYearBE);
@@ -207,6 +201,7 @@ export function ProfileCard({
       isAvailableForMentorship: Boolean(user.is_available_for_mentorship),
       facebookUrl: user.facebook_url || '',
       lineId: user.line_id || '',
+      phone: user.phone || '',
       showContactOnMap: Boolean(user.show_contact_on_map),
     });
     setIsEditModalOpen(true);
@@ -256,6 +251,7 @@ export function ProfileCard({
         isAvailableForMentorship: editForm.isAvailableForMentorship,
         facebookUrl: editForm.facebookUrl.trim(),
         lineId: editForm.lineId.trim(),
+        phone: editForm.phone.trim(),
         showContactOnMap: editForm.showContactOnMap,
       });
       setIsEditModalOpen(false);
@@ -296,41 +292,9 @@ export function ProfileCard({
     );
   }
 
-  const photos = activeAlbum === 'tagged' ? taggedPhotosList : unlockedPhotos;
   const level = Math.floor((user.total_points ?? 0) / POINTS_PER_LEVEL) + 1;
   const progressInLevel = (user.total_points ?? 0) % POINTS_PER_LEVEL;
   const progressPct = Math.round((progressInLevel / POINTS_PER_LEVEL) * 100);
-
-  // Handle Untag / Remove Tag
-  async function confirmUntag() {
-    if (!photoToUntag) return;
-    setIsUntagging(true);
-    try {
-      const res = await fetch('/api/gallery/untag', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mediaAssetId: photoToUntag.id, userId: user.id }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setTaggedPhotosList((prev) => prev.filter((p) => p.id !== photoToUntag.id));
-        if (selectedPhoto?.id === photoToUntag.id) {
-          setSelectedPhoto(null);
-        }
-        setPhotoToUntag(null);
-        setToastMessage({ message: 'ลบแท็กตัวคุณออกจากรูปภาพเรียบร้อยแล้ว ✨', type: 'success' });
-        setTimeout(() => setToastMessage(null), 3500);
-      } else {
-        setToastMessage({ message: data.error || 'เกิดข้อผิดพลาดในการลบแท็ก', type: 'error' });
-        setTimeout(() => setToastMessage(null), 3500);
-      }
-    } catch (err: any) {
-      setToastMessage({ message: err.message || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', type: 'error' });
-      setTimeout(() => setToastMessage(null), 3500);
-    } finally {
-      setIsUntagging(false);
-    }
-  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 animate-slide-up relative">
@@ -373,7 +337,8 @@ export function ProfileCard({
             id: 'gallery' as const,
             label: 'อัลบั้มของฉัน',
             icon: ImageIcon,
-            badge: `${taggedPhotosList.length + unlockedPhotos.length}`,
+            badge: `${albumCounts.tagged}`,
+            ownerOnly: true,
           },
           {
             id: 'activity' as const,
@@ -381,7 +346,10 @@ export function ProfileCard({
             icon: Sparkles,
             badge: `${user.total_points ?? 0}`,
           },
-        ].map((tab) => {
+        ]
+          // อัลบั้มเป็นของส่วนตัว — ดูโปรไฟล์คนอื่นไม่เห็นแท็บนี้
+          .filter((tab) => !('ownerOnly' in tab) || isOwner)
+          .map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
@@ -467,6 +435,11 @@ export function ProfileCard({
                         {user.generation || 'ยังไม่ระบุ'} • {user.student_status === 'alumni' ? 'ศิษย์เก่า' : 'นักศึกษาปัจจุบัน'}
                         {user.student_status === 'alumni' && user.expected_graduation_year ? ` (จบปี ${user.expected_graduation_year})` : ''}
                       </dd>
+                      {user.leader_generation && (
+                        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
+                          👑 หัวหน้า{user.leader_generation}
+                        </span>
+                      )}
 
                       {/* เจ้าของโปรไฟล์ยืนยันสถานะเอง — ระบบไม่เปลี่ยนให้อัตโนมัติ */}
                       {isOwner && onSaveProfile && user.student_status !== 'alumni' && !isConfirmingGraduation && (
@@ -655,7 +628,7 @@ export function ProfileCard({
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-slate-500 uppercase">รูปที่มีคุณ</p>
-                <p className="text-base sm:text-lg font-black text-slate-900">{taggedPhotosList.length} รูป</p>
+                <p className="text-base sm:text-lg font-black text-slate-900">{albumCounts.tagged} รูป</p>
               </div>
             </div>
             <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex items-center gap-3.5">
@@ -663,8 +636,8 @@ export function ProfileCard({
                 <Lock className="h-5 w-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-slate-500 uppercase">รูปที่ปลดล็อก</p>
-                <p className="text-base sm:text-lg font-black text-slate-900">{unlockedPhotos.length} รูป</p>
+                <p className="text-xs font-semibold text-slate-500 uppercase">คลังภาพที่ปลดล็อก</p>
+                <p className="text-base sm:text-lg font-black text-slate-900">{albumCounts.unlocked} รุ่น</p>
               </div>
             </div>
           </section>
@@ -863,157 +836,7 @@ export function ProfileCard({
       {/* ════════════════════════════════════════════════════════════════
           TAB 3: อัลบั้มของฉัน (GALLERY)
       ════════════════════════════════════════════════════════════════ */}
-      {activeTab === 'gallery' && (
-        <div className="space-y-6 animate-fade-in">
-          {/* Symmetrical 2-card Stat Grid */}
-          <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex items-center justify-between">
-              <div className="flex items-center gap-3.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
-                  <ImageIcon className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">รูปที่มีคุณ (ถูกแท็ก)</p>
-                  <p className="text-lg sm:text-xl font-black text-slate-900 mt-0.5">{taggedPhotosList.length} รูปภาพ</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveAlbum('tagged')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeAlbum === 'tagged' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                ดูรูปที่แท็ก
-              </button>
-            </div>
-
-            <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex items-center justify-between">
-              <div className="flex items-center gap-3.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-purple-50 text-purple-600">
-                  <Lock className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">รูปที่ปลดล็อกแล้ว</p>
-                  <p className="text-lg sm:text-xl font-black text-slate-900 mt-0.5">{unlockedPhotos.length} รูปภาพ</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveAlbum('unlocked')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeAlbum === 'unlocked' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                ดูรูปปลดล็อก
-              </button>
-            </div>
-          </section>
-
-          {/* อัลบั้มรูป */}
-          <section className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs space-y-5">
-            <div className="flex items-center justify-between flex-wrap gap-3 pb-4 border-b border-slate-100">
-              <div>
-                <h3 className="text-sm sm:text-base font-bold text-slate-900">
-                  {activeAlbum === 'tagged' ? '🏷️ รูปภาพที่มีคุณ (ถูกแท็ก)' : '🔓 รูปภาพที่คุณตอบคำถามปลดล็อก'}
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {activeAlbum === 'tagged'
-                    ? 'รูปภาพที่คุณถูกแท็กโดยเพื่อน สามารถแตะเพื่อดูรูปขนาดใหญ่หรือขอลบแท็กออกได้'
-                    : 'รูปภาพที่คุณร่วมตอบคำถามปลดล็อกด้วยตนเองในคลังภาพเก่า'}
-                </p>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveAlbum('tagged')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    activeAlbum === 'tagged'
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  🏷️ รูปที่มีคุณ ({taggedPhotosList.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveAlbum('unlocked')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    activeAlbum === 'unlocked'
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  🔓 รูปที่ปลดล็อก ({unlockedPhotos.length})
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-              {photos.map((photo) => (
-                <div
-                  key={photo.id}
-                  className="group relative overflow-hidden rounded-2xl bg-slate-100 border border-slate-200/70 shadow-2xs cursor-pointer aspect-square"
-                  onClick={() => setSelectedPhoto(photo)}
-                >
-                  <img
-                    src={photo.original_image_url || photo.image_url}
-                    alt={photo.caption}
-                    onError={(e) => {
-                      const img = e.currentTarget;
-                      if (img.src !== photo.image_url && photo.image_url) {
-                        img.src = photo.image_url;
-                      } else {
-                        img.style.display = 'none';
-                      }
-                    }}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-
-                  {/* Hover Overlay with Quick Actions */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-between">
-                    <div className="flex justify-end">
-                      {activeAlbum === 'tagged' && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPhotoToUntag(photo);
-                          }}
-                          className="flex items-center gap-1 rounded-full bg-rose-500/90 hover:bg-rose-600 text-white px-2.5 py-1 text-[11px] font-bold shadow-sm backdrop-blur-xs transition-transform active:scale-95"
-                          title="ลบแท็กฉันออกจากรูปนี้"
-                        >
-                          <UserMinus className="h-3 w-3" />
-                          <span>ลบแท็ก</span>
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="text-white">
-                      <p className="text-xs font-semibold truncate drop-shadow-sm">{photo.caption || 'รูปภาพกิจกรรม'}</p>
-                      {photo.tagged_by_name && (
-                        <p className="text-[10px] text-white/80 truncate">แท็กโดย {photo.tagged_by_name}</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {photos.length === 0 && (
-                <div className="col-span-full rounded-2xl bg-slate-50 p-12 text-center text-sm text-slate-500 border border-dashed border-slate-200">
-                  <p className="font-bold text-slate-700">ยังไม่มีรูปในอัลบั้มนี้</p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    {activeAlbum === 'tagged'
-                      ? 'เมื่อมีเพื่อนแท็กคุณในคลังภาพเก่า รูปภาพจะมาปรากฏที่นี่โดยอัตโนมัติ'
-                      : 'ลองไปตอบคำถามปลดล็อกรูปที่หน้าคลังภาพเก่าเพื่อเก็บสะสมรูปภาพของคุณ'}
-                  </p>
-                </div>
-              )}
-            </div>
-          </section>
-        </div>
-      )}
+      {activeTab === 'gallery' && isOwner && <MyAlbum onCountsChange={handleAlbumCounts} />}
 
       {/* ════════════════════════════════════════════════════════════════
           TAB 4: กิจกรรม & แต้มสะสม (ACTIVITY)
@@ -1090,451 +913,355 @@ export function ProfileCard({
         </div>
       )}
 
-      {/* ===== PHOTO PREVIEW LIGHTBOX MODAL ===== */}
-      {selectedPhoto && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in"
-          onClick={() => setSelectedPhoto(null)}
-        >
-          <div
-            className="relative max-w-2xl w-full bg-white rounded-[32px] overflow-hidden shadow-2xl animate-scale-up"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Close button */}
-            <button
-              onClick={() => setSelectedPhoto(null)}
-              className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
-
-            {/* Photo Image */}
-            <div className="relative aspect-4/3 w-full bg-slate-900 flex items-center justify-center overflow-hidden">
-              <img
-                src={selectedPhoto.image_url || selectedPhoto.original_image_url || ''}
-                alt={selectedPhoto.caption}
-                className="h-full w-full object-contain"
-              />
-            </div>
-
-            {/* Photo Info & Untag Action */}
-            <div className="p-6 sm:p-7 space-y-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h4 className="text-lg font-bold text-slate-900">{selectedPhoto.caption || 'รูปภาพความทรงจำ'}</h4>
-                  <div className="flex items-center gap-3 text-xs text-slate-400 mt-1 flex-wrap">
-                    {selectedPhoto.tagged_by_name && (
-                      <span className="flex items-center gap-1 text-purple-600 font-medium">
-                        <UserIcon className="h-3.5 w-3.5" /> แท็กโดย: {selectedPhoto.tagged_by_name}
-                      </span>
-                    )}
-                    {selectedPhoto.created_at && (
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3.5 w-3.5" /> {new Date(selectedPhoto.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {activeAlbum === 'tagged' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPhotoToUntag(selectedPhoto);
-                    }}
-                    className="flex items-center gap-1.5 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-4 py-2 text-xs font-bold transition-all hover:scale-105 active:scale-95 shrink-0"
-                  >
-                    <UserMinus className="h-4 w-4 text-rose-500" />
-                    <span>ลบแท็กตัวฉันออก</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===== UNTAG CONFIRMATION DIALOG MODAL ===== */}
-      {photoToUntag && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in"
-          onClick={() => !isUntagging && setPhotoToUntag(null)}
-        >
-          <div
-            className="w-full max-w-md rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-slate-100 animate-scale-up space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3 text-rose-600">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 border border-rose-200">
-                <UserMinus className="h-6 w-6 text-rose-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-slate-900">ยืนยันการลบแท็ก</h3>
-                <p className="text-xs text-slate-400">ลบแท็กตัวคุณออกจากรูปนี้</p>
-              </div>
-            </div>
-
-            <div className="rounded-2xl bg-slate-50 p-4 text-xs sm:text-sm text-slate-600 space-y-1.5 border border-slate-100">
-              <p className="font-semibold text-slate-800">
-                คุณต้องการลบแท็กชื่อของคุณออกจากรูปภาพนี้ใช่หรือไม่?
-              </p>
-              <p className="text-slate-500 text-xs leading-relaxed">
-                • รูปนี้จะไม่แสดงในหน้าโปรไฟล์และอัลบั้มของคุณอีกต่อไป<br />
-                • รูปภาพต้นฉบับในคลังภาพยังคงอยู่ตามปกติ
-              </p>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                disabled={isUntagging}
-                onClick={() => setPhotoToUntag(null)}
-                className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
-              >
-                ยกเลิก
-              </button>
-              <button
-                type="button"
-                disabled={isUntagging}
-                onClick={confirmUntag}
-                className="flex items-center gap-1.5 rounded-full bg-rose-600 hover:bg-rose-700 px-6 py-2.5 text-xs font-bold text-white shadow-xs transition-all active:scale-95 disabled:opacity-50"
-              >
-                {isUntagging ? (
-                  <>
-                    <span className="h-3.5 w-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                    <span>กำลังลบแท็ก...</span>
-                  </>
-                ) : (
-                  <>
-                    <UserMinus className="h-3.5 w-3.5" />
-                    <span>ยืนยันลบแท็ก</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ===== EDIT PROFILE MODAL ===== */}
       {isEditModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in"
-          onClick={() => !isSavingProfile && setIsEditModalOpen(false)}
-        >
-          <form
-            onSubmit={handleSaveProfileSubmit}
-            className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-slate-100 animate-scale-up space-y-5"
-            onClick={(e) => e.stopPropagation()}
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in"
+            onClick={() => !isSavingProfile && setIsEditModalOpen(false)}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
-                  <Edit3 className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900">แก้ไขข้อมูลส่วนตัว</h3>
-                  <p className="text-xs text-slate-400">ข้อมูลนี้จะแสดงบนหน้าโปรไฟล์ วอลล์ และหนังสือรุ่น</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                disabled={isSavingProfile}
-                onClick={() => setIsEditModalOpen(false)}
-                className="h-8 w-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Avatar */}
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
-              <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                <Camera className="h-3.5 w-3.5 text-indigo-500" /> รูปโปรไฟล์
-              </label>
-              <div className="flex flex-col sm:flex-row items-center gap-4">
-                <img
-                  src={editForm.avatarUrl || PRESET_AVATARS[0]}
-                  alt="ตัวอย่างรูปโปรไฟล์"
-                  className="h-16 w-16 rounded-2xl object-cover border-2 border-indigo-200 shadow-xs shrink-0 bg-slate-200"
-                />
-                <div className="flex-1 w-full space-y-2.5">
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                    {PRESET_AVATARS.map((url, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setEditForm((prev) => ({ ...prev, avatarUrl: url }))}
-                        className={`relative rounded-xl overflow-hidden h-9 w-9 border-2 transition-all cursor-pointer shrink-0 ${
-                          editForm.avatarUrl === url
-                            ? 'border-indigo-500 ring-2 ring-indigo-300 scale-105'
-                            : 'border-slate-200 opacity-70 hover:opacity-100'
-                        }`}
-                      >
-                        <img src={url} alt={`ตัวเลือก ${idx + 1}`} className="h-full w-full object-cover" />
-                      </button>
-                    ))}
+            <form
+              onSubmit={handleSaveProfileSubmit}
+              className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-slate-100 animate-scale-up space-y-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
+                    <Edit3 className="h-5 w-5" />
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-xs text-slate-600 cursor-pointer transition-all">
-                      <Upload className="h-3.5 w-3.5 text-indigo-500" />
-                      <span>อัปโหลดจากเครื่อง</span>
-                      <input type="file" accept="image/*" onChange={handleAvatarFileUpload} className="hidden" />
-                    </label>
-                    <div className="flex-1 min-w-[180px]">
-                      <input
-                        type="url"
-                        value={editForm.avatarUrl.startsWith('data:') ? '' : editForm.avatarUrl}
-                        onChange={(e) => setEditForm((prev) => ({ ...prev, avatarUrl: e.target.value }))}
-                        placeholder="หรือวาง URL รูปภาพ..."
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
-                      />
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">แก้ไขข้อมูลส่วนตัว</h3>
+                    <p className="text-xs text-slate-400">ข้อมูลนี้จะแสดงบนหน้าโปรไฟล์ วอลล์ และหนังสือรุ่น</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={isSavingProfile}
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="h-8 w-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Avatar */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
+                <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                  <Camera className="h-3.5 w-3.5 text-indigo-500" /> รูปโปรไฟล์
+                </label>
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <img
+                    src={editForm.avatarUrl || PRESET_AVATARS[0]}
+                    alt="ตัวอย่างรูปโปรไฟล์"
+                    className="h-16 w-16 rounded-2xl object-cover border-2 border-indigo-200 shadow-xs shrink-0 bg-slate-200"
+                  />
+                  <div className="flex-1 w-full space-y-2.5">
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                      {PRESET_AVATARS.map((url, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setEditForm((prev) => ({ ...prev, avatarUrl: url }))}
+                          className={`relative rounded-xl overflow-hidden h-9 w-9 border-2 transition-all cursor-pointer shrink-0 ${
+                            editForm.avatarUrl === url
+                              ? 'border-indigo-500 ring-2 ring-indigo-300 scale-105'
+                              : 'border-slate-200 opacity-70 hover:opacity-100'
+                          }`}
+                        >
+                          <img src={url} alt={`ตัวเลือก ${idx + 1}`} className="h-full w-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-xs text-slate-600 cursor-pointer transition-all">
+                        <Upload className="h-3.5 w-3.5 text-indigo-500" />
+                        <span>อัปโหลดจากเครื่อง</span>
+                        <input type="file" accept="image/*" onChange={handleAvatarFileUpload} className="hidden" />
+                      </label>
+                      <div className="flex-1 min-w-[180px]">
+                        <input
+                          type="url"
+                          value={/^(data:|\/api\/uploads\/)/.test(editForm.avatarUrl) ? '' : editForm.avatarUrl}
+                          onChange={(e) => setEditForm((prev) => ({ ...prev, avatarUrl: e.target.value }))}
+                          placeholder="หรือวาง URL รูปภาพ..."
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Name & Nickname */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-600">ชื่อ-นามสกุล *</label>
-                <input
-                  type="text"
-                  required
-                  value={editForm.name}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-600">ชื่อเล่น</label>
-                <input
-                  type="text"
-                  value={editForm.nickname}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, nickname: e.target.value }))}
-                  placeholder="เช่น เอ, บอย, พลอย..."
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
-                />
-              </div>
-            </div>
-
-            {/* Generation & Hometown Province */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                  <GraduationCap className="h-3.5 w-3.5 text-indigo-500" /> รุ่นการศึกษา
-                </label>
-                <select
-                  value={editForm.generationOptionId}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, generationOptionId: e.target.value }))}
-                  disabled={Boolean(user.generation_option_id)}
-                  title={user.generation_option_id ? 'เปลี่ยนรุ่นได้โดยผู้ดูแลระบบเท่านั้น' : undefined}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
-                >
-                  <option value="">ไม่ระบุ</option>
-                  {(lookupOptions?.generations || []).map((g) => (
-                    <option key={g.id} value={g.id}>{g.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 text-indigo-500" /> จังหวัดภูมิลำเนา
-                </label>
-                <LocationPicker
-                  value={editForm.provinceOptionId}
-                  onChange={(val) => setEditForm((prev) => ({ ...prev, provinceOptionId: val }))}
-                  options={lookupOptions?.provinces || []}
-                  accentColor="indigo"
-                  placeholder="เลือกจังหวัด หรือ ประเทศภูมิลำเนา"
-                />
-              </div>
-            </div>
-
-            {/* Company & Position */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                  <Building2 className="h-3.5 w-3.5 text-purple-500" /> บริษัท / สถานที่ทำงาน
-                </label>
-                <input
-                  type="text"
-                  value={editForm.company}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, company: e.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100 transition-all"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                  <Briefcase className="h-3.5 w-3.5 text-purple-500" /> ตำแหน่งงาน
-                </label>
-                <input
-                  type="text"
-                  value={editForm.position}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, position: e.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100 transition-all"
-                />
-              </div>
-            </div>
-
-            {/* Career type & Work province */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                  <Layers className="h-3.5 w-3.5 text-purple-500" /> ประเภทสายงาน
-                </label>
-                <select
-                  value={editForm.careerOptionId}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, careerOptionId: e.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100 transition-all"
-                >
-                  <option value="">ไม่ระบุ</option>
-                  {(lookupOptions?.careerTypes || []).map((ct) => (
-                    <option key={ct.id} value={ct.id}>{ct.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 text-purple-500" /> จังหวัดที่ทำงาน
-                </label>
-                <LocationPicker
-                  value={editForm.workProvinceId}
-                  onChange={(val) => setEditForm((prev) => ({ ...prev, workProvinceId: val }))}
-                  options={lookupOptions?.provinces || []}
-                  accentColor="amber"
-                  placeholder="เลือกจังหวัด หรือ ประเทศที่ทำงาน"
-                />
-              </div>
-            </div>
-
-            {/* Bio */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                <Quote className="h-3.5 w-3.5 text-slate-500" /> เกี่ยวกับฉัน
-              </label>
-              <textarea
-                rows={3}
-                value={editForm.bio}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, bio: e.target.value }))}
-                placeholder="แนะนำตัวสั้นๆ หรือคติประจำใจ..."
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100 transition-all resize-none"
-              />
-            </div>
-
-            {/* Facebook & LINE + toggle แสดงบนแผนที่ รวมอยู่การ์ดเดียวกัน เพื่อไม่ให้พลาดเปิดการแสดงผล */}
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 space-y-3.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <MessageCircle className="h-4 w-4 text-indigo-500" />
-                  <span>ช่องทางติดต่อ (Facebook / LINE)</span>
-                </label>
-                <span className="text-[11px] text-slate-400">ไม่บังคับ</span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Name & Nickname */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">
-                    <Link2 className="h-3.5 w-3.5 text-indigo-500" /> Facebook
+                  <label className="text-xs font-bold text-slate-600">ชื่อ-นามสกุล *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.name}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600">ชื่อเล่น</label>
+                  <input
+                    type="text"
+                    value={editForm.nickname}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, nickname: e.target.value }))}
+                    placeholder="เช่น เอ, บอย, พลอย..."
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Generation & Hometown Province */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                    <GraduationCap className="h-3.5 w-3.5 text-indigo-500" /> รุ่นการศึกษา
+                  </label>
+                  <div className="relative">
+                      <select
+                      value={editForm.generationOptionId}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, generationOptionId: e.target.value }))}
+                      disabled={Boolean(user.generation_option_id)}
+                      title={user.generation_option_id ? 'เปลี่ยนรุ่นได้โดยผู้ดูแลระบบเท่านั้น' : undefined}
+                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-white pl-4 pr-10 py-2.5 text-sm text-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
+                    >
+                      <option value="">ไม่ระบุ</option>
+                      {(lookupOptions?.generations || []).map((g) => (
+                        <option key={g.id} value={g.id}>{g.label}</option>
+                      ))}
+                    </select>
+                    {/* ลูกศรเดียวกับ LocationPicker — ลูกศรของ <select> เบราว์เซอร์วาดเองเป็นสีดำ */}
+                    <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-indigo-500" /> จังหวัดภูมิลำเนา
+                  </label>
+                  <LocationPicker
+                    value={editForm.provinceOptionId}
+                    onChange={(val) => setEditForm((prev) => ({ ...prev, provinceOptionId: val }))}
+                    options={lookupOptions?.provinces || []}
+                    accentColor="indigo"
+                    theme="light"
+                    placeholder="เลือกจังหวัด หรือ ประเทศภูมิลำเนา"
+                  />
+                </div>
+              </div>
+
+              {/* Company & Position */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5 text-purple-500" /> บริษัท / สถานที่ทำงาน
                   </label>
                   <input
                     type="text"
-                    value={editForm.facebookUrl}
-                    onChange={(e) => setEditForm((prev) => ({ ...prev, facebookUrl: e.target.value }))}
-                    placeholder="ลิงก์โปรไฟล์ หรือ ชื่อผู้ใช้ Facebook"
+                    value={editForm.company}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, company: e.target.value }))}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100 transition-all"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                    <Briefcase className="h-3.5 w-3.5 text-purple-500" /> ตำแหน่งงาน
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.position}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, position: e.target.value }))}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Career type & Work province */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                    <Layers className="h-3.5 w-3.5 text-purple-500" /> ประเภทสายงาน
+                  </label>
+                  <div className="relative">
+                      <select
+                      value={editForm.careerOptionId}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, careerOptionId: e.target.value }))}
+                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-white pl-4 pr-10 py-2.5 text-sm text-slate-800 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100 transition-all"
+                    >
+                      <option value="">ไม่ระบุ</option>
+                      {(lookupOptions?.careerTypes || []).map((ct) => (
+                        <option key={ct.id} value={ct.id}>{ct.label}</option>
+                      ))}
+                    </select>
+                    {/* ลูกศรเดียวกับ LocationPicker — ลูกศรของ <select> เบราว์เซอร์วาดเองเป็นสีดำ */}
+                    <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-purple-500" /> จังหวัดที่ทำงาน
+                  </label>
+                  <LocationPicker
+                    value={editForm.workProvinceId}
+                    onChange={(val) => setEditForm((prev) => ({ ...prev, workProvinceId: val }))}
+                    options={lookupOptions?.provinces || []}
+                    accentColor="amber"
+                    theme="light"
+                    placeholder="เลือกจังหวัด หรือ ประเทศที่ทำงาน"
+                  />
+                </div>
+              </div>
+
+              {/* Bio */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                  <Quote className="h-3.5 w-3.5 text-slate-500" /> เกี่ยวกับฉัน
+                </label>
+                <textarea
+                  rows={3}
+                  value={editForm.bio}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, bio: e.target.value }))}
+                  placeholder="แนะนำตัวสั้นๆ หรือคติประจำใจ..."
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100 transition-all resize-none"
+                />
+              </div>
+
+              {/* Facebook & LINE + toggle แสดงบนแผนที่ รวมอยู่การ์ดเดียวกัน เพื่อไม่ให้พลาดเปิดการแสดงผล */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <MessageCircle className="h-4 w-4 text-indigo-500" />
+                    <span>ช่องทางติดต่อ (Facebook / LINE)</span>
+                  </label>
+                  <span className="text-[11px] text-slate-400">ไม่บังคับ</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">
+                      <Link2 className="h-3.5 w-3.5 text-indigo-500" /> Facebook
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.facebookUrl}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, facebookUrl: e.target.value }))}
+                      placeholder="ลิงก์โปรไฟล์ หรือ ชื่อผู้ใช้ Facebook"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">
+                      <MessageCircle className="h-3.5 w-3.5 text-emerald-500" /> LINE ID
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.lineId}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, lineId: e.target.value }))}
+                      placeholder="LINE ID ของคุณ"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* เบอร์โทร — ไม่มี toggle เปิดเผย แอดมินและเจ้าของเห็นเท่านั้น */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">
+                    <Phone className="h-3.5 w-3.5 text-slate-500" /> เบอร์โทรศัพท์
+                    <span className="font-normal text-slate-400">(เห็นเฉพาะคุณและแอดมินเท่านั้น ไม่เปิดเผย)</span>
+                  </label>
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    maxLength={20}
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, phone: e.target.value }))}
+                    placeholder="เช่น 081-234-5678"
                     className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">
-                    <MessageCircle className="h-3.5 w-3.5 text-emerald-500" /> LINE ID
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.lineId}
-                    onChange={(e) => setEditForm((prev) => ({ ...prev, lineId: e.target.value }))}
-                    placeholder="LINE ID ของคุณ"
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 transition-all"
-                  />
+
+                {/* Toggle แสดงบนแผนที่ — อยู่ติดกับช่องกรอกโดยตรง กันพลาดกรอกแล้วลืมเปิด */}
+                <div
+                  onClick={() => setEditForm((prev) => ({ ...prev, showContactOnMap: !prev.showContactOnMap }))}
+                  className={`flex items-center justify-between gap-3 rounded-xl border p-3 cursor-pointer select-none transition-all ${
+                    editForm.showContactOnMap ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${editForm.showContactOnMap ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                      {editForm.showContactOnMap ? <Globe className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                    </div>
+                    <p className="text-xs font-bold text-slate-700 truncate">
+                      แสดงช่องทางนี้บนแผนที่เมื่อคนอื่นดูโปรไฟล์คุณ
+                    </p>
+                  </div>
+                  <div className={`relative inline-flex h-5.5 w-10 shrink-0 rounded-full transition-colors ${editForm.showContactOnMap ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                    <span
+                      className={`pointer-events-none absolute top-0.5 left-0.5 inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow-md transition-transform ${
+                        editForm.showContactOnMap ? 'translate-x-4.5' : 'translate-x-0'
+                      }`}
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Toggle แสดงบนแผนที่ — อยู่ติดกับช่องกรอกโดยตรง กันพลาดกรอกแล้วลืมเปิด */}
+              {/* Mentorship toggle */}
               <div
-                onClick={() => setEditForm((prev) => ({ ...prev, showContactOnMap: !prev.showContactOnMap }))}
-                className={`flex items-center justify-between gap-3 rounded-xl border p-3 cursor-pointer select-none transition-all ${
-                  editForm.showContactOnMap ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200 hover:border-slate-300'
+                onClick={() => setEditForm((prev) => ({ ...prev, isAvailableForMentorship: !prev.isAvailableForMentorship }))}
+                className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex items-center justify-between gap-3 ${
+                  editForm.isAvailableForMentorship ? 'bg-purple-50 border-purple-200' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
                 }`}
               >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${editForm.showContactOnMap ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-                    {editForm.showContactOnMap ? <Globe className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-xl ${editForm.isAvailableForMentorship ? 'bg-purple-100 text-purple-600' : 'bg-white text-slate-400'}`}>
+                    <HeartHandshake className="h-4 w-4" />
                   </div>
-                  <p className="text-xs font-bold text-slate-700 truncate">
-                    แสดงช่องทางนี้บนแผนที่เมื่อคนอื่นดูโปรไฟล์คุณ
-                  </p>
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">ยินดีให้คำแนะนำรุ่นน้อง</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">แสดงป้าย &ldquo;ยินดีให้คำแนะนำ&rdquo; บนโปรไฟล์และโพสต์ของคุณ</p>
+                  </div>
                 </div>
-                <div className={`relative inline-flex h-5.5 w-10 shrink-0 rounded-full transition-colors ${editForm.showContactOnMap ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                  <span
-                    className={`pointer-events-none absolute top-0.5 left-0.5 inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow-md transition-transform ${
-                      editForm.showContactOnMap ? 'translate-x-4.5' : 'translate-x-0'
-                    }`}
-                  />
+                <div className={`h-6 w-11 rounded-full p-0.5 transition-colors shrink-0 ${editForm.isAvailableForMentorship ? 'bg-purple-500' : 'bg-slate-300'}`}>
+                  <div className={`h-5 w-5 rounded-full bg-white transition-transform ${editForm.isAvailableForMentorship ? 'translate-x-5' : 'translate-x-0'}`} />
                 </div>
               </div>
-            </div>
 
-            {/* Mentorship toggle */}
-            <div
-              onClick={() => setEditForm((prev) => ({ ...prev, isAvailableForMentorship: !prev.isAvailableForMentorship }))}
-              className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex items-center justify-between gap-3 ${
-                editForm.isAvailableForMentorship ? 'bg-purple-50 border-purple-200' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`p-2.5 rounded-xl ${editForm.isAvailableForMentorship ? 'bg-purple-100 text-purple-600' : 'bg-white text-slate-400'}`}>
-                  <HeartHandshake className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-800">ยินดีให้คำแนะนำรุ่นน้อง</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">แสดงป้าย &ldquo;ยินดีให้คำแนะนำ&rdquo; บนโปรไฟล์และโพสต์ของคุณ</p>
-                </div>
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={isSavingProfile}
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingProfile}
+                  className="flex items-center gap-1.5 rounded-full bg-indigo-600 hover:bg-indigo-700 px-6 py-2.5 text-xs font-bold text-white shadow-xs transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {isSavingProfile ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>กำลังบันทึก...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      <span>บันทึกข้อมูล</span>
+                    </>
+                  )}
+                </button>
               </div>
-              <div className={`h-6 w-11 rounded-full p-0.5 transition-colors shrink-0 ${editForm.isAvailableForMentorship ? 'bg-purple-500' : 'bg-slate-300'}`}>
-                <div className={`h-5 w-5 rounded-full bg-white transition-transform ${editForm.isAvailableForMentorship ? 'translate-x-5' : 'translate-x-0'}`} />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                disabled={isSavingProfile}
-                onClick={() => setIsEditModalOpen(false)}
-                className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
-              >
-                ยกเลิก
-              </button>
-              <button
-                type="submit"
-                disabled={isSavingProfile}
-                className="flex items-center gap-1.5 rounded-full bg-indigo-600 hover:bg-indigo-700 px-6 py-2.5 text-xs font-bold text-white shadow-xs transition-all active:scale-95 disabled:opacity-50"
-              >
-                {isSavingProfile ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span>กำลังบันทึก...</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    <span>บันทึกข้อมูล</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
+            </form>
+          </div>
+        </ModalPortal>
       )}
     </div>
   );

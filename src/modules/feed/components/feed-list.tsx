@@ -9,6 +9,7 @@ import { BirthdayWidget } from './widgets/birthday-widget';
 import { LeaderboardWidget } from './widgets/leaderboard-widget';
 import { ContentWarningModal, toContentWarning, type ContentWarning } from '@/components/ui/content-warning-modal';
 import { ReportContentDialog, type ReportTarget } from '@/components/ui/report-content-dialog';
+import { COMMENT_REACTION_EMOJIS, DEFAULT_COMMENT_EMOJI } from '@/lib/reactions';
 
 function formatPostDateTime(dateStr: string) {
   if (!dateStr) return '';
@@ -61,6 +62,7 @@ import {
   Flag,
   ChevronDown
 } from 'lucide-react';
+import { ModalPortal } from '@/components/ui/modal-portal';
 
 interface Comment {
   id: number;
@@ -70,6 +72,25 @@ interface Comment {
   userAvatar?: string;
   isAvailableForMentorship?: boolean;
   parentCommentId?: number | null;
+  likeCount?: number;
+  likedByMe?: boolean;
+  myEmoji?: string;
+  topEmoji?: string;
+}
+
+interface CommentLikeState {
+  count: number;
+  likedByMe: boolean;
+  emoji: string;
+}
+
+/** สถานะถูกใจของความคิดเห็นตามข้อมูลจาก server (ก่อนผู้ใช้กดอะไรในหน้านี้) */
+function commentLikeFromServer(comment: Comment): CommentLikeState {
+  return {
+    count: comment.likeCount ?? 0,
+    likedByMe: Boolean(comment.likedByMe),
+    emoji: comment.myEmoji || comment.topEmoji || DEFAULT_COMMENT_EMOJI,
+  };
 }
 
 interface PollOption {
@@ -229,7 +250,8 @@ export function FeedList({
   const [floatingHearts, setFloatingHearts] = useState<BurstParticle[]>([]);
 
   // ─── Comment Like & Reply State ───────────────────────────────────
-  const [commentLikes, setCommentLikes] = useState<Record<number, { count: number; likedByMe: boolean; emoji: string }>>({});
+  // ค่าที่ผู้ใช้กดในหน้านี้ (ทับค่าจาก server) — ค่าตั้งต้นมาจาก commentLikeFromServer
+  const [commentLikes, setCommentLikes] = useState<Record<number, CommentLikeState>>({});
   const [activeCommentReactionPicker, setActiveCommentReactionPicker] = useState<number | null>(null);
   const [replyTargets, setReplyTargets] = useState<Record<number, { commentId: number; authorName: string } | null>>({});
 
@@ -287,6 +309,59 @@ export function FeedList({
   const [postToDelete, setPostToDelete] = useState<Post | null>(null);
   const [isDeletingPost, setIsDeletingPost] = useState<boolean>(false);
   const [deleteToast, setDeleteToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // ตัวกรองหมวดหมู่ (null = ทั้งหมด) — กรองฝั่ง server เพราะ /api/feed ดึงแค่ 50 โพสต์ล่าสุด
+  const [categories, setCategories] = useState<{ category: string; count: number }[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isFilteringFeed, setIsFilteringFeed] = useState<boolean>(false);
+  const feedUrl = selectedCategory ? `/api/feed?category=${encodeURIComponent(selectedCategory)}` : '/api/feed';
+  // เปิด/ปิดแถบหมวดหมู่ จำค่าไว้ในเบราว์เซอร์ (อ่าน storage ไม่ได้ = เปิดไว้)
+  const [showCategoryFilter, setShowCategoryFilter] = useState<boolean>(() => {
+    try {
+      return typeof window === 'undefined' || localStorage.getItem('feed.showCategoryFilter') !== '0';
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    fetch('/api/feed/categories')
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setCategories(data);
+      })
+      .catch(() => {});
+  }, []);
+
+  function toggleCategoryFilter() {
+    setShowCategoryFilter((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('feed.showCategoryFilter', next ? '1' : '0');
+      } catch {}
+      return next;
+    });
+  }
+
+  async function handleSelectCategory(category: string | null) {
+    if (category === selectedCategory) return;
+    setSelectedCategory(category);
+    if (category === null) {
+      setFeedPosts(posts);
+      return;
+    }
+    setIsFilteringFeed(true);
+    try {
+      const res = await fetch(`/api/feed?category=${encodeURIComponent(category)}`);
+      const data = await res.json();
+      if (Array.isArray(data)) setFeedPosts(data);
+    } catch {
+      setDeleteToast({ message: 'ไม่สามารถโหลดโพสต์ในหมวดหมู่นี้ได้', type: 'error' });
+      setTimeout(() => setDeleteToast(null), 3500);
+    } finally {
+      setIsFilteringFeed(false);
+    }
+  }
   // pop-up กลางจอเมื่อโพสต์/โพล/ความคิดเห็นมีคำไม่เหมาะสม และกล่องรายงานเนื้อหาที่หลุดตัวกรอง
   const [contentWarning, setContentWarning] = useState<ContentWarning | null>(null);
   const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
@@ -398,8 +473,8 @@ export function FeedList({
       } else {
         setDeleteToast({ message: data.error || 'ไม่สามารถบันทึกการโหวตได้', type: 'error' });
         setTimeout(() => setDeleteToast(null), 3500);
-        // Refresh feed posts to sync accurate state from server
-        fetch('/api/feed')
+        // Refresh feed posts to sync accurate state from server (คงหมวดหมู่ที่เลือกไว้)
+        fetch(feedUrl)
           .then((r) => r.json())
           .then((fresh) => {
             if (Array.isArray(fresh)) setFeedPosts(fresh);
@@ -628,6 +703,63 @@ export function FeedList({
     }
   }
 
+  // ถูกใจความคิดเห็น — อัปเดตหน้าจอทันที แล้วบันทึกที่ /api/feed/comment/like (ไม่สำเร็จ = ย้อนกลับ)
+  // emoji ไม่ส่ง = กดปุ่มถูกใจ (สลับ), ส่ง = เลือกจากแถบอีโมจิ
+  async function handleCommentReaction(comment: Comment, emoji?: string) {
+    const before = commentLikes[comment.id] ?? commentLikeFromServer(comment);
+    const optimistic: CommentLikeState = emoji
+      ? { count: before.likedByMe ? before.count : before.count + 1, likedByMe: true, emoji }
+      : {
+          count: before.likedByMe ? Math.max(0, before.count - 1) : before.count + 1,
+          likedByMe: !before.likedByMe,
+          emoji: before.likedByMe ? before.emoji : DEFAULT_COMMENT_EMOJI,
+        };
+    setCommentLikes((prev) => ({ ...prev, [comment.id]: optimistic }));
+
+    try {
+      const res = await fetch('/api/feed/comment/like', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commentId: comment.id, emoji }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'บันทึกการถูกใจไม่สำเร็จ');
+      }
+      setCommentLikes((prev) => ({
+        ...prev,
+        [comment.id]: { count: data.count, likedByMe: data.liked, emoji: data.emoji },
+      }));
+    } catch (err: any) {
+      setCommentLikes((prev) => ({ ...prev, [comment.id]: before }));
+      setDeleteToast({ message: err.message || 'บันทึกการถูกใจไม่สำเร็จ', type: 'error' });
+      setTimeout(() => setDeleteToast(null), 3000);
+    }
+  }
+
+  // แอดมินปักหมุด / เลิกปักหมุด — อัปเดตหน้าจอทันที (sortedFeedPosts ย้ายโพสต์ขึ้น/ลงเอง) ไม่สำเร็จ = ย้อนกลับ
+  async function handleTogglePin(post: Post) {
+    const next = !post.pinned;
+    const setPinned = (pinned: boolean) =>
+      setFeedPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, pinned } : p)));
+
+    setPinned(next);
+    try {
+      const res = await fetch('/api/feed/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: post.id, pinned: next }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) throw new Error(data?.error || 'ปักหมุดไม่สำเร็จ');
+      setDeleteToast({ message: next ? '📌 ปักหมุดโพสต์ไว้บนสุดแล้ว' : 'เลิกปักหมุดโพสต์แล้ว', type: 'success' });
+    } catch (err: any) {
+      setPinned(!next);
+      setDeleteToast({ message: err.message || 'ปักหมุดไม่สำเร็จ', type: 'error' });
+    }
+    setTimeout(() => setDeleteToast(null), 3000);
+  }
+
   // Handle Default Like Toggle
   async function handleToggleLike(postId: number, e?: React.MouseEvent) {
     if (e) {
@@ -803,7 +935,7 @@ export function FeedList({
   }
 
   return (
-    <div className="grid gap-8 xl:gap-x-16 xl:grid-cols-[1fr_380px] min-[90rem]:grid-cols-[1fr_420px] max-w-[1600px] mx-auto font-sans items-start px-2 sm:px-4 lg:pl-7 lg:pr-8 relative">
+    <div className="grid gap-8 xl:gap-x-16 xl:grid-cols-[minmax(0,1fr)_minmax(340px,30%)] mx-auto font-sans items-start px-2 sm:px-4 lg:pl-7 lg:pr-8 relative">
 
       {/* 360 Explosion & Gravity Fall Particle Overlay */}
       {floatingHearts.map((particle) => (
@@ -1102,11 +1234,74 @@ export function FeedList({
         </div>
         </div>
 
+        {/* ===== CATEGORY FILTER ===== */}
+        {categories.length > 0 && (
+          <div className="rounded-2xl border border-slate-200 bg-white">
+            <button
+              type="button"
+              aria-expanded={showCategoryFilter}
+              onClick={toggleCategoryFilter}
+              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+            >
+              <span className="text-sm text-slate-500">
+                หมวดหมู่
+                {selectedCategory && <span className="ml-2 font-medium text-slate-900">{selectedCategory}</span>}
+              </span>
+              <span className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-700">
+                {showCategoryFilter ? 'ซ่อน' : 'แสดง'}
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showCategoryFilter ? 'rotate-180' : ''}`} />
+              </span>
+            </button>
+
+            {showCategoryFilter && (
+              <div className="flex flex-wrap gap-2 border-t border-slate-100 px-4 py-3">
+                {[{ category: null as string | null, count: categories.reduce((sum, c) => sum + c.count, 0) }, ...categories].map(
+                  ({ category, count }) => {
+                    const isActive = selectedCategory === category;
+                    return (
+                      <button
+                        key={category ?? '__all__'}
+                        type="button"
+                        aria-pressed={isActive}
+                        disabled={isFilteringFeed}
+                        onClick={() => handleSelectCategory(category)}
+                        className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                          isActive
+                            ? 'border-slate-900 bg-slate-900 text-white'
+                            : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {category ?? 'ทั้งหมด'}
+                        <span className="ml-1.5 text-xs text-slate-400">{count}</span>
+                      </button>
+                    );
+                  }
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ===== POST CARDS ===== */}
-        {sortedFeedPosts.length === 0 ? (
+        {isFilteringFeed ? (
+          <p className="py-16 text-center text-sm text-slate-400" aria-busy="true">
+            กำลังโหลด...
+          </p>
+        ) : sortedFeedPosts.length === 0 ? (
           <div className="rounded-[32px] border border-slate-100 bg-white p-20 text-center text-slate-400 shadow-xs">
             <Sparkles className="mx-auto h-12 w-12 text-pink-300 animate-pulse" />
-            <p className="mt-4 text-base font-medium">ยังไม่มีโพสต์บนวอลล์ในขณะนี้</p>
+            <p className="mt-4 text-base font-medium">
+              {selectedCategory ? `ยังไม่มีโพสต์ในหมวด ${selectedCategory}` : 'ยังไม่มีโพสต์บนวอลล์ในขณะนี้'}
+            </p>
+            {selectedCategory && (
+              <button
+                type="button"
+                onClick={() => handleSelectCategory(null)}
+                className="mt-3 text-sm text-slate-500 underline underline-offset-4 hover:text-slate-800"
+              >
+                ดูโพสต์ทั้งหมด
+              </button>
+            )}
           </div>
         ) : (
           sortedFeedPosts.map((post) => {
@@ -1231,6 +1426,16 @@ export function FeedList({
                           {activeRole === 'admin' ? (
                             <>
                               <div className="my-1 border-t border-slate-100" />
+                              <button
+                                onClick={() => {
+                                  setActivePostMenuId(null);
+                                  handleTogglePin(post);
+                                }}
+                                className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-slate-700 hover:bg-amber-50 hover:text-amber-700 font-semibold transition-colors text-left"
+                              >
+                                <Pin className={`h-4 w-4 ${post.pinned ? 'text-amber-500 fill-amber-500' : 'text-slate-400'}`} />
+                                <span>{post.pinned ? 'เลิกปักหมุด' : 'ปักหมุดไว้บนสุด'}</span>
+                              </button>
                               <button
                                 onClick={() => {
                                   setActivePostMenuId(null);
@@ -1456,7 +1661,7 @@ export function FeedList({
                       <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
                         {post.commentsList && post.commentsList.length > 0 ? (
                           post.commentsList.map((comment) => {
-                            const cLike = commentLikes[comment.id] ?? { count: 0, likedByMe: false, emoji: '❤️' };
+                            const cLike = commentLikes[comment.id] ?? commentLikeFromServer(comment);
                             const isCommentPickerOpen = activeCommentReactionPicker === comment.id;
                             return (
                               <div key={comment.id} className="flex items-start gap-2.5">
@@ -1481,20 +1686,13 @@ export function FeedList({
                                         className="absolute left-0 -top-11 z-30 flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 shadow-lg border border-slate-200 animate-fade-in"
                                         onClick={(e) => e.stopPropagation()}
                                       >
-                                        {EMOJI_REACTIONS.map((item) => (
+                                        {COMMENT_REACTION_EMOJIS.map((item) => (
                                           <button
                                             key={item.emoji}
                                             title={item.label}
                                             onClick={() => {
-                                              setCommentLikes((prev) => ({
-                                                ...prev,
-                                                [comment.id]: {
-                                                  count: cLike.likedByMe ? cLike.count : cLike.count + 1,
-                                                  likedByMe: true,
-                                                  emoji: item.emoji,
-                                                },
-                                              }));
                                               setActiveCommentReactionPicker(null);
+                                              handleCommentReaction(comment, item.emoji);
                                             }}
                                             className="text-lg hover:scale-125 transition-transform"
                                           >
@@ -1536,20 +1734,9 @@ export function FeedList({
                                         onMouseLeave={() =>
                                           setTimeout(() => setActiveCommentReactionPicker((cur) => (cur === comment.id ? null : cur)), 300)
                                         }
-                                        onClick={() => {
-                                          // toggle like with current emoji
-                                          setCommentLikes((prev) => {
-                                            const cur = prev[comment.id] ?? { count: 0, likedByMe: false, emoji: '❤️' };
-                                            return {
-                                              ...prev,
-                                              [comment.id]: {
-                                                count: cur.likedByMe ? cur.count - 1 : cur.count + 1,
-                                                likedByMe: !cur.likedByMe,
-                                                emoji: cur.emoji,
-                                              },
-                                            };
-                                          });
-                                        }}
+                                        // ความคิดเห็นที่ยังส่งไม่เสร็จยังไม่มี id จริงใน DB
+                                        disabled={Boolean(submittingComment[post.id])}
+                                        onClick={() => handleCommentReaction(comment)}
                                         className={`text-xs font-semibold transition-colors ${
                                           cLike.likedByMe ? 'text-rose-500' : 'text-slate-400 hover:text-rose-400'
                                         }`}
@@ -1720,102 +1907,104 @@ export function FeedList({
       />
 
       {postToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
-          <div
-            className="w-full max-w-lg rounded-[32px] border border-rose-100 bg-white p-7 sm:p-8 shadow-hero animate-scale-up space-y-6 relative overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Top decorative gradient bar */}
-            <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-rose-500 via-pink-500 to-amber-500" />
+        <ModalPortal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
+            <div
+              className="w-full max-w-lg rounded-[32px] border border-rose-100 bg-white p-7 sm:p-8 shadow-hero animate-scale-up space-y-6 relative overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Top decorative gradient bar */}
+              <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-rose-500 via-pink-500 to-amber-500" />
 
-            {/* Modal Header */}
-            <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-100/80 text-rose-600 shadow-2xs">
-                <ShieldAlert className="h-6 w-6" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-bold text-slate-900">ยืนยันการลบโพสต์ข่าว</h3>
-                  <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-[11px] font-bold text-rose-600 border border-rose-200">
-                    Admin Only
-                  </span>
+              {/* Modal Header */}
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-100/80 text-rose-600 shadow-2xs">
+                  <ShieldAlert className="h-6 w-6" />
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  คุณกำลังจะลบโพสต์นี้ออกจากวอลล์/ฟีดของระบบ
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-slate-900">ยืนยันการลบโพสต์ข่าว</h3>
+                    <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-[11px] font-bold text-rose-600 border border-rose-200">
+                      Admin Only
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    คุณกำลังจะลบโพสต์นี้ออกจากวอลล์/ฟีดของระบบ
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (!isDeletingPost) setPostToDelete(null);
+                  }}
+                  disabled={isDeletingPost}
+                  className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Post Preview Box */}
+              <div className="rounded-2xl border border-rose-100 bg-rose-50/40 p-4.5 space-y-2 text-xs">
+                <div className="flex items-center justify-between text-slate-500">
+                  <span className="font-semibold text-rose-700">ผู้โพสต์: {postToDelete.author || 'แอดมิน'}</span>
+                  {postToDelete.category && (
+                    <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-slate-600 border border-rose-100">
+                      {postToDelete.category}
+                    </span>
+                  )}
+                </div>
+                {postToDelete.title && (
+                  <p className="font-bold text-slate-900 text-sm">{postToDelete.title}</p>
+                )}
+                <p className="text-slate-600 line-clamp-3 leading-relaxed">
+                  {postToDelete.body}
                 </p>
               </div>
-              <button
-                onClick={() => {
-                  if (!isDeletingPost) setPostToDelete(null);
-                }}
-                disabled={isDeletingPost}
-                className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
 
-            {/* Post Preview Box */}
-            <div className="rounded-2xl border border-rose-100 bg-rose-50/40 p-4.5 space-y-2 text-xs">
-              <div className="flex items-center justify-between text-slate-500">
-                <span className="font-semibold text-rose-700">ผู้โพสต์: {postToDelete.author || 'แอดมิน'}</span>
-                {postToDelete.category && (
-                  <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-slate-600 border border-rose-100">
-                    {postToDelete.category}
-                  </span>
-                )}
+              {/* Warning Details */}
+              <div className="rounded-2xl bg-amber-50/80 border border-amber-200/80 p-3.5 flex items-start gap-2.5 text-xs text-amber-900">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold">คำเตือนการลบข้อมูลถาวร</p>
+                  <p className="mt-0.5 text-amber-800 leading-relaxed">
+                    การลบโพสต์นี้จะลบคอมเมนต์, การส่งความรัก (Likes) และผลโหวตที่เกี่ยวข้องทั้งหมด และไม่สามารถกู้คืนได้
+                  </p>
+                </div>
               </div>
-              {postToDelete.title && (
-                <p className="font-bold text-slate-900 text-sm">{postToDelete.title}</p>
-              )}
-              <p className="text-slate-600 line-clamp-3 leading-relaxed">
-                {postToDelete.body}
-              </p>
-            </div>
 
-            {/* Warning Details */}
-            <div className="rounded-2xl bg-amber-50/80 border border-amber-200/80 p-3.5 flex items-start gap-2.5 text-xs text-amber-900">
-              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-bold">คำเตือนการลบข้อมูลถาวร</p>
-                <p className="mt-0.5 text-amber-800 leading-relaxed">
-                  การลบโพสต์นี้จะลบคอมเมนต์, การส่งความรัก (Likes) และผลโหวตที่เกี่ยวข้องทั้งหมด และไม่สามารถกู้คืนได้
-                </p>
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPostToDelete(null)}
+                  disabled={isDeletingPost}
+                  className="rounded-full border border-slate-200 px-6 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                >
+                  ยกเลิก
+                </button>
+
+                <button
+                  type="button"
+                  onClick={confirmDeletePost}
+                  disabled={isDeletingPost}
+                  className="flex items-center gap-2 rounded-full bg-gradient-to-r from-rose-600 to-pink-600 px-6 py-2.5 text-xs font-bold text-white shadow-md hover:from-rose-700 hover:to-pink-700 active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {isDeletingPost ? (
+                    <>
+                      <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                      <span>กำลังลบโพสต์...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4" />
+                      <span>ยืนยันลบโพสต์</span>
+                    </>
+                  )}
+                </button>
               </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setPostToDelete(null)}
-                disabled={isDeletingPost}
-                className="rounded-full border border-slate-200 px-6 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
-              >
-                ยกเลิก
-              </button>
-
-              <button
-                type="button"
-                onClick={confirmDeletePost}
-                disabled={isDeletingPost}
-                className="flex items-center gap-2 rounded-full bg-gradient-to-r from-rose-600 to-pink-600 px-6 py-2.5 text-xs font-bold text-white shadow-md hover:from-rose-700 hover:to-pink-700 active:scale-95 transition-all disabled:opacity-50"
-              >
-                {isDeletingPost ? (
-                  <>
-                    <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                    <span>กำลังลบโพสต์...</span>
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="h-4 w-4" />
-                    <span>ยืนยันลบโพสต์</span>
-                  </>
-                )}
-              </button>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </div>
   );

@@ -173,6 +173,25 @@ export async function deleteSession(sessionId: string): Promise<void> {
   await pool.query(`DELETE FROM sessions WHERE id = $1`, [sessionId]);
 }
 
+// ─── เวลาใช้งานล่าสุด (users.last_active_at) — ใช้นับผู้ใช้ active ในหน้าแอดมิน ───────────────
+// เขียน DB ไม่เกิน 5 นาทีครั้งต่อคน: จำเวลาที่เขียนล่าสุดไว้ในหน่วยความจำ และเงื่อนไขใน WHERE กันซ้ำอีกชั้น
+// (กรณีมีหลาย process) ไม่รอผล และไม่ทำให้ request ล้มถ้าเขียนไม่สำเร็จ (เช่น ยังไม่ได้รัน migration)
+const ACTIVE_TOUCH_INTERVAL_MS = 5 * 60 * 1000;
+const lastTouchedAt = new Map<number, number>();
+
+function touchLastActive(userId: number): void {
+  const now = Date.now();
+  if (now - (lastTouchedAt.get(userId) ?? 0) < ACTIVE_TOUCH_INTERVAL_MS) return;
+  lastTouchedAt.set(userId, now);
+  pool
+    .query(
+      `UPDATE users SET last_active_at = now()
+       WHERE id = $1 AND (last_active_at IS NULL OR last_active_at < now() - interval '5 minutes')`,
+      [userId]
+    )
+    .catch(() => {});
+}
+
 /**
  * ดึง Current User ปัจจุบันจาก Session Cookie เท่านั้น
  *
@@ -187,7 +206,9 @@ export async function getCurrentUser(): Promise<UserSession | null> {
     const cookieStore = await cookies();
     const sessionId = cookieStore.get('session_id')?.value;
     if (!sessionId) return null;
-    return await getSessionUser(sessionId);
+    const user = await getSessionUser(sessionId);
+    if (user) touchLastActive(user.id);
+    return user;
   } catch (err) {
     // เดิม catch เงียบไม่ log อะไรเลย ทำให้ debug ปัญหา session/DB จริงไม่ได้ (เห็นแค่ 401/403
     // ปลายทางโดยไม่รู้สาเหตุ) — log ไว้เพื่อให้เห็นใน `docker compose logs app` เสมอ

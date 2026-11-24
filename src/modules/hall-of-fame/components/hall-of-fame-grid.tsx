@@ -28,6 +28,7 @@ import {
   ChevronDown,
   GraduationCap,
 } from 'lucide-react';
+import { ModalPortal } from '@/components/ui/modal-portal';
 
 /* ═══════════════════════════════════════════════
    TYPE DEFINITIONS
@@ -358,57 +359,59 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
           ║  popup วิธีการโหวต — โผล่ครั้งเดียวตอนเข้าหน้านี้  ║
           ╚══════════════════════════════════════════╝ */}
       {isVotingOpen && showHowToVote && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm"
-          onClick={() => setShowHowToVote(false)}
-        >
+        <ModalPortal>
           <div
-            className="relative w-full max-w-sm bg-white rounded-[32px] p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-4"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm"
+            onClick={() => setShowHowToVote(false)}
           >
-            <button
-              onClick={() => setShowHowToVote(false)}
-              className="absolute top-4 right-4 h-8 w-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer"
+            <div
+              className="relative w-full max-w-sm bg-white rounded-[32px] p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-4"
+              onClick={(e) => e.stopPropagation()}
             >
-              <X className="h-4 w-4" />
-            </button>
+              <button
+                onClick={() => setShowHowToVote(false)}
+                className="absolute top-4 right-4 h-8 w-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
 
-            <div className="text-center space-y-1.5">
-              <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 mb-1">
-                <HelpCircle className="h-6 w-6" />
+              <div className="text-center space-y-1.5">
+                <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 mb-1">
+                  <HelpCircle className="h-6 w-6" />
+                </div>
+                <h3 className="text-lg font-black text-slate-800">วิธีการโหวต 💖</h3>
               </div>
-              <h3 className="text-lg font-black text-slate-800">วิธีการโหวต 💖</h3>
+
+              <ul className="space-y-2.5 text-sm text-slate-600">
+                <li className="flex items-start gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700 text-xs font-bold mt-0.5">1</span>
+                  <span>ทุกคนมีสิทธิ์โหวต <b>2 ครั้ง</b> ต่อรอบ — โหวตให้ศิษย์เก่า<b>ในรุ่นตัวเอง</b>ได้ 1 ครั้ง และ<b>นอกรุ่น</b>อีก 1 ครั้ง</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700 text-xs font-bold mt-0.5">2</span>
+                  <span>กดปุ่ม <b>โหวต 💖</b> ที่การ์ดของศิษย์เก่าที่ต้องการสนับสนุน โหวตแล้วแก้ไขไม่ได้</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700 text-xs font-bold mt-0.5">3</span>
+                  <span>ทุกโหวตที่คุณส่งจะได้รับ <b>+10 แต้มสะสม</b> ทันที</span>
+                </li>
+              </ul>
+
+              <button
+                onClick={() => setShowHowToVote(false)}
+                className="w-full rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 py-3 text-sm font-bold text-white shadow-md hover:opacity-95 transition-all cursor-pointer"
+              >
+                เข้าใจแล้ว เริ่มโหวตเลย ✨
+              </button>
             </div>
-
-            <ul className="space-y-2.5 text-sm text-slate-600">
-              <li className="flex items-start gap-2.5">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700 text-xs font-bold mt-0.5">1</span>
-                <span>ทุกคนมีสิทธิ์โหวต <b>2 ครั้ง</b> ต่อรอบ — โหวตให้ศิษย์เก่า<b>ในรุ่นตัวเอง</b>ได้ 1 ครั้ง และ<b>นอกรุ่น</b>อีก 1 ครั้ง</span>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700 text-xs font-bold mt-0.5">2</span>
-                <span>กดปุ่ม <b>โหวต 💖</b> ที่การ์ดของศิษย์เก่าที่ต้องการสนับสนุน โหวตแล้วแก้ไขไม่ได้</span>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700 text-xs font-bold mt-0.5">3</span>
-                <span>ทุกโหวตที่คุณส่งจะได้รับ <b>+10 แต้มสะสม</b> ทันที</span>
-              </li>
-            </ul>
-
-            <button
-              onClick={() => setShowHowToVote(false)}
-              className="w-full rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 py-3 text-sm font-bold text-white shadow-md hover:opacity-95 transition-all cursor-pointer"
-            >
-              เข้าใจแล้ว เริ่มโหวตเลย ✨
-            </button>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* ╔══════════════════════════════════════════╗
           ║  2+4. TOP 3 (ซ้าย) วางข้างลิสต์อันดับ 4-10 (ขวา)  ║
           ╚══════════════════════════════════════════╝ */}
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-6 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(340px,30%)] gap-6 items-start">
 
       {/* ╔══════════════════════════════════════════╗
           ║  2. TOP 3 - FLOATING CIRCULAR AVATARS    ║
@@ -752,126 +755,128 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
           ║  5. CANDIDATE PROFILE MODAL (YEARBOOK)   ║
           ╚══════════════════════════════════════════╝ */}
       {selectedCandidate && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm"
-          onClick={() => setSelectedCandidate(null)}
-        >
+        <ModalPortal>
           <div
-            className="relative w-full max-w-md bg-white rounded-[36px] p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm"
+            onClick={() => setSelectedCandidate(null)}
           >
-            {/* Close button */}
-            <button
-              onClick={() => setSelectedCandidate(null)}
-              className="absolute top-4 right-4 h-8 w-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer z-10"
+            <div
+              className="relative w-full max-w-md bg-white rounded-[36px] p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
             >
-              <X className="h-4 w-4" />
-            </button>
+              {/* Close button */}
+              <button
+                onClick={() => setSelectedCandidate(null)}
+                className="absolute top-4 right-4 h-8 w-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer z-10"
+              >
+                <X className="h-4 w-4" />
+              </button>
 
-            {/* ── Profile Header (Photo square-rounded, Gen badge, Name, studentId) ── */}
-            <div className="text-center space-y-3">
-              <div className="relative inline-block">
-                <CandidateAvatar
-                  src={selectedCandidate.avatar_url}
-                  name={selectedCandidate.name}
-                  className="h-32 w-32 rounded-3xl object-cover mx-auto ring-4 ring-indigo-100 shadow-md text-4xl"
-                />
-              </div>
+              {/* ── Profile Header (Photo square-rounded, Gen badge, Name, studentId) ── */}
+              <div className="text-center space-y-3">
+                <div className="relative inline-block">
+                  <CandidateAvatar
+                    src={selectedCandidate.avatar_url}
+                    name={selectedCandidate.name}
+                    className="h-32 w-32 rounded-3xl object-cover mx-auto ring-4 ring-indigo-100 shadow-md text-4xl"
+                  />
+                </div>
 
-              <div>
-                <div className="flex flex-wrap items-center justify-center gap-1.5 mb-1.5">
-                  {selectedCandidate.generation_label && (
-                    <span className="inline-block bg-indigo-50 text-indigo-700 px-3 py-0.5 text-xs font-extrabold rounded-full border border-indigo-100">
-                      {selectedCandidate.generation_label}
-                    </span>
+                <div>
+                  <div className="flex flex-wrap items-center justify-center gap-1.5 mb-1.5">
+                    {selectedCandidate.generation_label && (
+                      <span className="inline-block bg-indigo-50 text-indigo-700 px-3 py-0.5 text-xs font-extrabold rounded-full border border-indigo-100">
+                        {selectedCandidate.generation_label}
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-900">
+                    {selectedCandidate.name}
+                  </h2>
+                  {selectedCandidate.studentId && (
+                    <p className="text-xs text-slate-500 font-mono mt-0.5">
+                      รหัส: {selectedCandidate.studentId}
+                    </p>
                   )}
                 </div>
-                <h2 className="text-xl font-bold text-slate-900">
-                  {selectedCandidate.name}
-                </h2>
-                {selectedCandidate.studentId && (
-                  <p className="text-xs text-slate-500 font-mono mt-0.5">
-                    รหัส: {selectedCandidate.studentId}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* ── Info rows (position, company, careerType) ── */}
-            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 space-y-3 text-left">
-              <div className="flex items-start gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 mt-0.5">
-                  <Briefcase className="h-4 w-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">ตำแหน่งงาน</p>
-                  <p className="text-sm font-bold text-slate-800 break-words">
-                    {selectedCandidate.position || 'ไม่ได้ระบุ'}
-                  </p>
-                </div>
               </div>
 
-              <div className="flex items-start gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-600 mt-0.5">
-                  <Building2 className="h-4 w-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">สถานที่ทำงาน / องค์กร</p>
-                  <p className="text-sm font-bold text-slate-800 break-words">
-                    {selectedCandidate.company || 'ไม่ได้ระบุ'}
-                  </p>
-                </div>
-              </div>
-
-              {selectedCandidate.employmentType && (
-                <div className="flex items-start gap-3 pt-2 border-t border-slate-200/60">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 mt-0.5">
-                    <MapPin className="h-4 w-4" />
+              {/* ── Info rows (position, company, careerType) ── */}
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 space-y-3 text-left">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 mt-0.5">
+                    <Briefcase className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">ประเภทสายงาน</p>
-                    <p className="text-sm font-semibold text-slate-700">
-                      {selectedCandidate.employmentType}
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">ตำแหน่งงาน</p>
+                    <p className="text-sm font-bold text-slate-800 break-words">
+                      {selectedCandidate.position || 'ไม่ได้ระบุ'}
                     </p>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* ── Achievement / Description (like Senior Quote) ── */}
-            {selectedCandidate.description && (
-              <div className="rounded-2xl bg-violet-50/80 p-4 border border-violet-200/60 text-left shadow-2xs relative">
-                <p className="text-xs font-bold text-violet-700 flex items-center gap-1.5 mb-2">
-                  <Award className="h-3.5 w-3.5" />
-                  ผลงานและคุณประโยชน์
-                </p>
-                <p className="text-sm text-slate-700 leading-relaxed">
-                  {selectedCandidate.description}
-                </p>
+                <div className="flex items-start gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-600 mt-0.5">
+                    <Building2 className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">สถานที่ทำงาน / องค์กร</p>
+                    <p className="text-sm font-bold text-slate-800 break-words">
+                      {selectedCandidate.company || 'ไม่ได้ระบุ'}
+                    </p>
+                  </div>
+                </div>
+
+                {selectedCandidate.employmentType && (
+                  <div className="flex items-start gap-3 pt-2 border-t border-slate-200/60">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 mt-0.5">
+                      <MapPin className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">ประเภทสายงาน</p>
+                      <p className="text-sm font-semibold text-slate-700">
+                        {selectedCandidate.employmentType}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
 
-            {/* ── Vote Footer ── */}
-            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-              <div className="text-left">
-                <span className="text-[11px] text-slate-400 font-medium">คะแนนโหวตปัจจุบัน</span>
-                <p className="text-lg font-black text-violet-600">
-                  {selectedCandidate.votes || 0} <span className="text-xs font-normal text-slate-400">คะแนน</span>
-                </p>
-              </div>
-
-              {isVotingOpen && (
-                <VoteButton
-                  size="lg"
-                  voted={votedIds[selectedCandidate.id]}
-                  isVoting={votingId === selectedCandidate.id}
-                  animating={voteAnimId === selectedCandidate.id}
-                  onVote={(e) => handleVote(e, selectedCandidate.id)}
-                />
+              {/* ── Achievement / Description (like Senior Quote) ── */}
+              {selectedCandidate.description && (
+                <div className="rounded-2xl bg-violet-50/80 p-4 border border-violet-200/60 text-left shadow-2xs relative">
+                  <p className="text-xs font-bold text-violet-700 flex items-center gap-1.5 mb-2">
+                    <Award className="h-3.5 w-3.5" />
+                    ผลงานและคุณประโยชน์
+                  </p>
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    {selectedCandidate.description}
+                  </p>
+                </div>
               )}
+
+              {/* ── Vote Footer ── */}
+              <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                <div className="text-left">
+                  <span className="text-[11px] text-slate-400 font-medium">คะแนนโหวตปัจจุบัน</span>
+                  <p className="text-lg font-black text-violet-600">
+                    {selectedCandidate.votes || 0} <span className="text-xs font-normal text-slate-400">คะแนน</span>
+                  </p>
+                </div>
+
+                {isVotingOpen && (
+                  <VoteButton
+                    size="lg"
+                    voted={votedIds[selectedCandidate.id]}
+                    isVoting={votingId === selectedCandidate.id}
+                    animating={voteAnimId === selectedCandidate.id}
+                    onVote={(e) => handleVote(e, selectedCandidate.id)}
+                  />
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
       </>
       )}

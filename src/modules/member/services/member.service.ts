@@ -1,5 +1,6 @@
 import { pool } from '@/lib/db';
 import { notificationDbService } from '@/modules/notifications/services/notification.service';
+import { leaderService } from '@/modules/member/services/leader.service';
 
 export class MemberDbService {
   /** ดึงรายการเพื่อนร่วมรุ่นที่รออนุมัติ */
@@ -21,9 +22,10 @@ export class MemberDbService {
 
   /**
    * ยืนยันตัวตนผู้สมัคร — ทำได้ 2 แบบ:
-   *  - เพื่อนร่วมรุ่น (บัญชี approved รุ่นเดียวกัน): ยืนยันได้เฉพาะผู้สมัครที่ยัง pending
+   *  - หัวหน้ารุ่น (generation_leaders) ของรุ่นผู้สมัคร: ยืนยันได้เฉพาะผู้สมัครที่ยัง pending
+   *    (เดิมเพื่อนร่วมรุ่นทุกคนยืนยันได้ เปลี่ยนเป็นหัวหน้ารุ่นเท่านั้นเพื่อความน่าเชื่อถือ)
    *  - แอดมิน: ยืนยันได้ทุกรุ่น รวมถึงคนที่เคยถูกปฏิเสธไปแล้ว (เปลี่ยนใจได้)
-   * เพื่อนร่วมรุ่นห้ามอนุมัติคนที่แอดมินปฏิเสธไปแล้ว ไม่งั้นการปฏิเสธของแอดมินไม่มีผล
+   * หัวหน้ารุ่นห้ามอนุมัติคนที่แอดมินปฏิเสธไปแล้ว ไม่งั้นการปฏิเสธของแอดมินไม่มีผล
    */
   async approveBatchmate(applicantId: number, approverUserId: number) {
     const { rows: approver } = await pool.query(
@@ -46,8 +48,9 @@ export class MemberDbService {
       if (applicant[0].status !== 'pending') {
         throw new Error('ผู้สมัครรายนี้ถูกผู้ดูแลระบบปฏิเสธแล้ว เฉพาะผู้ดูแลระบบเท่านั้นที่เปลี่ยนสถานะได้');
       }
-      if (!approver[0].generation_option_id || approver[0].generation_option_id !== applicant[0].generation_option_id) {
-        throw new Error('เฉพาะเพื่อนร่วมรุ่นเดียวกันเท่านั้นที่สามารถยืนยันตัวตนได้');
+      const leaderOf = await leaderService.getLeaderGeneration(approver[0].id);
+      if (!leaderOf || leaderOf.id !== applicant[0].generation_option_id) {
+        throw new Error('เฉพาะหัวหน้ารุ่นของผู้สมัครหรือผู้ดูแลระบบเท่านั้นที่ยืนยันตัวตนได้');
       }
     }
 
@@ -60,14 +63,14 @@ export class MemberDbService {
     );
     if (!updated.length) throw new Error('สถานะผู้สมัครเปลี่ยนไปแล้ว กรุณารีเฟรชหน้า');
 
-    const approverLabel = isAdmin ? 'ผู้ดูแลระบบ' : 'เพื่อนร่วมรุ่น';
+    const approverLabel = isAdmin ? 'ผู้ดูแลระบบ' : 'หัวหน้ารุ่น';
     await pool.query(
       `INSERT INTO user_verifications (user_id, verified_by, source, status, remark)
        VALUES ($1, $2, $3, 'approved', $4)`,
       [
         applicantId,
         approverUserId,
-        isAdmin ? 'admin_manual' : 'batchmate_endorsement',
+        isAdmin ? 'admin_manual' : 'generation_leader',
         `ยืนยันตัวตนโดย${approverLabel}: ${approver[0].name}`,
       ]
     );
@@ -86,8 +89,8 @@ export class MemberDbService {
         await notificationDbService.createNotification(
           admin.id,
           'system',
-          'เพื่อนร่วมรุ่นยืนยันสมาชิกแล้ว',
-          `${approver[0].name} ได้ยืนยันตัวตนเพื่อนร่วมรุ่น ${applicant[0].name} เรียบร้อยแล้ว`,
+          'หัวหน้ารุ่นยืนยันสมาชิกแล้ว',
+          `${approver[0].name} (หัวหน้ารุ่น) ได้ยืนยันตัวตน ${applicant[0].name} เรียบร้อยแล้ว`,
           '/member/approvals'
         );
       }

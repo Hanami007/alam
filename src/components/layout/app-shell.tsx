@@ -92,11 +92,13 @@ interface NavItem {
   label: string;
   icon: any;
   adminOnly?: boolean;
+  /** แอดมินหรือหัวหน้ารุ่น */
+  leaderOnly?: boolean;
 }
 
 const ACCOUNT_NAV: NavItem[] = [
   { href: '/profile', label: 'โปรไฟล์', icon: User },
-  { href: '/member/approvals', label: 'ยืนยันสมาชิกใหม่', icon: Shield },
+  { href: '/member/approvals', label: 'จัดการรุ่น', icon: Shield, leaderOnly: true },
   { href: '/admin', label: 'จัดการระบบ', icon: Settings, adminOnly: true },
 ];
 
@@ -174,7 +176,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const unreadNotifCount = visibleNotifications.length;
   const isAdmin = currentUser?.role === 'admin';
-  const navAccountItems = ACCOUNT_NAV.filter((item) => !item.adminOnly || isAdmin);
+  const isGenerationLeader = Boolean(currentUser?.is_generation_leader);
+  const navAccountItems = ACCOUNT_NAV.filter(
+    (item) => (!item.adminOnly || isAdmin) && (!item.leaderOnly || isAdmin || isGenerationLeader)
+  );
 
   const fetchUserProfile = useCallback(() => {
     fetch('/api/user/profile')
@@ -203,6 +208,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             avatar_url: u.avatarUrl || u.avatar_url,
             role: u.role || 'alumni',
             is_available_for_mentorship: Boolean(u.isAvailableForMentorship ?? u.is_available_for_mentorship),
+            is_generation_leader: Boolean(u.leaderGeneration),
           });
         } else {
           setCurrentUser(null);
@@ -830,7 +836,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         data-sidebar={collapsed ? 'collapsed' : 'expanded'}
         className={`group/shell flex min-h-screen flex-col transition-[padding] duration-200 ${contentOffset}`}
       >
-        <main className="flex-1 px-3.5 py-4 sm:px-6 lg:px-8 pb-24 lg:pb-8">{children}</main>
+        <main className="flex-1 px-3.5 py-4 sm:px-6 lg:px-8 pb-24 lg:pb-8">
+          {/* จำกัดความกว้างและจัดกลางจอ — เปิด/ปิดเมนูข้าง ระยะขอบซ้ายขวายังสมดุล ไม่ยืดไปข้างเดียว */}
+          <div className="mx-auto w-full max-w-[1480px]">{children}</div>
+        </main>
       </div>
 
       {/* ─── Modern Glassmorphic Mobile Bottom Navigation Bar (< lg) ─── */}
