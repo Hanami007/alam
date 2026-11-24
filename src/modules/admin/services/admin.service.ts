@@ -1,4 +1,5 @@
 import { pool } from '@/lib/db';
+import { deletePostImageFile } from '@/lib/upload-storage';
 import { leaderService } from '@/modules/member/services/leader.service';
 
 export interface AdminOverviewStats {
@@ -240,6 +241,11 @@ export class AdminDbService {
       await client.query(`UPDATE user_verifications SET verified_by = NULL WHERE verified_by = $1`, [userId]);
 
       // ลบโพสต์ที่สมาชิกคนนี้ร้องขอเอง (ลบโพลของโพสต์ก่อน เพราะไม่มี cascade จาก posts)
+      // แถว post_images ลบตาม cascade ส่วนไฟล์บนดิสก์เก็บ path ไว้ลบหลัง COMMIT
+      const { rows: postImageRows } = await client.query(
+        `SELECT pi.image_url FROM post_images pi JOIN posts p ON p.id = pi.post_id WHERE p.requested_by = $1`,
+        [userId]
+      );
       await client.query(
         `DELETE FROM polls WHERE post_id IN (SELECT id FROM posts WHERE requested_by = $1)`,
         [userId]
@@ -284,6 +290,7 @@ export class AdminDbService {
       }
 
       await client.query('COMMIT');
+      await Promise.all(postImageRows.map((r) => deletePostImageFile(r.image_url)));
       return { success: true };
     } catch (err: any) {
       await client.query('ROLLBACK');

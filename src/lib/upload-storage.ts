@@ -100,3 +100,59 @@ export async function readAvatarFile(
     return null;
   }
 }
+
+// ─── รูปในโพสต์ (post_images) ─────────────────────────────────────────────────
+
+export const POST_IMAGE_URL_PREFIX = '/api/uploads/posts/';
+const POST_IMAGE_DIR = path.join(UPLOAD_ROOT, 'posts');
+const POST_IMAGE_FILE_RE = /^[a-f0-9-]{36}\.webp$/;
+export const MAX_POST_IMAGES = 4;
+const MAX_POST_IMAGE_BYTES = 5 * 1024 * 1024;
+const POST_IMAGE_MAX_SIDE = 1600;
+
+export function isPostImageFileName(name: string): boolean {
+  return POST_IMAGE_FILE_RE.test(name);
+}
+
+/** แปลง data URL เป็น webp ด้านยาวไม่เกิน 1600px (ตัด EXIF/GPS ทิ้ง) แล้วคืน path สำหรับเก็บใน post_images */
+export async function savePostImageFromDataUrl(dataUrl: string): Promise<string> {
+  const match = /^data:image\/(png|jpe?g|webp);base64,([A-Za-z0-9+/=\s]+)$/i.exec(dataUrl);
+  if (!match) throw new Error('รองรับเฉพาะรูป JPG, PNG หรือ WebP');
+
+  const buffer = Buffer.from(match[2], 'base64');
+  if (buffer.length === 0) throw new Error('ไฟล์รูปภาพว่างเปล่า');
+  if (buffer.length > MAX_POST_IMAGE_BYTES) throw new Error('รูปในโพสต์ต้องมีขนาดไม่เกิน 5MB ต่อรูป');
+
+  let output: Buffer;
+  try {
+    output = await sharp(buffer)
+      .rotate()
+      .resize(POST_IMAGE_MAX_SIDE, POST_IMAGE_MAX_SIDE, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 82 })
+      .toBuffer();
+  } catch {
+    throw new Error('ไม่สามารถอ่านไฟล์รูปภาพนี้ได้');
+  }
+
+  const fileName = `${randomUUID()}.webp`;
+  await mkdir(POST_IMAGE_DIR, { recursive: true });
+  await writeFile(path.join(POST_IMAGE_DIR, fileName), output);
+  return `${POST_IMAGE_URL_PREFIX}${fileName}`;
+}
+
+/** ลบไฟล์รูปโพสต์ (ข้ามค่าที่ไม่ใช่ไฟล์ที่ระบบเก็บเอง) */
+export async function deletePostImageFile(imageUrl: string | null | undefined): Promise<void> {
+  if (!imageUrl?.startsWith(POST_IMAGE_URL_PREFIX)) return;
+  const fileName = imageUrl.slice(POST_IMAGE_URL_PREFIX.length);
+  if (!isPostImageFileName(fileName)) return;
+  await unlink(path.join(POST_IMAGE_DIR, fileName)).catch(() => {});
+}
+
+export async function readPostImageFile(fileName: string): Promise<{ data: Buffer; contentType: string } | null> {
+  if (!isPostImageFileName(fileName)) return null;
+  try {
+    return { data: await readFile(path.join(POST_IMAGE_DIR, fileName)), contentType: 'image/webp' };
+  } catch {
+    return null;
+  }
+}

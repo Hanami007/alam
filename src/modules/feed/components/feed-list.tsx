@@ -63,6 +63,8 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { ModalPortal } from '@/components/ui/modal-portal';
+import { PostImagePicker } from './post-image-picker';
+import { PostImageGrid } from './post-image-grid';
 
 interface Comment {
   id: number;
@@ -127,6 +129,7 @@ interface Post {
   selectedEmoji?: string;
   isAvailableForMentorship?: boolean;
   poll?: PollData;
+  images?: string[];
 }
 
 
@@ -265,6 +268,7 @@ export function FeedList({
     pollQuestion: string;
     pollOptions: string[];
     pointsPerVote: number;
+    images: string[];
   }>({
     postType: 'normal',
     title: '',
@@ -273,6 +277,7 @@ export function FeedList({
     pollQuestion: '',
     pollOptions: ['', ''],
     pointsPerVote: 5,
+    images: [],
   });
   const [requestStatus, setRequestStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
 
@@ -554,6 +559,7 @@ export function FeedList({
                 pointsPerVote: requestForm.pointsPerVote || 5,
               }
             : undefined,
+          images: requestForm.images,
         }),
       });
       const data = await res.json().catch(() => null);
@@ -567,6 +573,7 @@ export function FeedList({
           pollQuestion: '',
           pollOptions: ['', ''],
           pointsPerVote: 5,
+          images: [],
         });
         setDeleteToast({
           message: isPoll ? '✨ ส่งคำขอสร้างโพลแบบสำรวจเรียบร้อยแล้ว!' : '✨ ส่งคำขอสร้างโพสต์เรียบร้อยแล้ว!',
@@ -1175,6 +1182,12 @@ export function FeedList({
                 <p className="text-right text-xs text-slate-400 mt-1">{requestForm.content.length}/1000</p>
               </div>
 
+              <PostImagePicker
+                images={requestForm.images}
+                onChange={(images) => setRequestForm((f) => ({ ...f, images }))}
+                disabled={requestStatus === 'submitting'}
+              />
+
               {/* Submit Button */}
               <div className="flex items-center justify-between gap-3 pt-1">
                 <button
@@ -1189,6 +1202,7 @@ export function FeedList({
                       pollQuestion: '',
                       pollOptions: ['', ''],
                       pointsPerVote: 5,
+                      images: [],
                     });
                     setRequestStatus('idle');
                   }}
@@ -1457,13 +1471,16 @@ export function FeedList({
                     </div>
                   </div>
 
-                  {/* Post Content Box */}
-                  <div className="mt-4 space-y-2 bg-slate-50/70 rounded-2xl p-4 sm:p-6 border border-slate-200/70 shadow-xs/30">
-                    {post.title && (
-                      <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">{post.title}</h3>
-                    )}
-                    <p className="text-sm sm:text-base leading-relaxed text-slate-700 whitespace-pre-line">{post.body}</p>
-                  </div>
+                  {/* Post Content Box — โพสต์โพลแสดงหัวข้อ/เนื้อหา/รูปรวมในการ์ดโพลใบเดียวด้านล่างแทน */}
+                  {!post.poll && (
+                    <div className="mt-4 space-y-2 bg-slate-50/70 rounded-2xl p-4 sm:p-6 border border-slate-200/70 shadow-xs/30">
+                      {post.title && (
+                        <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">{post.title}</h3>
+                      )}
+                      <p className="text-sm sm:text-base leading-relaxed text-slate-700 whitespace-pre-line">{post.body}</p>
+                      {post.images && post.images.length > 0 && <PostImageGrid images={post.images} title={post.title} />}
+                    </div>
+                  )}
 
                   {/* Poll Box (Interactive Real Voting) */}
                   {post.poll && (() => {
@@ -1474,9 +1491,15 @@ export function FeedList({
                     const hasVoted = Boolean(
                       poll.hasVoted || poll.votedUserIds?.includes(currentUserId) || userVote
                     );
+                    // ฟอร์มสร้างโพลเติม title/content ด้วยคำถามเมื่อผู้ใช้เว้นว่าง — แสดงเฉพาะข้อความที่ไม่ซ้ำกัน
+                    const question = poll.question.trim();
+                    const heading = post.title?.trim() || question;
+                    const subQuestion = question && question !== heading ? question : '';
+                    const details = post.body?.trim();
+                    const showDetails = Boolean(details) && details !== heading && details !== question;
 
                     return (
-                      <div className="mt-5 rounded-2xl border border-purple-200/80 bg-gradient-to-br from-purple-50/60 via-white to-pink-50/40 p-5 sm:p-6 shadow-xs">
+                      <div className="mt-4 rounded-2xl border border-purple-200/80 bg-gradient-to-br from-purple-50/60 via-white to-pink-50/40 p-5 sm:p-6 shadow-xs">
                         <div className="flex items-center justify-between gap-2 mb-2">
                           <p className="text-xs font-bold text-purple-600 uppercase tracking-wider flex items-center gap-1.5">
                             <Zap className="h-4 w-4" /> โพลแบบสำรวจ
@@ -1486,7 +1509,13 @@ export function FeedList({
                           </span>
                         </div>
 
-                        <p className="text-base sm:text-lg font-bold text-slate-800 mb-4">{poll.question}</p>
+                        <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">{heading}</h3>
+                        {subQuestion && <p className="mt-1 text-sm sm:text-base font-semibold text-slate-700">{subQuestion}</p>}
+                        {showDetails && (
+                          <p className="mt-1.5 text-sm leading-relaxed text-slate-600 whitespace-pre-line">{details}</p>
+                        )}
+                        {post.images && post.images.length > 0 && <PostImageGrid images={post.images} title={heading} />}
+                        <div className="mb-4" />
 
                         <div className="space-y-3">
                           {poll.options.map((opt) => {
