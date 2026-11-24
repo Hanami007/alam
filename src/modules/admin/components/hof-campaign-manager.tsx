@@ -6,6 +6,7 @@ import {
   ChevronDown, ChevronUp, Clock, RefreshCw, Pencil, Trash2, X, Check,
   Medal, Crown, History, Eye, EyeOff, Copy, AlertTriangle,
 } from 'lucide-react';
+import { ModalPortal } from '@/components/ui/modal-portal';
 
 interface HofResult {
   id: number;
@@ -321,78 +322,80 @@ function NewCampaignForm({ onCreated }: { onCreated: () => void }) {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-base font-extrabold text-slate-900">สร้างรอบโหวตใหม่</h3>
-              <button onClick={() => setOpen(false)} className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 cursor-pointer">
-                <X className="h-4 w-4" />
-              </button>
+        <ModalPortal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-xl">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-base font-extrabold text-slate-900">สร้างรอบโหวตใหม่</h3>
+                <button onClick={() => setOpen(false)} className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 cursor-pointer">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5">ชื่อแคมเปญ *</label>
+                  <input
+                    required
+                    value={form.title}
+                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    placeholder="ศิษย์เก่าดีเด่น Q3/2569"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5">ป้ายกำกับ (Quarter)</label>
+                  <input
+                    value={form.quarter}
+                    onChange={(e) => setForm((f) => ({ ...f, quarter: e.target.value }))}
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    placeholder="Q3/2569"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1.5">วันเริ่ม *</label>
+                    <input
+                      required type="date"
+                      value={form.period_start}
+                      onChange={(e) => setForm((f) => ({ ...f, period_start: e.target.value }))}
+                      className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1.5">วันสิ้นสุด *</label>
+                    <input
+                      required type="date"
+                      value={form.period_end}
+                      onChange={(e) => setForm((f) => ({ ...f, period_end: e.target.value }))}
+                      className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    />
+                  </div>
+                </div>
+                <div className="rounded-2xl bg-amber-50 p-3.5">
+                  <p className="text-xs text-amber-800 font-semibold">
+                    ⚠️ การสร้างรอบใหม่จะปิด campaign ที่เปิดอยู่โดยอัตโนมัติ
+                  </p>
+                </div>
+                <div className="flex gap-3 pt-1">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 py-2.5 text-xs font-extrabold text-white hover:opacity-90 disabled:opacity-50 cursor-pointer transition-all"
+                  >
+                    {loading ? 'กำลังสร้าง...' : 'สร้างรอบใหม่'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    className="rounded-2xl border border-slate-200 px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                  >
+                    ยกเลิก
+                  </button>
+                </div>
+              </form>
             </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">ชื่อแคมเปญ *</label>
-                <input
-                  required
-                  value={form.title}
-                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                  placeholder="ศิษย์เก่าดีเด่น Q3/2569"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">ป้ายกำกับ (Quarter)</label>
-                <input
-                  value={form.quarter}
-                  onChange={(e) => setForm((f) => ({ ...f, quarter: e.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                  placeholder="Q3/2569"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">วันเริ่ม *</label>
-                  <input
-                    required type="date"
-                    value={form.period_start}
-                    onChange={(e) => setForm((f) => ({ ...f, period_start: e.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">วันสิ้นสุด *</label>
-                  <input
-                    required type="date"
-                    value={form.period_end}
-                    onChange={(e) => setForm((f) => ({ ...f, period_end: e.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                  />
-                </div>
-              </div>
-              <div className="rounded-2xl bg-amber-50 p-3.5">
-                <p className="text-xs text-amber-800 font-semibold">
-                  ⚠️ การสร้างรอบใหม่จะปิด campaign ที่เปิดอยู่โดยอัตโนมัติ
-                </p>
-              </div>
-              <div className="flex gap-3 pt-1">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 py-2.5 text-xs font-extrabold text-white hover:opacity-90 disabled:opacity-50 cursor-pointer transition-all"
-                >
-                  {loading ? 'กำลังสร้าง...' : 'สร้างรอบใหม่'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="rounded-2xl border border-slate-200 px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
-                >
-                  ยกเลิก
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </>
   );

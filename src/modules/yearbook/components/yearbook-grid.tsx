@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import { resizeImageToDataUrl } from '@/lib/image-resize';
+import { ModalPortal } from '@/components/ui/modal-portal';
 
 export interface YearbookAlumnus {
   id: number | string;
@@ -39,6 +40,7 @@ export interface YearbookAlumnus {
   generationNumber: number;
   gradYear: string;
   studentStatus: 'studying' | 'alumni';
+  isGenerationLeader?: boolean;
   position: string;
   company: string;
   careerType: string;
@@ -48,7 +50,6 @@ export interface YearbookAlumnus {
   bio: string;
   skills: string[];
   likesCount?: number;
-  laughsCount?: number;
   isAvailableForMentorship?: boolean;
 }
 
@@ -98,8 +99,7 @@ export function YearbookGrid() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isGenModalOpen]);
 
-  // Reaction State
-  const [reactions, setReactions] = useState<Record<string, { likes: number; laughs: number }>>({});
+  // ถูกใจ: ยอดอยู่ใน alumniList[].likesCount, likedIds = หน้าที่ฉันกดถูกใจไว้ (มาจาก server)
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
 
   // Current logged in user state & My Yearbook Entry form state
@@ -144,20 +144,21 @@ export function YearbookGrid() {
               // expected_graduation_year เก็บเป็น พ.ศ. (ดู /api/auth/register)
               gradYear: item.expectedGraduationYear ? String(item.expectedGraduationYear) : '',
               studentStatus: item.studentStatus === 'studying' ? 'studying' : 'alumni',
-              position: item.position || 'Software Developer',
-              company: item.company || 'Tech Company',
-              careerType: item.careerType || 'Software & Technology',
-              province: item.province || 'เชียงใหม่',
+              isGenerationLeader: Boolean(item.isGenerationLeader),
+              position: item.position || '',
+              company: item.company || '',
+              careerType: item.careerType || '',
+              province: item.province || '',
               avatarUrl: item.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80',
               quote: item.quote ? item.quote : fallbackQuote,
               bio: item.quote || 'ศิษย์เก่าภาควิชาวิทยาการคอมพิวเตอร์ มหาวิทยาลัยแม่โจ้',
               skills: ['CS MJU'],
-              likesCount: 15 + idx * 3,
-              laughsCount: 20 + idx * 5,
+              likesCount: item.likeCount ?? 0,
               isAvailableForMentorship: Boolean(item.isAvailableForMentorship),
             };
           });
           setAlumniList(formatted);
+          setLikedIds(new Set(data.filter((item: any) => item.likedByMe).map((item: any) => String(item.id))));
         }
 
         // ดึงรายชื่อรุ่นที่มีข้อมูลจริงในระบบ (แหล่งเดียวกับหน้าสมัครสมาชิก) มาใช้เป็นตัวเลือก
@@ -183,38 +184,41 @@ export function YearbookGrid() {
     loadData();
   }, []);
 
-  // Reaction Handler (toggle like)
-  const handleReact = (e: React.MouseEvent, id: number | string, type: 'likes' | 'laughs') => {
+  const isOwnEntry = (alumnus: YearbookAlumnus) => Boolean(currentUser) && String(alumnus.id) === String(currentUser.id);
+
+  // ถูกใจหนังสือรุ่น — อัปเดตหน้าจอทันที แล้วบันทึกที่ /api/yearbook/like (ไม่สำเร็จ = ย้อนกลับ)
+  const handleReact = async (e: React.MouseEvent, alumnus: YearbookAlumnus) => {
     e.stopPropagation();
-    const key = String(id);
-    if (type === 'likes') {
-      const alreadyLiked = likedIds.has(key);
+    if (isOwnEntry(alumnus)) return;
+    const key = String(alumnus.id);
+    const wasLiked = likedIds.has(key);
+    const prevCount = alumnus.likesCount ?? 0;
+
+    const apply = (liked: boolean, count: number) => {
       setLikedIds((prev) => {
         const next = new Set(prev);
-        if (alreadyLiked) next.delete(key);
-        else next.add(key);
+        if (liked) next.add(key);
+        else next.delete(key);
         return next;
       });
-      setReactions((prev) => {
-        const current = prev[key] || { likes: 0, laughs: 0 };
-        return {
-          ...prev,
-          [key]: { ...current, likes: alreadyLiked ? current.likes - 1 : current.likes + 1 },
-        };
-      });
-    } else {
-      setReactions((prev) => {
-        const current = prev[key] || { likes: 0, laughs: 0 };
-        return { ...prev, [key]: { ...current, [type]: current[type] + 1 } };
-      });
-    }
-  };
+      setAlumniList((prev) => prev.map((a) => (String(a.id) === key ? { ...a, likesCount: count } : a)));
+      setSelectedAlumnus((prev) => (prev && String(prev.id) === key ? { ...prev, likesCount: count } : prev));
+    };
 
-  const getReactionCount = (alumnus: YearbookAlumnus, type: 'likes' | 'laughs') => {
-    const key = String(alumnus.id);
-    const added = reactions[key]?.[type] || 0;
-    const base = type === 'likes' ? alumnus.likesCount || 0 : alumnus.laughsCount || 0;
-    return base + added;
+    apply(!wasLiked, wasLiked ? Math.max(0, prevCount - 1) : prevCount + 1);
+    try {
+      const res = await fetch('/api/yearbook/like', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: alumnus.id }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) throw new Error(data?.error || 'บันทึกการถูกใจไม่สำเร็จ');
+      apply(data.liked, data.count);
+    } catch (err: any) {
+      apply(wasLiked, prevCount);
+      setStatusAlert({ type: 'error', message: err.message || 'บันทึกการถูกใจไม่สำเร็จ' });
+    }
   };
 
   const myExistingEntry = useMemo(() => {
@@ -327,14 +331,15 @@ export function YearbookGrid() {
             generationNumber: genNum,
             gradYear: currentUser.expected_graduation_year ? String(currentUser.expected_graduation_year) : '',
             studentStatus: currentUser.student_status === 'studying' ? 'studying' : 'alumni',
-            position: currentUser.position || 'ศิษย์เก่า',
-            company: currentUser.company || 'มหาวิทยาลัยแม่โจ้',
-            careerType: 'Software & Technology',
-            province: currentUser.province || 'เชียงใหม่',
+            position: currentUser.position || '',
+            company: currentUser.company || '',
+            careerType: currentUser.career_type || '',
+            province: currentUser.province || '',
             avatarUrl: myEntryForm.avatarUrl.trim() || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80',
             quote: myEntryForm.quote.trim(),
             bio: myEntryForm.quote.trim(),
             skills: ['CS MJU'],
+            likesCount: 0,
             isAvailableForMentorship: myEntryForm.isAvailableForMentorship,
           };
           return [newEntry, ...prevList];
@@ -651,6 +656,11 @@ export function YearbookGrid() {
                         ศิษย์ปัจจุบัน
                       </span>
                     )}
+                    {alumnus.isGenerationLeader && (
+                      <span className="inline-block text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                        👑 หัวหน้ารุ่น
+                      </span>
+                    )}
                   </div>
 
                   {/* 3. ชื่อ */}
@@ -666,7 +676,9 @@ export function YearbookGrid() {
 
                   {/* 5. ปุ่มกดใจ */}
                   <button
-                    onClick={(e) => handleReact(e, alumnus.id, 'likes')}
+                    onClick={(e) => handleReact(e, alumnus)}
+                    disabled={isOwnEntry(alumnus)}
+                    title={isOwnEntry(alumnus) ? 'กดถูกใจหนังสือรุ่นของตัวเองไม่ได้' : undefined}
                     className={`self-start mt-1 inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full transition-all duration-200 active:scale-90 ${
                       likedIds.has(String(alumnus.id))
                         ? 'bg-rose-100 text-rose-600 border border-rose-200 shadow-xs'
@@ -680,7 +692,7 @@ export function YearbookGrid() {
                           : 'fill-transparent text-rose-300'
                       }`}
                     />
-                    <span>{getReactionCount(alumnus, 'likes')}</span>
+                    <span>{alumnus.likesCount ?? 0}</span>
                   </button>
                 </div>
               </div>
@@ -741,7 +753,9 @@ export function YearbookGrid() {
                 {/* Like button */}
                 <div className="flex items-center justify-end shrink-0">
                   <button
-                    onClick={(e) => handleReact(e, alumnus.id, 'likes')}
+                    onClick={(e) => handleReact(e, alumnus)}
+                    disabled={isOwnEntry(alumnus)}
+                    title={isOwnEntry(alumnus) ? 'กดถูกใจหนังสือรุ่นของตัวเองไม่ได้' : undefined}
                     className={`inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full transition-all cursor-pointer ${
                       likedIds.has(String(alumnus.id))
                         ? 'bg-rose-100 text-rose-600 border border-rose-200'
@@ -751,7 +765,7 @@ export function YearbookGrid() {
                     <Heart className={`h-3.5 w-3.5 transition-all ${
                       likedIds.has(String(alumnus.id)) ? 'fill-rose-500 text-rose-500' : 'fill-transparent text-rose-400'
                     }`} />
-                    <span>{getReactionCount(alumnus, 'likes')}</span>
+                    <span>{alumnus.likesCount ?? 0}</span>
                   </button>
                 </div>
               </div>
@@ -762,317 +776,347 @@ export function YearbookGrid() {
 
       {/* ─── Add/Edit My Yearbook Entry Modal ────────────────────────────── */}
       {isEditModalOpen && (
-        <div
-          onClick={() => setIsEditModalOpen(false)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-fade-in"
-        >
+        <ModalPortal>
           <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-lg bg-white p-6 shadow-2xl rounded-[32px] border border-slate-100 space-y-4 animate-scale-up"
+            onClick={() => setIsEditModalOpen(false)}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-fade-in"
           >
-            <button
-              onClick={() => setIsEditModalOpen(false)}
-              className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors cursor-pointer"
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-lg bg-white p-6 shadow-2xl rounded-[32px] border border-slate-100 space-y-4 animate-scale-up"
             >
-              <X className="h-4 w-4" />
-            </button>
-
-            <div className="border-b border-slate-100 pb-3">
-              <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-indigo-600" />
-                <span>
-                  {myExistingEntry ? 'แก้ไขข้อมูลหนังสือรุ่นของฉัน' : 'เพิ่มข้อมูลหนังสือรุ่นของฉัน'}
-                </span>
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                (1 บัญชีผู้ใช้สามารถสร้างข้อมูลหนังสือรุ่นได้ 1 รายการ)
-              </p>
-            </div>
-
-            {statusAlert && (
-              <div
-                className={`p-3 rounded-2xl text-xs font-bold border flex items-center gap-2 ${
-                  statusAlert.type === 'success'
-                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                    : 'bg-rose-50 text-rose-800 border-rose-200'
-                }`}
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors cursor-pointer"
               >
-                {statusAlert.type === 'success' && <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
-                <span>{statusAlert.message}</span>
-              </div>
-            )}
+                <X className="h-4 w-4" />
+              </button>
 
-            <form onSubmit={handleSaveMyEntry} className="space-y-3">
-              {/* ชื่อ & ชื่อเล่น */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    ชื่อ - นามสกุล *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={myEntryForm.name}
-                    onChange={(e) => setMyEntryForm({ ...myEntryForm, name: e.target.value })}
-                    placeholder="เช่น สมชาย ใจดี"
-                    className="w-full rounded-xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    ชื่อเล่น
-                  </label>
-                  <input
-                    type="text"
-                    value={myEntryForm.nickname}
-                    onChange={(e) => setMyEntryForm({ ...myEntryForm, nickname: e.target.value })}
-                    placeholder="เช่น ชาย"
-                    className="w-full rounded-xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* เลือกรุ่น */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
-                  <GraduationCap className="h-3.5 w-3.5 text-indigo-600" /> รุ่น (Generation) *
-                </label>
-                <select
-                  value={myEntryForm.generation}
-                  onChange={(e) => setMyEntryForm({ ...myEntryForm, generation: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-none cursor-pointer"
-                >
-                  {realGenerationOptions.map((gen) => (
-                    <option key={gen} value={gen}>
-                      {gen}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* วันเกิด (ใช้แสดงในวิดเจ็ต "สุขสันต์วันเกิด" หน้าฟีดเมื่อถึงวันจริง) */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
-                  <CalendarDays className="h-3.5 w-3.5 text-pink-500" /> วันเกิด
-                </label>
-                <input
-                  type="date"
-                  value={myEntryForm.birthDate}
-                  onChange={(e) => setMyEntryForm({ ...myEntryForm, birthDate: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none"
-                />
-                <p className="mt-1 text-[11px] text-slate-400">
-                  ระบบจะแสดงคุณในวิดเจ็ต &ldquo;สุขสันต์วันเกิด&rdquo; หน้าฟีดเมื่อถึงวันเกิดจริงของคุณ
+              <div className="border-b border-slate-100 pb-3">
+                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-indigo-600" />
+                  <span>
+                    {myExistingEntry ? 'แก้ไขข้อมูลหนังสือรุ่นของฉัน' : 'เพิ่มข้อมูลหนังสือรุ่นของฉัน'}
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  (1 บัญชีผู้ใช้สามารถสร้างข้อมูลหนังสือรุ่นได้ 1 รายการ)
                 </p>
               </div>
 
-              {/* อัปโหลดรูปภาพประจำตัว */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 uppercase flex items-center gap-1">
-                  <ImageIcon className="h-3.5 w-3.5 text-indigo-600" /> รูปภาพประจำตัว (Upload Photo)
-                </label>
+              {statusAlert && (
+                <div
+                  className={`p-3 rounded-2xl text-xs font-bold border flex items-center gap-2 ${
+                    statusAlert.type === 'success'
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      : 'bg-rose-50 text-rose-800 border-rose-200'
+                  }`}
+                >
+                  {statusAlert.type === 'success' && <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+                  <span>{statusAlert.message}</span>
+                </div>
+              )}
 
-                <div className="flex items-center gap-3">
-                  {/* Preview Thumbnail */}
-                  <div className="relative h-14 w-14 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
-                    {myEntryForm.avatarUrl ? (
-                      <img src={myEntryForm.avatarUrl} alt="Preview" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-slate-400">
-                        <ImageIcon className="h-6 w-6" />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex-1">
-                    {/* File Upload Input Button */}
-                    <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-50 text-indigo-700 text-xs font-extrabold border border-indigo-200 hover:bg-indigo-100 transition-colors cursor-pointer active:scale-95 shadow-2xs">
-                      <Upload className="h-4 w-4" />
-                      <span>อัปโหลดรูปภาพจากไฟล์...</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          e.target.value = '';
-                          if (!file) return;
-                          try {
-                            // ย่อรูปก่อน — รูปเต็มขนาดเกินเพดาน body ของ server ทำให้บันทึกไม่ติด
-                            const dataUrl = await resizeImageToDataUrl(file);
-                            setMyEntryForm((prev) => ({ ...prev, avatarUrl: dataUrl }));
-                          } catch (err: any) {
-                            setStatusAlert({ type: 'error', message: err?.message || 'ไม่สามารถอ่านไฟล์รูปภาพได้' });
-                          }
-                        }}
-                      />
+              <form onSubmit={handleSaveMyEntry} className="space-y-3">
+                {/* ชื่อ & ชื่อเล่น */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      ชื่อ - นามสกุล *
                     </label>
+                    <input
+                      type="text"
+                      required
+                      value={myEntryForm.name}
+                      onChange={(e) => setMyEntryForm({ ...myEntryForm, name: e.target.value })}
+                      placeholder="เช่น สมชาย ใจดี"
+                      className="w-full rounded-xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      ชื่อเล่น
+                    </label>
+                    <input
+                      type="text"
+                      value={myEntryForm.nickname}
+                      onChange={(e) => setMyEntryForm({ ...myEntryForm, nickname: e.target.value })}
+                      placeholder="เช่น ชาย"
+                      className="w-full rounded-xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none"
+                    />
                   </div>
                 </div>
-              </div>
 
-              {/* คำคมประจำใจ */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 uppercase flex items-center gap-1">
-                  <Quote className="h-3.5 w-3.5 text-amber-500" /> คำคมประจำใจ (Senior Quote) *
-                </label>
-                <textarea
-                  rows={3}
-                  maxLength={180}
-                  required
-                  value={myEntryForm.quote}
-                  onChange={(e) => setMyEntryForm({ ...myEntryForm, quote: e.target.value })}
-                  placeholder="พิมพ์คำคมตลกๆ หรือคติประจำใจของคุณที่นี่..."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none transition-all"
-                />
-                <div className="flex items-center justify-between text-[11px] text-slate-400">
-                  <span>จำกัดไม่เกิน 180 ตัวอักษร</span>
-                  <span className="font-mono">{myEntryForm.quote.length} / 180</span>
+                {/* เลือกรุ่น */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
+                    <GraduationCap className="h-3.5 w-3.5 text-indigo-600" /> รุ่น (Generation) *
+                  </label>
+                  <select
+                    value={myEntryForm.generation}
+                    onChange={(e) => setMyEntryForm({ ...myEntryForm, generation: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-none cursor-pointer"
+                  >
+                    {realGenerationOptions.map((gen) => (
+                      <option key={gen} value={gen}>
+                        {gen}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              </div>
+
+                {/* วันเกิด (ใช้แสดงในวิดเจ็ต "สุขสันต์วันเกิด" หน้าฟีดเมื่อถึงวันจริง) */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
+                    <CalendarDays className="h-3.5 w-3.5 text-pink-500" /> วันเกิด
+                  </label>
+                  <input
+                    type="date"
+                    value={myEntryForm.birthDate}
+                    onChange={(e) => setMyEntryForm({ ...myEntryForm, birthDate: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none"
+                  />
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    ระบบจะแสดงคุณในวิดเจ็ต &ldquo;สุขสันต์วันเกิด&rdquo; หน้าฟีดเมื่อถึงวันเกิดจริงของคุณ
+                  </p>
+                </div>
+
+                {/* อัปโหลดรูปภาพประจำตัว */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase flex items-center gap-1">
+                    <ImageIcon className="h-3.5 w-3.5 text-indigo-600" /> รูปภาพประจำตัว (Upload Photo)
+                  </label>
+
+                  <div className="flex items-center gap-3">
+                    {/* Preview Thumbnail */}
+                    <div className="relative h-14 w-14 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                      {myEntryForm.avatarUrl ? (
+                        <img src={myEntryForm.avatarUrl} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-slate-400">
+                          <ImageIcon className="h-6 w-6" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1">
+                      {/* File Upload Input Button */}
+                      <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-50 text-indigo-700 text-xs font-extrabold border border-indigo-200 hover:bg-indigo-100 transition-colors cursor-pointer active:scale-95 shadow-2xs">
+                        <Upload className="h-4 w-4" />
+                        <span>อัปโหลดรูปภาพจากไฟล์...</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            e.target.value = '';
+                            if (!file) return;
+                            try {
+                              // ย่อรูปก่อน — รูปเต็มขนาดเกินเพดาน body ของ server ทำให้บันทึกไม่ติด
+                              const dataUrl = await resizeImageToDataUrl(file);
+                              setMyEntryForm((prev) => ({ ...prev, avatarUrl: dataUrl }));
+                            } catch (err: any) {
+                              setStatusAlert({ type: 'error', message: err?.message || 'ไม่สามารถอ่านไฟล์รูปภาพได้' });
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* คำคมประจำใจ */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase flex items-center gap-1">
+                    <Quote className="h-3.5 w-3.5 text-amber-500" /> คำคมประจำใจ (Senior Quote) *
+                  </label>
+                  <textarea
+                    rows={3}
+                    maxLength={180}
+                    required
+                    value={myEntryForm.quote}
+                    onChange={(e) => setMyEntryForm({ ...myEntryForm, quote: e.target.value })}
+                    placeholder="พิมพ์คำคมตลกๆ หรือคติประจำใจของคุณที่นี่..."
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none transition-all"
+                  />
+                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                    <span>จำกัดไม่เกิน 180 ตัวอักษร</span>
+                    <span className="font-mono">{myEntryForm.quote.length} / 180</span>
+                  </div>
+                </div>
 
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-100 transition-colors cursor-pointer"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-bold hover:opacity-90 transition-opacity rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
-                >
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      <span>กำลังบันทึก...</span>
-                    </>
-                  ) : (
-                    <span>{myExistingEntry ? 'บันทึกการแก้ไข' : 'สร้างข้อมูลหนังสือรุ่น'}</span>
-                  )}
-                </button>
-              </div>
-            </form>
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-100 transition-colors cursor-pointer"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-bold hover:opacity-90 transition-opacity rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>กำลังบันทึก...</span>
+                      </>
+                    ) : (
+                      <span>{myExistingEntry ? 'บันทึกการแก้ไข' : 'สร้างข้อมูลหนังสือรุ่น'}</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* ─── Detail Modal ────────────────────────────────────────────── */}
       {selectedAlumnus && (
-        <div
-          onClick={() => setSelectedAlumnus(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-fade-in"
-        >
+        <ModalPortal>
           <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-md bg-white p-6 sm:p-7 shadow-2xl rounded-[36px] border border-slate-100 space-y-4 animate-scale-up max-h-[90vh] overflow-y-auto"
+            onClick={() => setSelectedAlumnus(null)}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-fade-in"
           >
-            <button
-              onClick={() => setSelectedAlumnus(null)}
-              className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors cursor-pointer z-10"
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-md bg-white p-6 sm:p-7 shadow-2xl rounded-[36px] border border-slate-100 space-y-4 animate-scale-up max-h-[90vh] overflow-y-auto"
             >
-              <X className="h-4 w-4" />
-            </button>
+              <button
+                onClick={() => setSelectedAlumnus(null)}
+                className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors cursor-pointer z-10"
+              >
+                <X className="h-4 w-4" />
+              </button>
 
-            {/* Profile Header (Photo, Gen, Name) */}
-            <div className="text-center space-y-3">
-              <div className="relative inline-block">
-                <img
-                  src={selectedAlumnus.avatarUrl}
-                  alt={selectedAlumnus.name}
-                  className="h-32 w-32 rounded-3xl object-cover mx-auto ring-4 ring-indigo-100 shadow-md"
-                />
-                {selectedAlumnus.isAvailableForMentorship && (
-                  <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-emerald-500 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full shadow-sm flex items-center gap-1 border-2 border-white">
-                    <MessageCircle className="h-3 w-3" /> ยินดีให้คำแนะนำ
-                  </span>
-                )}
-              </div>
-
-              <div>
-                <div className="flex flex-wrap items-center justify-center gap-1.5 mb-1.5">
-                  <span className="inline-block bg-indigo-50 text-indigo-700 px-3 py-0.5 text-xs font-extrabold rounded-full border border-indigo-100">
-                    {selectedAlumnus.generation}
-                  </span>
-                  {selectedAlumnus.studentStatus === 'studying' ? (
-                    <span className="inline-block bg-sky-50 text-sky-700 px-2.5 py-0.5 text-xs font-medium rounded-full border border-sky-100">
-                      ศิษย์ปัจจุบัน{selectedAlumnus.gradYear ? ` · คาดว่าจบ ${selectedAlumnus.gradYear}` : ''}
+              {/* Profile Header (Photo, Gen, Name) */}
+              <div className="text-center space-y-3">
+                <div className="relative inline-block">
+                  <img
+                    src={selectedAlumnus.avatarUrl}
+                    alt={selectedAlumnus.name}
+                    className="h-32 w-32 rounded-3xl object-cover mx-auto ring-4 ring-indigo-100 shadow-md"
+                  />
+                  {selectedAlumnus.isAvailableForMentorship && (
+                    <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-emerald-500 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full shadow-sm flex items-center gap-1 border-2 border-white">
+                      <MessageCircle className="h-3 w-3" /> ยินดีให้คำแนะนำ
                     </span>
-                  ) : (
-                    selectedAlumnus.gradYear && (
-                      <span className="inline-block bg-slate-100 text-slate-600 px-2.5 py-0.5 text-xs font-medium rounded-full">
-                        จบปี {selectedAlumnus.gradYear}
-                      </span>
-                    )
                   )}
                 </div>
-                <h2 className="text-xl font-bold text-slate-900">
-                  {selectedAlumnus.name} {selectedAlumnus.nickname ? `(${selectedAlumnus.nickname})` : ''}
-                </h2>
-                {selectedAlumnus.studentId && (
-                  <p className="text-xs text-slate-500 font-mono mt-0.5">
-                    รหัส: {selectedAlumnus.studentId}
-                  </p>
-                )}
-              </div>
-            </div>
 
-            {/* Workplace & Position Info Card (ข้อมูลที่ทำงานและตำแหน่งงาน) */}
-            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 space-y-3 text-left">
-              <div className="flex items-start gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 mt-0.5">
-                  <Briefcase className="h-4 w-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">ตำแหน่งงาน</p>
-                  <p className="text-sm font-bold text-slate-800 break-words">
-                    {selectedAlumnus.position || 'ไม่ได้ระบุ'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-600 mt-0.5">
-                  <Building2 className="h-4 w-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">สถานที่ทำงาน / องค์กร</p>
-                  <p className="text-sm font-bold text-slate-800 break-words">
-                    {selectedAlumnus.company || 'ไม่ได้ระบุ'}
-                  </p>
+                <div>
+                  <div className="flex flex-wrap items-center justify-center gap-1.5 mb-1.5">
+                    <span className="inline-block bg-indigo-50 text-indigo-700 px-3 py-0.5 text-xs font-extrabold rounded-full border border-indigo-100">
+                      {selectedAlumnus.generation}
+                    </span>
+                    {selectedAlumnus.studentStatus === 'studying' ? (
+                      <span className="inline-block bg-sky-50 text-sky-700 px-2.5 py-0.5 text-xs font-medium rounded-full border border-sky-100">
+                        ศิษย์ปัจจุบัน{selectedAlumnus.gradYear ? ` · คาดว่าจบ ${selectedAlumnus.gradYear}` : ''}
+                      </span>
+                    ) : (
+                      selectedAlumnus.gradYear && (
+                        <span className="inline-block bg-slate-100 text-slate-600 px-2.5 py-0.5 text-xs font-medium rounded-full">
+                          จบปี {selectedAlumnus.gradYear}
+                        </span>
+                      )
+                    )}
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-900">
+                    {selectedAlumnus.name} {selectedAlumnus.nickname ? `(${selectedAlumnus.nickname})` : ''}
+                  </h2>
+                  {selectedAlumnus.studentId && (
+                    <p className="text-xs text-slate-500 font-mono mt-0.5">
+                      รหัส: {selectedAlumnus.studentId}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {(selectedAlumnus.province || selectedAlumnus.careerType) && (
-                <div className="flex items-start gap-3 pt-2 border-t border-slate-200/60">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 mt-0.5">
-                    <MapPin className="h-4 w-4" />
+              {/* Workplace & Position Info Card (ข้อมูลที่ทำงานและตำแหน่งงาน) */}
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 space-y-3 text-left">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 mt-0.5">
+                    <Briefcase className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">พื้นที่ & ประเภทสายงาน</p>
-                    <p className="text-xs sm:text-sm font-semibold text-slate-700">
-                      {selectedAlumnus.province || 'ไม่ระบุจังหวัด'} {selectedAlumnus.careerType ? `• ${selectedAlumnus.careerType}` : ''}
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">ตำแหน่งงาน</p>
+                    <p className="text-sm font-bold text-slate-800 break-words">
+                      {selectedAlumnus.position || 'ไม่ได้ระบุ'}
                     </p>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Senior Quote (คำคมประจำใจ) */}
-            {selectedAlumnus.quote && (
-              <div className="rounded-2xl bg-amber-50/80 p-4 border border-amber-200/60 text-center shadow-2xs relative">
-                <Quote className="h-4 w-4 text-amber-500 mx-auto mb-1" />
-                <p className="text-sm font-serif italic font-bold text-amber-950 leading-relaxed">
-                  &ldquo;{selectedAlumnus.quote}&rdquo;
-                </p>
+                <div className="flex items-start gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-600 mt-0.5">
+                    <Building2 className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">สถานที่ทำงาน / องค์กร</p>
+                    <p className="text-sm font-bold text-slate-800 break-words">
+                      {selectedAlumnus.company || 'ไม่ได้ระบุ'}
+                    </p>
+                  </div>
+                </div>
+
+                {(selectedAlumnus.province || selectedAlumnus.careerType) && (
+                  <div className="flex items-start gap-3 pt-2 border-t border-slate-200/60">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 mt-0.5">
+                      <MapPin className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">พื้นที่ & ประเภทสายงาน</p>
+                      <p className="text-xs sm:text-sm font-semibold text-slate-700">
+                        {selectedAlumnus.province || 'ไม่ระบุจังหวัด'} {selectedAlumnus.careerType ? `• ${selectedAlumnus.careerType}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* Senior Quote (คำคมประจำใจ) */}
+              {selectedAlumnus.quote && (
+                <div className="rounded-2xl bg-amber-50/80 p-4 border border-amber-200/60 text-center shadow-2xs relative">
+                  <Quote className="h-4 w-4 text-amber-500 mx-auto mb-1" />
+                  <p className="text-sm font-serif italic font-bold text-amber-950 leading-relaxed">
+                    &ldquo;{selectedAlumnus.quote}&rdquo;
+                  </p>
+                </div>
+              )}
+
+              {/* ถูกใจ — ตัวเดียวกับปุ่มบนการ์ด */}
+              <div className="flex justify-center">
+                <button
+                  onClick={(e) => handleReact(e, selectedAlumnus)}
+                  disabled={isOwnEntry(selectedAlumnus)}
+                  className={`inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-bold transition-all active:scale-95 disabled:cursor-default ${
+                    likedIds.has(String(selectedAlumnus.id))
+                      ? 'bg-rose-100 text-rose-600 border border-rose-200'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200'
+                  }`}
+                >
+                  <Heart
+                    className={`h-4 w-4 transition-all ${
+                      likedIds.has(String(selectedAlumnus.id)) ? 'fill-rose-500 text-rose-500 scale-110' : 'fill-transparent text-rose-400'
+                    }`}
+                  />
+                  <span>
+                    {isOwnEntry(selectedAlumnus)
+                      ? `มีคนถูกใจ ${selectedAlumnus.likesCount ?? 0} คน`
+                      : likedIds.has(String(selectedAlumnus.id))
+                        ? `ถูกใจแล้ว · ${selectedAlumnus.likesCount ?? 0}`
+                        : `ถูกใจ · ${selectedAlumnus.likesCount ?? 0}`}
+                  </span>
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
     </div>

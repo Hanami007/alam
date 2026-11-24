@@ -35,7 +35,7 @@ export class NotificationDbService {
     }
   }
 
-  /** แจ้งเตือนเพื่อนร่วมรุ่นทุกคนที่ได้รับการอนุมัติแล้ว */
+  /** แจ้งเตือนหัวหน้ารุ่นของผู้สมัคร (คนเดียวที่ยืนยันได้นอกจากแอดมิน — ดู leader.service) */
   async notifyBatchmatesNewRegistration(
     generationOptionId: number,
     newUserId: number,
@@ -44,21 +44,25 @@ export class NotificationDbService {
   ) {
     if (!generationOptionId) return;
 
-    const { rows: batchmates } = await pool.query(
-      `SELECT id FROM users
-       WHERE generation_option_id = $1
-         AND status = 'approved'
-         AND id != $2`,
-      [generationOptionId, newUserId]
-    );
+    let batchmates: { id: number }[] = [];
+    try {
+      ({ rows: batchmates } = await pool.query(
+        `SELECT u.id FROM generation_leaders gl
+         JOIN users u ON u.id = gl.user_id
+         WHERE gl.generation_option_id = $1 AND u.status = 'approved' AND u.id != $2`,
+        [generationOptionId, newUserId]
+      ));
+    } catch {
+      return; // ยังไม่ได้รัน migration generation_leaders
+    }
 
     const studentIdText = studentId ? ` (รหัส ${studentId})` : '';
     for (const mate of batchmates) {
       await this.createNotification(
         mate.id,
         'batchmate_pending',
-        'เพื่อนร่วมรุ่นคนใหม่รอการยืนยัน',
-        `${applicantName}${studentIdText} ได้สมัครเข้าสู่ระบบในรุ่นของคุณ ช่วยยืนยันตัวตนเพื่อนร่วมรุ่น`,
+        'สมาชิกใหม่ในรุ่นของคุณรอการยืนยัน',
+        `${applicantName}${studentIdText} ได้สมัครเข้าสู่ระบบในรุ่นของคุณ ในฐานะหัวหน้ารุ่น ช่วยตรวจสอบและยืนยันตัวตน`,
         '/member/approvals',
         String(newUserId)
       );

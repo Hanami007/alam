@@ -22,6 +22,8 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { ParsedNasPhoto, GenerationSummary } from '@/services/nas/catalog.service';
+import { ModalPortal } from '@/components/ui/modal-portal';
+import { PhotoTagPanel } from '@/modules/gallery/components/photo-tag-panel';
 
 interface GalleryGridProps {
   currentUserId: number;
@@ -89,6 +91,8 @@ export function GalleryGrid({
     code3?: string;
     year?: number;
     tags?: string[];
+    /** path ใน NAS — ใช้แท็กคนในรูป (ไม่มี = รูปตัวอย่าง แท็กไม่ได้) */
+    path?: string;
   } | null>(null);
 
   // Pagination state (20 photos per page)
@@ -204,7 +208,7 @@ export function GalleryGrid({
       const data = await res.json();
 
       if (data.success) {
-        notifyPointsUpdated(10);
+        if (data.pointsEarned > 0) notifyPointsUpdated(data.pointsEarned);
         setGenUnlockSuccess(true);
         setUnlockedGenerations((prev) => [...prev, selectedGen]);
         setTimeout(() => {
@@ -217,13 +221,9 @@ export function GalleryGrid({
         setGenUnlocking(false);
       }
     } catch {
-      setGenUnlockSuccess(true);
-      setUnlockedGenerations((prev) => [...prev, selectedGen]);
-      setTimeout(() => {
-        setGenUnlocking(false);
-        setGenUnlockSuccess(false);
-        setGenQuizAnswer('');
-      }, 1200);
+      // เดิมถือว่าปลดล็อกสำเร็จเมื่อเชื่อมต่อไม่ได้ — ทำให้ข้ามคำถามได้แค่ตัดเน็ต
+      alert('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่อีกครั้ง');
+      setGenUnlocking(false);
     }
   }
 
@@ -231,39 +231,42 @@ export function GalleryGrid({
     <div className="space-y-6 animate-slide-up">
       {/* ─── Lightbox Modal ────────────────────────────────────────────── */}
       {lightbox && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 animate-fade-in"
-          onClick={() => setLightbox(null)}
-        >
-          <div className="relative max-w-4xl w-full bg-slate-900 rounded-[32px] p-5 border border-white/10 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => setLightbox(null)}
-              className="absolute top-4 right-4 z-10 rounded-full bg-black/50 p-2.5 text-white/80 hover:text-white hover:bg-black/80 transition-colors cursor-pointer"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <div className="flex justify-center bg-slate-950/60 rounded-2xl p-3">
-              <img
-                src={lightbox.image}
-                alt={lightbox.title}
-                className="max-h-[75vh] object-contain rounded-xl shadow-lg"
-              />
-            </div>
-            <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 text-white">
-              <div>
-                <p className="text-lg font-bold">{lightbox.title}</p>
-                {lightbox.subtitle && <p className="text-xs text-indigo-300 font-semibold">{lightbox.subtitle}</p>}
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 animate-fade-in"
+            onClick={() => setLightbox(null)}
+          >
+            <div className="relative max-w-4xl w-full bg-slate-900 rounded-[32px] p-5 border border-white/10 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => setLightbox(null)}
+                className="absolute top-4 right-4 z-10 rounded-full bg-black/50 p-2.5 text-white/80 hover:text-white hover:bg-black/80 transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              <div className="flex justify-center bg-slate-950/60 rounded-2xl p-3">
+                <img
+                  src={lightbox.image}
+                  alt={lightbox.title}
+                  className="max-h-[75vh] object-contain rounded-xl shadow-lg"
+                />
               </div>
-              <div className="flex items-center gap-2">
-                {lightbox.year && (
-                  <span className="rounded-xl bg-indigo-500/30 px-3.5 py-1.5 text-xs font-bold text-indigo-300 border border-indigo-500/40">
-                    📅 ปีการศึกษา 25{lightbox.year}
-                  </span>
-                )}
+              <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 text-white">
+                <div>
+                  <p className="text-lg font-bold">{lightbox.title}</p>
+                  {lightbox.subtitle && <p className="text-xs text-indigo-300 font-semibold">{lightbox.subtitle}</p>}
+                </div>
+                <div className="flex items-center gap-2">
+                  {lightbox.year && (
+                    <span className="rounded-xl bg-indigo-500/30 px-3.5 py-1.5 text-xs font-bold text-indigo-300 border border-indigo-500/40">
+                      📅 ปีการศึกษา 25{lightbox.year}
+                    </span>
+                  )}
+                </div>
               </div>
+              {lightbox.path && currentUserId > 0 && <PhotoTagPanel path={lightbox.path} currentUserId={currentUserId} />}
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* ─── Hero Header & Mode Switcher ───────────────────────────────── */}
@@ -290,7 +293,7 @@ export function GalleryGrid({
       {/* ─── ทำเนียบรุ่น: DYNAMIC PARSER & YEARBOOK GRID WITH LOCK QUIZ ── */}
       {/* ───────────────────────────────────────────────────────────────── */}
       {(
-        <div className="grid gap-6 lg:grid-cols-[290px_1fr]">
+        <div className="grid gap-6 lg:grid-cols-[minmax(260px,22%)_minmax(0,1fr)]">
           {/* ─── LEFT: Synology FileStation Folder Tree Sidebar ───────────── */}
           <div className="rounded-[28px] border border-slate-200/90 bg-white p-4 shadow-card h-fit space-y-3">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 text-xs font-bold text-slate-700">
@@ -600,6 +603,7 @@ export function GalleryGrid({
                                 subtitle: `ทำเนียบรุ่นภาควิชาวิทยาการคอมพิวเตอร์ แม่โจ้`,
                                 year: photo.year,
                                 image: photo.photoUrl,
+                                path: photo.isPlaceholder ? undefined : photo.rawPath,
                               });
                             }
                           }}
@@ -607,18 +611,21 @@ export function GalleryGrid({
                             isCurrentGenUnlocked ? 'cursor-zoom-in group-hover:scale-[1.02] transition-transform' : ''
                           }`}
                         >
-                          <img
-                            src={photo.photoUrl}
-                            alt={`${photo.generationLabel} ${photo.yearLabel}`}
-                            className={`h-full w-full object-cover transition-all duration-300 ${
-                              !isCurrentGenUnlocked ? 'blur-md brightness-90 scale-105' : 'hover:scale-105'
-                            }`}
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                photo.generationLabel
-                              )}&background=6366f1&color=fff`;
-                            }}
-                          />
+                          {/* รุ่นที่ยังไม่ปลดล็อก server ไม่ส่งรูปให้ (nas-access.service) — แสดงพื้นหลังแทน ไม่โหลดรูปจริงมาเบลอ */}
+                          {isCurrentGenUnlocked ? (
+                            <img
+                              src={photo.photoUrl}
+                              alt={`${photo.generationLabel} ${photo.yearLabel}`}
+                              className="h-full w-full object-cover transition-all duration-300 hover:scale-105"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                  photo.generationLabel
+                                )}&background=6366f1&color=fff`;
+                              }}
+                            />
+                          ) : (
+                            <div className="h-full w-full bg-gradient-to-br from-slate-200 via-indigo-100 to-slate-300" />
+                          )}
 
                           {/* Lock Overlay if not unlocked */}
                           {!isCurrentGenUnlocked && (

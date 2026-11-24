@@ -1,9 +1,13 @@
 import { pool } from '@/lib/db';
+import { normalizePhone } from '@/lib/phone';
 import { checkLength } from '@/lib/field-limits';
 import { deleteAvatarFile, normalizeAvatarInput } from '@/lib/upload-storage';
+import { leaderService } from '@/modules/member/services/leader.service';
 
 export interface UserProfileData {
   id: number;
+  /** รุ่นที่เป็นหัวหน้ารุ่นอยู่ (null = ไม่ได้เป็น) — ดู leader.service */
+  leaderGeneration: { id: number; label: string } | null;
   studentId: string | null;
   email: string;
   name: string;
@@ -31,6 +35,8 @@ export interface UserProfileData {
   birthDate: string | null;
   facebookUrl: string | null;
   lineId: string | null;
+  /** แอดมินและเจ้าของบัญชีเห็นเท่านั้น — redactPrivateFields ซ่อนเสมอ */
+  phone: string | null;
   showContactOnMap: boolean;
   showEmail: boolean;
   showBirthDate: boolean;
@@ -69,6 +75,8 @@ export function redactPrivateFields<T extends Record<string, any>>(
   if (!privacy.showStudentId) out.studentId = null;
   if (!privacy.showFacebook) out.facebookUrl = null;
   if (!privacy.showLineId) out.lineId = null;
+  // เบอร์โทรไม่มี toggle ให้เปิด — คนอื่นไม่เห็นเลย (แอดมิน/เจ้าของไม่ผ่านฟังก์ชันนี้)
+  out.phone = null;
   return out as T;
 }
 
@@ -91,7 +99,7 @@ export class UserDbService {
         u.expected_graduation_year, u.total_points, u.avatar_url, u.company, u.position, u.bio,
         u.show_hometown_on_map, u.show_workplace_on_map, u.is_available_for_mentorship, u.birth_date, u.created_at,
         u.generation_option_id, u.province_option_id, u.work_province_id, u.career_option_id,
-        u.facebook_url, u.line_id, u.show_contact_on_map,
+        u.facebook_url, u.line_id, u.phone, u.show_contact_on_map,
         u.show_email, u.show_birth_date, u.show_student_id, u.show_facebook, u.show_line_id,
         gen.label as generation,
         prov.label as province,
@@ -137,6 +145,7 @@ export class UserDbService {
       birthDate: r.birth_date,
       facebookUrl: r.facebook_url,
       lineId: r.line_id,
+      phone: r.phone,
       showContactOnMap: Boolean(r.show_contact_on_map),
       showEmail: Boolean(r.show_email),
       showBirthDate: Boolean(r.show_birth_date),
@@ -144,6 +153,7 @@ export class UserDbService {
       showFacebook: Boolean(r.show_facebook),
       showLineId: Boolean(r.show_line_id),
       createdAt: r.created_at,
+      leaderGeneration: await leaderService.getLeaderGeneration(r.id),
     };
   }
 
@@ -219,6 +229,7 @@ export class UserDbService {
       yearbookPublished?: boolean;
       facebookUrl?: string;
       lineId?: string;
+      phone?: string;
       showContactOnMap?: boolean;
       studentStatus?: 'studying' | 'alumni';
       graduationYear?: number | string;
@@ -287,6 +298,12 @@ export class UserDbService {
     if (data.lineId !== undefined) {
       updates.push(`line_id = $${idx++}`);
       values.push(data.lineId || null);
+    }
+    if (data.phone !== undefined) {
+      const phone = normalizePhone(data.phone);
+      if (phone.error) throw new Error(phone.error);
+      updates.push(`phone = $${idx++}`);
+      values.push(phone.value);
     }
     if (data.showContactOnMap !== undefined) {
       updates.push(`show_contact_on_map = $${idx++}`);

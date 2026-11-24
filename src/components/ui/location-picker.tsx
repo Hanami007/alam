@@ -21,7 +21,60 @@ interface LocationPickerProps {
   disabled?: boolean;
   accentColor?: 'indigo' | 'amber';
   placeholder?: string;
+  /** dark = หน้าสมัคร (พื้นหลังเข้ม), light = ใช้ในกล่อง/ป๊อปอัปพื้นขาว เช่น แก้ไขโปรไฟล์ */
+  theme?: 'dark' | 'light';
 }
+
+const THEMES = {
+  dark: {
+    trigger: 'bg-slate-950/70',
+    triggerIdle: 'border-white/10 hover:border-white/20 hover:bg-slate-950/90',
+    label: 'text-white',
+    sub: 'text-slate-400',
+    placeholder: 'text-slate-500',
+    chevronOpen: 'text-white',
+    panel: 'border-white/15 bg-slate-900/95 backdrop-blur-2xl shadow-2xl shadow-black/80',
+    header: 'border-white/10 bg-slate-950/60',
+    tabs: 'bg-slate-900 border-white/10',
+    tabIdle: 'text-slate-400 hover:text-white hover:bg-white/5',
+    regionActive: 'bg-white/20 text-white font-bold',
+    regionIdle: 'text-slate-400 hover:text-slate-200 hover:bg-white/5',
+    searchWrap: 'border-white/5',
+    search: 'bg-slate-950/80 border-white/10 text-white placeholder:text-slate-500',
+    clear: 'text-slate-400 hover:text-white',
+    list: 'divide-white/5',
+    optIdle: 'text-slate-300 hover:bg-white/10 hover:text-white',
+    optSelectedIndigo: 'bg-indigo-500/20 text-indigo-200 font-bold',
+    optSelectedAmber: 'bg-amber-500/20 text-amber-200 font-bold',
+    regionBadge: 'bg-white/5 text-slate-400 border-white/10',
+    footer: 'border-white/10 bg-slate-950/80 text-slate-400',
+    footerCount: 'text-slate-500',
+  },
+  light: {
+    trigger: 'bg-white',
+    triggerIdle: 'border-slate-200 hover:border-slate-300',
+    label: 'text-slate-800',
+    sub: 'text-slate-400',
+    placeholder: 'text-slate-400',
+    chevronOpen: 'text-slate-600',
+    panel: 'border-slate-200 bg-white shadow-xl shadow-slate-900/10',
+    header: 'border-slate-100 bg-slate-50',
+    tabs: 'bg-white border-slate-200',
+    tabIdle: 'text-slate-500 hover:text-slate-800 hover:bg-slate-50',
+    regionActive: 'bg-slate-200 text-slate-800 font-bold',
+    regionIdle: 'text-slate-500 hover:text-slate-700 hover:bg-slate-100',
+    searchWrap: 'border-slate-100',
+    search: 'bg-white border-slate-200 text-slate-800 placeholder:text-slate-400',
+    clear: 'text-slate-400 hover:text-slate-700',
+    list: 'divide-slate-100',
+    optIdle: 'text-slate-700 hover:bg-slate-50',
+    optSelectedIndigo: 'bg-indigo-50 text-indigo-700 font-bold',
+    optSelectedAmber: 'bg-amber-50 text-amber-700 font-bold',
+    regionBadge: 'bg-slate-50 text-slate-500 border-slate-200',
+    footer: 'border-slate-100 bg-slate-50 text-slate-500',
+    footerCount: 'text-slate-400',
+  },
+} as const;
 
 export function LocationPicker({
   value,
@@ -30,7 +83,9 @@ export function LocationPicker({
   disabled = false,
   accentColor = 'indigo',
   placeholder = 'เลือกจังหวัด หรือ ประเทศที่ทำงาน/ภูมิลำเนา',
+  theme = 'dark',
 }: LocationPickerProps) {
+  const t = THEMES[theme];
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'thailand' | 'international'>('thailand');
   const [searchQuery, setSearchQuery] = useState('');
@@ -126,25 +181,25 @@ export function LocationPicker({
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between rounded-2xl border bg-slate-950/70 px-4 py-2.5 text-sm transition-all cursor-pointer select-none text-left ${
+        className={`w-full flex items-center justify-between rounded-2xl border ${t.trigger} px-4 py-2.5 text-sm transition-all cursor-pointer select-none text-left ${
           isOpen
             ? accentColor === 'amber'
               ? 'border-amber-400 ring-4 ring-amber-500/20 shadow-lg shadow-amber-500/10'
               : 'border-indigo-500 ring-4 ring-indigo-500/20 shadow-lg shadow-indigo-500/10'
-            : 'border-white/10 hover:border-white/20 hover:bg-slate-950/90'
+            : t.triggerIdle
         } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
         <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
           {selectedOption ? (
             <>
-              <span className="text-base shrink-0">
+              <span className="text-base leading-5 shrink-0">
                 {selectedOption.flag || (selectedOption.is_international ? '🌐' : '📍')}
               </span>
               <div className="truncate">
-                <span className="font-bold text-white text-sm">
+                <span className={`font-bold text-sm ${t.label}`}>
                   {selectedOption.label}
                 </span>
-                <span className="ml-2 text-xs text-slate-400 font-medium">
+                <span className={`ml-2 text-xs font-medium ${t.sub}`}>
                   {selectedOption.is_international
                     ? '(ต่างประเทศ / International)'
                     : `(ภาค${selectedOption.region || 'ไทย'})`}
@@ -152,23 +207,23 @@ export function LocationPicker({
               </div>
             </>
           ) : (
-            <span className="text-slate-500 text-xs sm:text-sm">{placeholder}</span>
+            <span className={`text-xs sm:text-sm ${t.placeholder}`}>{placeholder}</span>
           )}
         </div>
 
         <ChevronDown
           className={`h-4 w-4 text-slate-400 shrink-0 transition-transform duration-200 ${
-            isOpen ? 'rotate-180 text-white' : ''
+            isOpen ? `rotate-180 ${t.chevronOpen}` : ''
           }`}
         />
       </button>
 
       {/* Popover Dropdown (Strictly constrained within bounds, max-h-72, scrolling smoothly) */}
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl border border-white/15 bg-slate-900/95 backdrop-blur-2xl shadow-2xl shadow-black/80 overflow-hidden animate-slide-up flex flex-col">
+        <div className={`absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl border overflow-hidden animate-slide-up flex flex-col ${t.panel}`}>
           {/* Header Tabs: Thailand vs International */}
-          <div className="p-2 border-b border-white/10 bg-slate-950/60">
-            <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-900 rounded-xl border border-white/10">
+          <div className={`p-2 border-b ${t.header}`}>
+            <div className={`grid grid-cols-2 gap-1.5 p-1 rounded-xl border ${t.tabs}`}>
               <button
                 type="button"
                 onClick={() => {
@@ -178,7 +233,7 @@ export function LocationPicker({
                 className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs transition-all cursor-pointer ${
                   activeTab === 'thailand'
                     ? activeTabBg
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    : t.tabIdle
                 }`}
               >
                 <span>🇹🇭</span>
@@ -194,7 +249,7 @@ export function LocationPicker({
                 className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs transition-all cursor-pointer ${
                   activeTab === 'international'
                     ? activeTabBg
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    : t.tabIdle
                 }`}
               >
                 <span>🌐</span>
@@ -220,8 +275,8 @@ export function LocationPicker({
                     onClick={() => setRegionFilter(r.id)}
                     className={`px-2 py-0.5 rounded-md whitespace-nowrap transition-colors cursor-pointer ${
                       regionFilter === r.id
-                        ? 'bg-white/20 text-white font-bold'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                        ? t.regionActive
+                        : t.regionIdle
                     }`}
                   >
                     {r.label}
@@ -232,7 +287,7 @@ export function LocationPicker({
           </div>
 
           {/* Search Input */}
-          <div className="p-2 border-b border-white/5 relative">
+          <div className={`p-2 border-b relative ${t.searchWrap}`}>
             <Search className="h-3.5 w-3.5 text-slate-400 absolute left-4.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -243,14 +298,14 @@ export function LocationPicker({
                   ? 'พิมพ์ชื่อจังหวัด เช่น เชียงใหม่, กทม...'
                   : 'พิมพ์ชื่อประเทศ เช่น ญี่ปุ่น, สหรัฐอเมริกา, Japan...'
               }
-              className="w-full rounded-xl bg-slate-950/80 border border-white/10 pl-8 pr-7 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-400 transition-colors"
+              className={`w-full rounded-xl border pl-8 pr-7 py-1.5 text-xs focus:outline-none focus:border-indigo-400 transition-colors ${t.search}`}
               autoFocus
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5"
+                className={`absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 ${t.clear}`}
               >
                 <X className="h-3 w-3" />
               </button>
@@ -258,7 +313,7 @@ export function LocationPicker({
           </div>
 
           {/* List of Options (Scrollable, confined to max-h-56) */}
-          <div className="max-h-56 overflow-y-auto p-1.5 space-y-0.5 divide-y divide-white/5">
+          <div className={`max-h-56 overflow-y-auto p-1.5 space-y-0.5 divide-y ${t.list}`}>
             {filteredList.length === 0 ? (
               <div className="p-4 text-center text-xs text-slate-400">
                 ไม่พบผลการค้นหาสำหรับ &quot;{searchQuery}&quot;
@@ -278,9 +333,9 @@ export function LocationPicker({
                     className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors cursor-pointer text-xs ${
                       isSelected
                         ? accentColor === 'amber'
-                          ? 'bg-amber-500/20 text-amber-200 font-bold'
-                          : 'bg-indigo-500/20 text-indigo-200 font-bold'
-                        : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                          ? t.optSelectedAmber
+                          : t.optSelectedIndigo
+                        : t.optIdle
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate pr-2">
@@ -292,7 +347,7 @@ export function LocationPicker({
 
                     <div className="flex items-center gap-1.5 shrink-0">
                       {opt.region && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-slate-400 border border-white/10">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${t.regionBadge}`}>
                           {opt.region}
                         </span>
                       )}
@@ -307,13 +362,13 @@ export function LocationPicker({
           </div>
 
           {/* Bottom Hint */}
-          <div className="p-2 border-t border-white/10 bg-slate-950/80 text-[10px] text-slate-400 flex items-center justify-between">
+          <div className={`p-2 border-t text-[10px] flex items-center justify-between ${t.footer}`}>
             <span>
               {activeTab === 'international'
                 ? '🌍 หมุดจะไปปรากฏบนแผนที่โลก 3D (CSMJU Global)'
                 : '🇹🇭 หมุดจะปรากฏบนแผนที่ประเทศไทยและแผนที่โลก'}
             </span>
-            <span className="text-slate-500 font-mono">
+            <span className={`font-mono ${t.footerCount}`}>
               {filteredList.length} รายการ
             </span>
           </div>

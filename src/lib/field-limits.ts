@@ -25,6 +25,7 @@ export const FIELD_LIMITS = {
   bio: 500,
   facebookUrl: 255,
   lineId: 50,
+  phone: 20,
   avatarPath: 255,
   // content_reports
   reportDetail: 500,

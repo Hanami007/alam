@@ -168,6 +168,7 @@ export const api = {
       facebookUrl?: string;
       lineId?: string;
       showContactOnMap?: boolean;
+      phone?: string;
       studentStatus?: 'studying' | 'alumni';
       graduationYear?: number;
     }) =>
@@ -195,6 +196,15 @@ export const api = {
     getAllUsers: () => fetchJson<any[]>('/api/admin/users'),
     deleteUser: (userId: number) =>
       fetchJson<any>(`/api/admin/users?id=${encodeURIComponent(String(userId))}`, {
+        method: 'DELETE',
+      }),
+    appointGenerationLeader: (userId: number) =>
+      fetchJson<{ success: boolean; generationLabel: string; replacedName: string | null }>('/api/admin/generation-leaders', {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      }),
+    removeGenerationLeader: (userId: number) =>
+      fetchJson<{ success: boolean }>(`/api/admin/generation-leaders?userId=${encodeURIComponent(String(userId))}`, {
         method: 'DELETE',
       }),
     setStudentStatus: (userId: number, studentStatus: 'studying' | 'alumni') =>

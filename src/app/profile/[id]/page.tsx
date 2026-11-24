@@ -10,8 +10,6 @@ export default function DynamicMemberProfilePage() {
   const requestedId = params?.id as string;
 
   const [user, setUser] = useState<any>(null);
-  const [taggedPhotos, setTaggedPhotos] = useState<any[]>([]);
-  const [unlockedPhotos, setUnlockedPhotos] = useState<any[]>([]);
   const [activityLog, setActivityLog] = useState<any[]>([]);
   const [isOwner, setIsOwner] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
@@ -23,12 +21,10 @@ export default function DynamicMemberProfilePage() {
         setLoading(true);
         const profileUrl = `/api/user/profile?id=${requestedId}`;
         const activityUrl = `/api/user/activity?id=${requestedId}`;
-        const photosUrl = `/api/user/photos?userId=${requestedId}`;
-
-        const [profileRes, activityRes, photosRes] = await Promise.allSettled([
+        // อัลบั้มรูปเป็นของส่วนตัว (/api/user/photos ให้ดูเฉพาะของตัวเอง) — หน้านี้ไม่แสดง
+        const [profileRes, activityRes] = await Promise.allSettled([
           fetch(profileUrl).then((r) => r.json()),
           fetch(activityUrl).then((r) => r.json()),
-          fetch(photosUrl).then((r) => r.json()),
         ]);
 
         if (profileRes.status === 'fulfilled' && profileRes.value && !profileRes.value.error) {
@@ -47,6 +43,7 @@ export default function DynamicMemberProfilePage() {
             position: u.position,
             bio: u.bio,
             student_status: u.studentStatus || u.student_status || 'alumni',
+            leader_generation: u.leaderGeneration?.label ?? null,
             total_points: u.totalPoints ?? u.total_points ?? 0,
             avatar_url: u.avatarUrl || u.avatar_url || '',
             facebook_url: u.facebookUrl ?? u.facebook_url ?? '',
@@ -65,14 +62,6 @@ export default function DynamicMemberProfilePage() {
           }
         } else {
           setActivityLog([]);
-        }
-
-        if (photosRes.status === 'fulfilled' && photosRes.value) {
-          setTaggedPhotos(photosRes.value.taggedPhotos || []);
-          setUnlockedPhotos(photosRes.value.unlockedPhotos || []);
-        } else {
-          setTaggedPhotos([]);
-          setUnlockedPhotos([]);
         }
       } catch (err) {
         console.error('[DynamicProfilePage] Error loading profile:', err);
@@ -97,8 +86,6 @@ export default function DynamicMemberProfilePage() {
       ) : (
         <ProfileCard
           user={user}
-          taggedPhotos={taggedPhotos}
-          unlockedPhotos={unlockedPhotos}
           activityLog={activityLog}
           isOwner={isOwner}
         />

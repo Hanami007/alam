@@ -4,6 +4,7 @@ import { hashPassword } from '@/lib/auth';
 import { publicErrorMessage } from '@/lib/api-error';
 import { checkLength } from '@/lib/field-limits';
 import { parseStudentId } from '@/lib/student-id';
+import { normalizePhone } from '@/lib/phone';
 import { normalizeAvatarInput } from '@/lib/upload-storage';
 import { NextResponse } from 'next/server';
 
@@ -147,11 +148,17 @@ export async function POST(req: Request) {
     // ยกเว้นรหัส 8 หลัก (ระบบเดิม) เป็นศิษย์เก่าเสมอ — ปัจจุบันออกรหัสแค่ 10 หลัก
     const actualStatus = parsedId.length === 8 || studentStatus === 'alumni' ? 'alumni' : 'studying';
 
-    // ข้อมูลศิษย์เก่า (ถ้ามีระบุ)
-    const cleanCompany = company ? String(company).trim() : null;
-    const cleanPosition = position ? String(position).trim() : null;
-    const parsedCareerId = careerOptionId ? parseInt(String(careerOptionId), 10) : null;
-    const parsedWorkProvinceId = workProvinceId ? parseInt(String(workProvinceId), 10) : parseInt(provinceOptionId, 10);
+    // ที่ทำงาน — ศิษย์เก่าต้องกรอก ศิษย์ปัจจุบันกรอกได้ถ้ามี (ฝึกงาน/พาร์ทไทม์)
+    // ไม่ได้กรอกที่ทำงาน = ไม่มีจังหวัดที่ทำงาน (เดิมใส่จังหวัดภูมิลำเนาแทน ทำให้ไปโผล่บนแผนที่ที่ทำงาน)
+    const cleanCompany = company ? String(company).trim() || null : null;
+    const cleanPosition = position ? String(position).trim() || null : null;
+    const hasWork = Boolean(cleanCompany || cleanPosition);
+    const parsedCareerId = hasWork && careerOptionId ? parseInt(String(careerOptionId), 10) : null;
+    const parsedWorkProvinceId = !hasWork
+      ? null
+      : workProvinceId
+        ? parseInt(String(workProvinceId), 10)
+        : parseInt(provinceOptionId, 10);
     const cleanBio = bio ? String(bio).trim() : null;
     // รูปที่อัปโหลด (data URL) → บันทึกเป็นไฟล์ แล้วเก็บแค่ path ลง DB
     let cleanAvatarUrl: string | null;
@@ -163,9 +170,14 @@ export async function POST(req: Request) {
     const cleanBirthDate = birthDate ? String(birthDate).trim() : null;
     const cleanFacebookUrl = body.facebookUrl ? String(body.facebookUrl).trim() : null;
     const cleanLineId = body.lineId ? String(body.lineId).trim() : null;
+    // เบอร์โทร: สำหรับแอดมินติดต่อเท่านั้น ไม่เปิดเผยต่อสมาชิกคนอื่น
+    const phone = normalizePhone(body.phone);
+    if (phone.error) {
+      return NextResponse.json({ error: phone.error }, { status: 400 });
+    }
     const isMentorship = Boolean(body.isAvailableForMentorship || body.is_available_for_mentorship);
     const showHometown = body.showHometownOnMap !== undefined ? Boolean(body.showHometownOnMap) : true;
-    const showWorkplace = body.showWorkplaceOnMap !== undefined ? Boolean(body.showWorkplaceOnMap) : true;
+    const showWorkplace = hasWork && (body.showWorkplaceOnMap !== undefined ? Boolean(body.showWorkplaceOnMap) : true);
     // การแสดงข้อมูลส่วนตัวรายฟิลด์ (ไอคอนเขียว/แดงในหน้าสมัคร) — ไม่ส่งมา = ปิด
     const showEmail = Boolean(body.showEmail);
     const showBirthDate = Boolean(body.showBirthDate);
@@ -207,10 +219,11 @@ export async function POST(req: Request) {
         show_line_id,
         show_contact_on_map,
         yearbook_published,
+        phone,
         role,
         status
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21,
-                $22, $23, $24, $25, $26, $27, $28, 'alumni', 'pending')
+                $22, $23, $24, $25, $26, $27, $28, $29, 'alumni', 'pending')
       RETURNING id, student_id, name, email, student_status, generation_option_id, province_option_id, status`,
       [
         trimmedStudentId,
@@ -242,6 +255,7 @@ export async function POST(req: Request) {
         showContactOnMap,
         // กรอก Bio มาตอนสมัคร = ตั้งใจให้แสดงในหนังสือรุ่น (หนังสือรุ่นแสดงเฉพาะบัญชีที่อนุมัติแล้ว)
         Boolean(cleanBio),
+        phone.value,
       ]
     );
 

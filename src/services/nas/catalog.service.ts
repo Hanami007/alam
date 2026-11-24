@@ -16,6 +16,8 @@ export interface ParsedNasPhoto {
   studentName: string;
   degree?: string;
   company?: string;
+  /** รูปตัวอย่างตอนต่อ NAS ไม่ได้ (ไม่มีไฟล์จริง) — ห้ามแท็ก */
+  isPlaceholder?: boolean;
 }
 
 export interface GenerationSummary {
@@ -200,6 +202,7 @@ export class NasCatalogService {
         personCode: pCode,
         subfolder: selectedSubfolder,
         photoUrl: `/api/nas/image/${encodeURIComponent(`รุ่น ${genNumber}`)}/${sId}?v=syno`,
+        isPlaceholder: true,
         studentName: DEFAULT_NAMES[i % DEFAULT_NAMES.length],
         degree: 'วท.บ. วิทยาการคอมพิวเตอร์ แม่โจ้',
         company: 'วิทยาการคอมพิวเตอร์ มหาวิทยาลัยแม่โจ้',
@@ -213,6 +216,31 @@ export class NasCatalogService {
    * ดึงเฉพาะเลขรุ่นที่มีโฟลเดอร์จริงอยู่บน NAS (ไม่ดึงโฟลเดอร์ย่อย/รูปภาพ) สำหรับใช้เป็น
    * ตัวเลือกในดรอปดาวน์ต่างๆ โดยไม่ต้องยิง listFiles ซ้ำต่อรุ่นแบบ getGenerationsSummary
    */
+  /**
+   * หารูปทำเนียบของนักศึกษาจากไฟล์จริงใน NAS (ชื่อไฟล์ = รหัสนักศึกษา เช่น "6504101302.JPG")
+   * ค้นในโฟลเดอร์ทำเนียบก่อน แล้วค่อยโฟลเดอร์อื่นของรุ่น — ต่อ NAS ไม่ได้/ไม่พบ = null (ไม่ใช้รูปตัวอย่าง)
+   */
+  async findPortraitPath(studentId: string, genNumber: number): Promise<string | null> {
+    if (!/^\d{8,10}$/.test(studentId) || !genNumber) return null;
+    const genFolder = `รุ่น ${genNumber}`;
+    const matches = (name: string) => /\.(jpe?g|png|webp)$/i.test(name) && name.toLowerCase().startsWith(studentId);
+
+    const items = await synologyApi.listFiles(genFolder);
+    const direct = items.find((i) => !i.isdir && matches(i.name));
+    if (direct) return `${genFolder}/${direct.name}`;
+
+    const folders = items
+      .filter((i) => i.isdir)
+      .map((i) => i.name)
+      .sort((a, b) => Number(/ธรรมเนียบ|ทำเนียบ/.test(b)) - Number(/ธรรมเนียบ|ทำเนียบ/.test(a)));
+    for (const folder of folders) {
+      const files = await synologyApi.listFiles(`${genFolder}/${folder}`);
+      const hit = files.find((f) => !f.isdir && matches(f.name));
+      if (hit) return `${genFolder}/${folder}/${hit.name}`;
+    }
+    return null;
+  }
+
   async getGenerationNumbers(): Promise<number[]> {
     const rootItems = await synologyApi.listFiles('');
     const genNumbers = rootItems

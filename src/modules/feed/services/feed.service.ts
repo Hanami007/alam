@@ -1,5 +1,6 @@
 import { pool } from '@/lib/db';
 import { checkLength } from '@/lib/field-limits';
+import { DEFAULT_COMMENT_EMOJI } from '@/lib/reactions';
 
 export interface FeedComment {
   id: number;
@@ -11,6 +12,11 @@ export interface FeedComment {
   createdAt: string;
   created_at: string;
   isAvailableForMentorship?: boolean;
+  // การกดถูกใจความคิดเห็น (comment_reactions)
+  likeCount: number;
+  likedByMe: boolean;
+  myEmoji?: string;
+  topEmoji?: string;
 }
 
 export interface FeedPollOption {
@@ -105,6 +111,26 @@ export class FeedDbService {
         [postIds]
       );
 
+      // ยอดถูกใจความคิดเห็น — แยก try ไว้ ถ้ายังไม่ได้รัน migration comment_reactions ฟีดต้องยังโหลดได้
+      const reactionsByComment = new Map<number, { like_count: number; my_emoji: string | null; top_emoji: string | null }>();
+      if (comments.length > 0) {
+        try {
+          const { rows: reactions } = await pool.query(
+            `SELECT comment_id,
+                    COUNT(*)::int AS like_count,
+                    MAX(emoji) FILTER (WHERE user_id = $2) AS my_emoji,
+                    MODE() WITHIN GROUP (ORDER BY emoji) AS top_emoji
+             FROM comment_reactions
+             WHERE comment_id = ANY($1::int[])
+             GROUP BY comment_id`,
+            [comments.map((c) => c.id), currentUserId ?? 0]
+          );
+          for (const r of reactions) reactionsByComment.set(r.comment_id, r);
+        } catch (err) {
+          console.error('[FeedDbService] comment reactions error:', err);
+        }
+      }
+
       const { rows: polls } = await pool.query(
         `SELECT pl.id, pl.post_id, pl.question, pl.points_per_vote
          FROM polls pl
@@ -151,6 +177,10 @@ export class FeedDbService {
             createdAt: c.created_at,
             created_at: c.created_at,
             isAvailableForMentorship: Boolean(c.is_available_for_mentorship),
+            likeCount: reactionsByComment.get(c.id)?.like_count ?? 0,
+            likedByMe: Boolean(reactionsByComment.get(c.id)?.my_emoji),
+            myEmoji: reactionsByComment.get(c.id)?.my_emoji ?? undefined,
+            topEmoji: reactionsByComment.get(c.id)?.top_emoji ?? undefined,
           }));
 
         const poll = polls.find((pl) => pl.post_id === p.id);
@@ -258,6 +288,52 @@ export class FeedDbService {
       created_at: rows[0].created_at,
       author: user.rows[0]?.name || 'ศิษย์เก่า',
       avatar_url: user.rows[0]?.avatar_url || null,
+    };
+  }
+
+  /**
+   * ถูกใจความคิดเห็น (คนละ 1 อีโมจิต่อความคิดเห็น)
+   * - emoji ไม่ส่งมา: สลับ ถูกใจ (❤️) / ยกเลิก
+   * - emoji ส่งมา: ตั้งหรือเปลี่ยนเป็นอีโมจินั้น (ไม่ยกเลิก)
+   * คืน null ถ้าไม่พบความคิดเห็น (หรือถูกซ่อนไปแล้ว)
+   */
+  async reactToComment(commentId: number, userId: number, emoji?: string) {
+    const { rows: found } = await pool.query(
+      `SELECT 1 FROM post_interactions WHERE id = $1 AND type = 'comment' AND NOT is_hidden`,
+      [commentId]
+    );
+    if (found.length === 0) return null;
+
+    const { rows: existing } = await pool.query(
+      `SELECT emoji FROM comment_reactions WHERE comment_id = $1 AND user_id = $2`,
+      [commentId, userId]
+    );
+
+    let liked: boolean;
+    if (existing.length > 0 && emoji === undefined) {
+      await pool.query(`DELETE FROM comment_reactions WHERE comment_id = $1 AND user_id = $2`, [commentId, userId]);
+      liked = false;
+    } else {
+      // INSERT ... ON CONFLICT กันกดรัวสองแท็บพร้อมกันแล้วชน UNIQUE (comment_id, user_id)
+      await pool.query(
+        `INSERT INTO comment_reactions (comment_id, user_id, emoji) VALUES ($1, $2, $3)
+         ON CONFLICT (comment_id, user_id) DO UPDATE SET emoji = EXCLUDED.emoji`,
+        [commentId, userId, emoji ?? DEFAULT_COMMENT_EMOJI]
+      );
+      liked = true;
+    }
+
+    const { rows: stat } = await pool.query(
+      `SELECT COUNT(*)::int AS count,
+              MAX(emoji) FILTER (WHERE user_id = $2) AS my_emoji,
+              MODE() WITHIN GROUP (ORDER BY emoji) AS top_emoji
+       FROM comment_reactions WHERE comment_id = $1`,
+      [commentId, userId]
+    );
+    return {
+      liked,
+      count: stat[0]?.count ?? 0,
+      emoji: stat[0]?.my_emoji ?? stat[0]?.top_emoji ?? DEFAULT_COMMENT_EMOJI,
     };
   }
 
@@ -489,6 +565,30 @@ export class FeedDbService {
   }
 
   /** ลบโพสต์พร้อมข้อมูลที่เกี่ยวข้อง (Admin only) */
+  /**
+   * ปักหมุด / เลิกปักหมุดโพสต์ (แอดมิน) — โพสต์ที่ปักหมุดขึ้นบนสุดของฟีด (ORDER BY p.pinned DESC ใน getPosts)
+   * คืน null ถ้าไม่พบโพสต์ที่แสดงอยู่ในฟีด
+   */
+  async setPinned(postId: number, pinned: boolean, adminId: number) {
+    const { rows } = await pool.query(
+      `UPDATE posts SET pinned = $2
+       WHERE id = $1 AND status IN ('published', 'approved')
+       RETURNING id`,
+      [postId, pinned]
+    );
+    if (rows.length === 0) return null;
+
+    try {
+      await pool.query(
+        `INSERT INTO audit_logs (actor_id, action, target_type, target_id) VALUES ($1, $2, 'post', $3)`,
+        [adminId, pinned ? 'pin_post' : 'unpin_post', postId]
+      );
+    } catch {
+      // audit_logs table optional (เหมือน deletePost)
+    }
+    return rows[0];
+  }
+
   async deletePost(postId: number, adminId: number) {
     const { rows: adminUser } = await pool.query(`select id, role from users where id = $1`, [adminId]);
     if (!adminUser.length || adminUser[0].role !== 'admin') {

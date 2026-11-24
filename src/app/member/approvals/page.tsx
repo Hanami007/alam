@@ -16,12 +16,17 @@ import {
   AlertCircle
 } from 'lucide-react';
 import Link from 'next/link';
+import { UnlockQuestionEditor } from '@/modules/member/components/unlock-question-editor';
 
 export default function MemberApprovalsPage() {
   const [loading, setLoading] = useState(true);
   const [batchmates, setBatchmates] = useState<any[]>([]);
   const [userGen, setUserGen] = useState<string>('');
   const [isAdmin, setIsAdmin] = useState(false);
+  // หัวหน้ารุ่น (null = ไม่ได้เป็น → ไม่มีสิทธิ์ยืนยันสมาชิก/ตั้งคำถาม)
+  const [leaderGeneration, setLeaderGeneration] = useState<{ id: number; label: string } | null>(null);
+  const [notLeaderMessage, setNotLeaderMessage] = useState<string | null>(null);
+  const [generations, setGenerations] = useState<{ id: number; label: string }[]>([]);
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -34,6 +39,13 @@ export default function MemberApprovalsPage() {
         setBatchmates(data.pendingBatchmates || []);
         if (data.userGeneration) setUserGen(data.userGeneration);
         setIsAdmin(Boolean(data.isAdmin));
+        setLeaderGeneration(data.leaderGeneration ?? null);
+        setNotLeaderMessage(!data.isAdmin && !data.leaderGeneration ? data.message || null : null);
+        if (data.isAdmin) {
+          // แอดมินเลือกรุ่นที่จะตั้งคำถามได้ — ใช้รายชื่อรุ่นชุดเดียวกับหน้าสมัคร
+          const lookup = await fetch('/api/lookup/register-data').then((r) => r.json()).catch(() => null);
+          setGenerations((lookup?.generations || []).map((g: any) => ({ id: g.id, label: g.label })));
+        }
       } else {
         setToast({ message: data.error || 'ไม่สามารถโหลดข้อมูลได้', type: 'error' });
       }
@@ -108,13 +120,13 @@ export default function MemberApprovalsPage() {
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-md px-3.5 py-1 text-xs font-semibold text-indigo-200 border border-white/15">
                 <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-                <span>การยืนยันตัวตนเพื่อนร่วมรุ่น {userGen ? `(${userGen})` : ''}</span>
+                <span>{isAdmin ? 'ผู้ดูแลระบบ · ทุกรุ่น' : `👑 หัวหน้ารุ่น ${userGen ? `(${userGen})` : ''}`}</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                ยืนยันตัวตนเพื่อนร่วมรุ่น
+                จัดการรุ่น
               </h1>
               <p className="text-sm text-indigo-100/80 max-w-2xl leading-relaxed">
-                ช่วยรับรองและยืนยันตัวตนให้เพื่อนๆ ที่สมัครเข้าสู่ระบบในรุ่นเดียวกัน เพื่อเปิดสิทธิ์ให้เพื่อนสามารถล็อกอินและร่วมใช้งานเครือข่าย CS MJU CONNECT ได้
+                ยืนยันตัวตนสมาชิกใหม่ที่สมัครเข้ามาในรุ่น และตั้งคำถามปลดล็อกคลังภาพเก่าของรุ่น
               </p>
             </div>
 
@@ -129,7 +141,16 @@ export default function MemberApprovalsPage() {
           </div>
         </div>
 
+        {/* ไม่ใช่หัวหน้ารุ่น — ยืนยันสมาชิกได้เฉพาะหัวหน้ารุ่นและแอดมิน */}
+        {notLeaderMessage && (
+          <div className="flex items-start gap-3 rounded-[24px] border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
+            <AlertCircle className="h-5 w-5 shrink-0" />
+            <p>{notLeaderMessage}</p>
+          </div>
+        )}
+
         {/* Content Section */}
+        {!notLeaderMessage && (
         <div className="rounded-[32px] border border-slate-200/80 bg-white p-6 sm:p-8 shadow-xs space-y-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div className="flex items-center gap-2.5">
@@ -256,6 +277,12 @@ export default function MemberApprovalsPage() {
             </div>
           )}
         </div>
+        )}
+
+        {/* คำถามปลดล็อกคลังภาพ — หัวหน้ารุ่น (รุ่นตัวเอง) และแอดมิน (เลือกรุ่น) */}
+        {!loading && (isAdmin || leaderGeneration) && (
+          <UnlockQuestionEditor isAdmin={isAdmin} leaderGeneration={leaderGeneration} generations={generations} />
+        )}
       </div>
     </AppShell>
   );

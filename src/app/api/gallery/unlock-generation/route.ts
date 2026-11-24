@@ -19,6 +19,9 @@ export async function POST(req: Request) {
 
     // ใช้ user.id จาก session เสมอ — ห้ามเชื่อ userId ที่ client ส่งมา (กันปลดล็อก/รับแต้มแทนคนอื่น)
     const result = await galleryDbService.unlockGeneration(user.id, generation, answer);
+    if (!result.success) {
+      return NextResponse.json({ success: false, error: result.error }, { status: 400 });
+    }
 
     return NextResponse.json({
       success: true,

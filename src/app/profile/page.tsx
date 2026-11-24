@@ -10,8 +10,7 @@ import { USER_POINTS_UPDATED_EVENT } from '@/lib/events';
 export default function ProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
-  const [taggedPhotos, setTaggedPhotos] = useState<any[]>([]);
-  const [unlockedPhotos, setUnlockedPhotos] = useState<any[]>([]);
+  const [albumCounts, setAlbumCounts] = useState<{ tagged: number; unlocked: number } | undefined>(undefined);
   const [activityLog, setActivityLog] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [lookupOptions, setLookupOptions] = useState<{ generations: any[]; provinces: any[]; careerTypes: any[] }>({
@@ -54,6 +53,7 @@ export default function ProfilePage() {
           email: u.email || '',
           generation: u.generation || '',
           student_status: u.studentStatus ?? u.student_status ?? 'studying',
+          leader_generation: u.leaderGeneration?.label ?? null,
           expected_graduation_year: u.expectedGraduationYear ?? u.expected_graduation_year ?? null,
           generation_option_id: u.generationOptionId ?? u.generation_option_id ?? null,
           province: u.province || '',
@@ -72,6 +72,7 @@ export default function ProfilePage() {
           show_workplace_on_map: Boolean(u.showWorkplaceOnMap ?? u.show_workplace_on_map),
           facebook_url: u.facebookUrl ?? u.facebook_url ?? '',
           line_id: u.lineId ?? u.line_id ?? '',
+          phone: u.phone ?? '',
           show_contact_on_map: Boolean(u.showContactOnMap ?? u.show_contact_on_map),
           birth_date: u.birthDate ?? u.birth_date ?? null,
           show_email: Boolean(u.showEmail),
@@ -90,23 +91,12 @@ export default function ProfilePage() {
           setActivityLog([]);
         }
 
+        // ตัวเลขในหน้าภาพรวม — รายละเอียดอัลบั้มโหลดในแท็บ "อัลบั้มของฉัน" (MyAlbum)
         if (photosRes.status === 'fulfilled' && photosRes.value) {
-          const { taggedPhotos: tagged = [], unlockedPhotos: unlocked = [] } = photosRes.value;
-          setTaggedPhotos(tagged.map((p: any) => ({
-            id: p.id,
-            image_url: p.image_url,
-            original_image_url: p.original_image_url || null,
-            caption: p.caption || 'รูปภาพกิจกรรม',
-            created_at: p.created_at,
-            tagged_by_name: p.tagged_by_name || null,
-          })));
-          setUnlockedPhotos(unlocked.map((p: any) => ({
-            id: p.id,
-            image_url: p.image_url,
-            original_image_url: p.original_image_url || null,
-            caption: p.caption || 'รูปภาพที่ปลดล็อก',
-            created_at: p.created_at,
-          })));
+          setAlbumCounts({
+            tagged: photosRes.value.taggedPhotos?.length ?? 0,
+            unlocked: photosRes.value.unlockedGenerations?.length ?? 0,
+          });
         }
       } catch (err) {
         console.error('[ProfilePage] Error loading profile:', err);
@@ -155,8 +145,7 @@ export default function ProfilePage() {
       ) : (
         <ProfileCard
           user={user}
-          taggedPhotos={taggedPhotos}
-          unlockedPhotos={unlockedPhotos}
+          albumCounts={albumCounts}
           activityLog={activityLog}
           isOwner
           lookupOptions={lookupOptions}

@@ -1,4 +1,5 @@
 import { nasCatalogService } from '@/services/nas/catalog.service';
+import { leaderService } from '@/modules/member/services/leader.service';
 import { publicErrorMessage } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 
@@ -12,10 +13,16 @@ export async function GET(req: Request) {
 
     const genNum = parseInt(genParam.replace(/[^0-9]/g, ''), 10) || 20;
 
-    const [photos, generations] = await Promise.all([
+    const [photos, rawGenerations, leaderQuestions] = await Promise.all([
       nasCatalogService.getPhotosForGeneration(genNum, subfolder),
       nasCatalogService.getGenerationsSummary(),
+      leaderService.getQuestionsByLabel(),
     ]);
+    // คำถามปลดล็อกที่หัวหน้ารุ่นตั้งไว้ แทนคำถามตั้งต้นของ catalog (ส่งแค่คำถาม ไม่ส่งคำตอบ)
+    const generations = rawGenerations.map((g) => ({
+      ...g,
+      quiz: leaderQuestions.get(g.generationLabel) ?? g.quiz,
+    }));
 
     let filtered = photos;
 

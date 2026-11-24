@@ -2,12 +2,14 @@ import { getCurrentUser } from '@/lib/auth';
 import { pool } from '@/lib/db';
 import { publicErrorMessage } from '@/lib/api-error';
 import { memberDbService } from '@/modules/member/services/member.service';
+import { leaderService } from '@/modules/member/services/leader.service';
 import { NextResponse } from 'next/server';
 
 /**
  * GET /api/member/approvals
  *  - แอดมิน: เห็นผู้สมัครที่รอยืนยันทุกรุ่น
- *  - สมาชิกทั่วไป: เห็นเฉพาะผู้สมัครรุ่นเดียวกับตัวเอง
+ *  - หัวหน้ารุ่น: เห็นเฉพาะผู้สมัครของรุ่นที่ตัวเองเป็นหัวหน้า
+ *  - สมาชิกทั่วไป: ไม่เห็นคิว (ยืนยันสมาชิกได้เฉพาะหัวหน้ารุ่น)
  */
 export async function GET() {
   try {
@@ -30,25 +32,21 @@ export async function GET() {
       return NextResponse.json({ pendingBatchmates: rows, userGeneration: 'ทุกรุ่น', isAdmin: true });
     }
 
-    let genId = user.generation_option_id;
-    // ถ้ายังไม่มี generation_option_id ใน session ให้ query จาก DB ตรงๆ
-    if (!genId) {
-      const { rows } = await pool.query(`SELECT generation_option_id FROM users WHERE id = $1`, [user.id]);
-      genId = rows[0]?.generation_option_id;
-    }
-
-    if (!genId) {
+    const leaderOf = await leaderService.getLeaderGeneration(user.id);
+    if (!leaderOf) {
       return NextResponse.json({
         pendingBatchmates: [],
         isAdmin: false,
-        message: 'คุณยังไม่ได้ระบุรุ่นของคุณในโปรไฟล์',
+        leaderGeneration: null,
+        message: 'เฉพาะหัวหน้ารุ่นเท่านั้นที่ยืนยันสมาชิกใหม่ได้ ติดต่อผู้ดูแลระบบหากต้องการเป็นหัวหน้ารุ่น',
       });
     }
 
-    const pendingBatchmates = await memberDbService.getPendingBatchmates(genId);
+    const pendingBatchmates = await memberDbService.getPendingBatchmates(leaderOf.id);
     return NextResponse.json({
       pendingBatchmates,
-      userGeneration: user.generation,
+      userGeneration: leaderOf.label,
+      leaderGeneration: leaderOf,
       isAdmin: false,
     });
   } catch (err) {
@@ -59,7 +57,7 @@ export async function GET() {
 
 /**
  * POST /api/member/approvals  { applicantId, action?: 'approve' | 'reject', remark? }
- *  - approve: เพื่อนร่วมรุ่น หรือแอดมิน
+ *  - approve: หัวหน้ารุ่นของผู้สมัคร หรือแอดมิน
  *  - reject:  แอดมินเท่านั้น
  */
 export async function POST(req: Request) {
