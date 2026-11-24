@@ -309,6 +309,59 @@ export function FeedList({
   const [postToDelete, setPostToDelete] = useState<Post | null>(null);
   const [isDeletingPost, setIsDeletingPost] = useState<boolean>(false);
   const [deleteToast, setDeleteToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // ตัวกรองหมวดหมู่ (null = ทั้งหมด) — กรองฝั่ง server เพราะ /api/feed ดึงแค่ 50 โพสต์ล่าสุด
+  const [categories, setCategories] = useState<{ category: string; count: number }[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isFilteringFeed, setIsFilteringFeed] = useState<boolean>(false);
+  const feedUrl = selectedCategory ? `/api/feed?category=${encodeURIComponent(selectedCategory)}` : '/api/feed';
+  // เปิด/ปิดแถบหมวดหมู่ จำค่าไว้ในเบราว์เซอร์ (อ่าน storage ไม่ได้ = เปิดไว้)
+  const [showCategoryFilter, setShowCategoryFilter] = useState<boolean>(() => {
+    try {
+      return typeof window === 'undefined' || localStorage.getItem('feed.showCategoryFilter') !== '0';
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    fetch('/api/feed/categories')
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setCategories(data);
+      })
+      .catch(() => {});
+  }, []);
+
+  function toggleCategoryFilter() {
+    setShowCategoryFilter((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('feed.showCategoryFilter', next ? '1' : '0');
+      } catch {}
+      return next;
+    });
+  }
+
+  async function handleSelectCategory(category: string | null) {
+    if (category === selectedCategory) return;
+    setSelectedCategory(category);
+    if (category === null) {
+      setFeedPosts(posts);
+      return;
+    }
+    setIsFilteringFeed(true);
+    try {
+      const res = await fetch(`/api/feed?category=${encodeURIComponent(category)}`);
+      const data = await res.json();
+      if (Array.isArray(data)) setFeedPosts(data);
+    } catch {
+      setDeleteToast({ message: 'ไม่สามารถโหลดโพสต์ในหมวดหมู่นี้ได้', type: 'error' });
+      setTimeout(() => setDeleteToast(null), 3500);
+    } finally {
+      setIsFilteringFeed(false);
+    }
+  }
   // pop-up กลางจอเมื่อโพสต์/โพล/ความคิดเห็นมีคำไม่เหมาะสม และกล่องรายงานเนื้อหาที่หลุดตัวกรอง
   const [contentWarning, setContentWarning] = useState<ContentWarning | null>(null);
   const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
@@ -420,8 +473,8 @@ export function FeedList({
       } else {
         setDeleteToast({ message: data.error || 'ไม่สามารถบันทึกการโหวตได้', type: 'error' });
         setTimeout(() => setDeleteToast(null), 3500);
-        // Refresh feed posts to sync accurate state from server
-        fetch('/api/feed')
+        // Refresh feed posts to sync accurate state from server (คงหมวดหมู่ที่เลือกไว้)
+        fetch(feedUrl)
           .then((r) => r.json())
           .then((fresh) => {
             if (Array.isArray(fresh)) setFeedPosts(fresh);
@@ -1181,11 +1234,74 @@ export function FeedList({
         </div>
         </div>
 
+        {/* ===== CATEGORY FILTER ===== */}
+        {categories.length > 0 && (
+          <div className="rounded-2xl border border-slate-200 bg-white">
+            <button
+              type="button"
+              aria-expanded={showCategoryFilter}
+              onClick={toggleCategoryFilter}
+              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+            >
+              <span className="text-sm text-slate-500">
+                หมวดหมู่
+                {selectedCategory && <span className="ml-2 font-medium text-slate-900">{selectedCategory}</span>}
+              </span>
+              <span className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-700">
+                {showCategoryFilter ? 'ซ่อน' : 'แสดง'}
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showCategoryFilter ? 'rotate-180' : ''}`} />
+              </span>
+            </button>
+
+            {showCategoryFilter && (
+              <div className="flex flex-wrap gap-2 border-t border-slate-100 px-4 py-3">
+                {[{ category: null as string | null, count: categories.reduce((sum, c) => sum + c.count, 0) }, ...categories].map(
+                  ({ category, count }) => {
+                    const isActive = selectedCategory === category;
+                    return (
+                      <button
+                        key={category ?? '__all__'}
+                        type="button"
+                        aria-pressed={isActive}
+                        disabled={isFilteringFeed}
+                        onClick={() => handleSelectCategory(category)}
+                        className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                          isActive
+                            ? 'border-slate-900 bg-slate-900 text-white'
+                            : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {category ?? 'ทั้งหมด'}
+                        <span className="ml-1.5 text-xs text-slate-400">{count}</span>
+                      </button>
+                    );
+                  }
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ===== POST CARDS ===== */}
-        {sortedFeedPosts.length === 0 ? (
+        {isFilteringFeed ? (
+          <p className="py-16 text-center text-sm text-slate-400" aria-busy="true">
+            กำลังโหลด...
+          </p>
+        ) : sortedFeedPosts.length === 0 ? (
           <div className="rounded-[32px] border border-slate-100 bg-white p-20 text-center text-slate-400 shadow-xs">
             <Sparkles className="mx-auto h-12 w-12 text-pink-300 animate-pulse" />
-            <p className="mt-4 text-base font-medium">ยังไม่มีโพสต์บนวอลล์ในขณะนี้</p>
+            <p className="mt-4 text-base font-medium">
+              {selectedCategory ? `ยังไม่มีโพสต์ในหมวด ${selectedCategory}` : 'ยังไม่มีโพสต์บนวอลล์ในขณะนี้'}
+            </p>
+            {selectedCategory && (
+              <button
+                type="button"
+                onClick={() => handleSelectCategory(null)}
+                className="mt-3 text-sm text-slate-500 underline underline-offset-4 hover:text-slate-800"
+              >
+                ดูโพสต์ทั้งหมด
+              </button>
+            )}
           </div>
         ) : (
           sortedFeedPosts.map((post) => {

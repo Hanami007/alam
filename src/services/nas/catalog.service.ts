@@ -327,9 +327,9 @@ export class NasCatalogService {
       try {
         await pool.query(
           `INSERT INTO lookup_options (category, code, label)
-           SELECT 'generation', $1, $2
+           SELECT 'generation', $1::varchar, $2::varchar
            WHERE NOT EXISTS (
-             SELECT 1 FROM lookup_options WHERE category = 'generation' AND label = $2
+             SELECT 1 FROM lookup_options WHERE category = 'generation' AND label = $2::varchar
            )`,
           [`gen-${gen}`, `รุ่น ${gen}`]
         );

@@ -120,7 +120,7 @@ function Top10Table({
               </div>
             ) : (
               r.achievement && (
-                <p className="mt-0.5 text-xs text-slate-400 italic truncate">"{r.achievement}"</p>
+                <p className="mt-0.5 text-xs text-slate-400 italic truncate">&ldquo;{r.achievement}&rdquo;</p>
               )
             )}
           </div>
@@ -544,7 +544,7 @@ export function HofCampaignManager() {
                 <div className="rounded-[24px] border-2 border-dashed border-slate-200 p-10 text-center space-y-3">
                   <Trophy className="h-10 w-10 text-slate-300 mx-auto" />
                   <p className="text-sm font-bold text-slate-500">ยังไม่มี campaign ที่กำลังดำเนินการ</p>
-                  <p className="text-xs text-slate-400">กด "สร้างรอบใหม่" เพื่อเริ่มรอบโหวตถัดไป</p>
+                  <p className="text-xs text-slate-400">กด &ldquo;สร้างรอบใหม่&rdquo; เพื่อเริ่มรอบโหวตถัดไป</p>
                 </div>
               ) : (
                 current.map((c, i) => (

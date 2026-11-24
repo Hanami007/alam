@@ -65,8 +65,10 @@ export class FeedDbService {
   /**
    * ดึงรายการโพสต์ทั้งหมดพร้อม Polls, Comments, และ Likes
    */
-  async getPosts(currentUserId?: number): Promise<FeedPostItem[]> {
+  async getPosts(currentUserId?: number, category?: string): Promise<FeedPostItem[]> {
     try {
+      // กรองหมวดหมู่ฝั่ง server — ฟีดดึงแค่ 50 โพสต์ล่าสุด ถ้ากรองฝั่งหน้าเว็บจะไม่เห็นโพสต์เก่าในหมวดนั้น
+      const categoryFilter = category?.trim() || null;
       const { rows: posts } = await pool.query(`
         SELECT
           p.id, p.category, p.title, p.content as body, p.pinned, p.created_at, p.status,
@@ -94,9 +96,10 @@ export class FeedDbService {
           GROUP BY post_id
         ) comment_stat ON comment_stat.post_id = p.id
         WHERE p.status IN ('published', 'approved') AND NOT p.is_hidden
+          AND ($1::text IS NULL OR p.category = $1)
         ORDER BY p.pinned DESC, COALESCE(p.published_at, p.created_at) DESC, p.created_at DESC
         LIMIT 50
-      `);
+      `, [categoryFilter]);
 
       const postIds = posts.map((p) => p.id);
       if (postIds.length === 0) return [];
@@ -335,6 +338,19 @@ export class FeedDbService {
       count: stat[0]?.count ?? 0,
       emoji: stat[0]?.my_emoji ?? stat[0]?.top_emoji ?? DEFAULT_COMMENT_EMOJI,
     };
+  }
+
+  /** หมวดหมู่ที่มีโพสต์เผยแพร่อยู่ พร้อมจำนวนโพสต์ (ใช้ทำตัวกรองหน้าฟีด) */
+  async getCategories(): Promise<{ category: string; count: number }[]> {
+    const { rows } = await pool.query(
+      `SELECT p.category, COUNT(*)::int AS count
+       FROM posts p
+       WHERE p.status IN ('published', 'approved') AND NOT p.is_hidden
+         AND p.category IS NOT NULL AND btrim(p.category) <> ''
+       GROUP BY p.category
+       ORDER BY count DESC, p.category ASC`
+    );
+    return rows.map((r) => ({ category: r.category, count: r.count }));
   }
 
   /**

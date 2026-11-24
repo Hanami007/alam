@@ -1106,7 +1106,7 @@ export function GlobePanel({
     }));
 
     for (const p of intlPoints) {
-      let cluster = intlClusters.find(
+      const cluster = intlClusters.find(
         (c) =>
           (p.country_code && c.country_code === p.country_code) ||
           (p.province_name && (p.province_name.includes(c.country_name) || c.country_name.includes(p.province_name)))
