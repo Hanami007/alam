@@ -98,7 +98,10 @@ export async function authenticateUser(identifier: string, password: string): Pr
  * ครบจำนวนสูงสุดภายในช่วงเวลาที่กำหนดแล้ว ให้ปฏิเสธทันทีโดยไม่ต้องเช็ครหัสผ่านอีก
  * (ป้องกัน brute-force เดารหัสผ่าน — เดิมไม่มีการจำกัดจำนวนครั้งเลย)
  */
-export async function checkLoginRateLimit(identifier: string): Promise<void> {
+export const LOGIN_RATE_LIMIT_MESSAGE = 'เข้าสู่ระบบผิดพลาดหลายครั้งเกินไป กรุณาลองใหม่อีกครั้งใน 15 นาที';
+
+/** คืน true ถ้าถูกจำกัดแล้ว — error อื่น (เช่น DB ล่ม) ปล่อยให้ throw ออกไป ไม่ให้กลายเป็น 429 */
+export async function isLoginRateLimited(identifier: string): Promise<boolean> {
   const { rows } = await pool.query(
     `SELECT COUNT(*)::int AS failed_count
      FROM login_attempts
@@ -106,9 +109,7 @@ export async function checkLoginRateLimit(identifier: string): Promise<void> {
        AND created_at > now() - interval '${LOGIN_RATE_LIMIT_WINDOW_TEXT}'`,
     [identifier.trim().toLowerCase()]
   );
-  if ((rows[0]?.failed_count ?? 0) >= LOGIN_RATE_LIMIT_MAX_ATTEMPTS) {
-    throw new Error('เข้าสู่ระบบผิดพลาดหลายครั้งเกินไป กรุณาลองใหม่อีกครั้งใน 15 นาที');
-  }
+  return (rows[0]?.failed_count ?? 0) >= LOGIN_RATE_LIMIT_MAX_ATTEMPTS;
 }
 
 /** บันทึกผลการล็อกอินแต่ละครั้งไว้ใช้คำนวณ rate limit — ไม่ throw แม้บันทึกไม่สำเร็จ */

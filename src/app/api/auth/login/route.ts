@@ -1,4 +1,11 @@
-import { authenticateUser, createSession, checkLoginRateLimit, recordLoginAttempt, SESSION_MAX_AGE_SECONDS } from '@/lib/auth';
+import {
+  authenticateUser,
+  createSession,
+  isLoginRateLimited,
+  LOGIN_RATE_LIMIT_MESSAGE,
+  recordLoginAttempt,
+  SESSION_MAX_AGE_SECONDS,
+} from '@/lib/auth';
 import { publicErrorMessage } from '@/lib/api-error';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
@@ -16,10 +23,8 @@ export async function POST(req: Request) {
       );
     }
 
-    try {
-      await checkLoginRateLimit(identifier);
-    } catch (rateLimitErr: any) {
-      return NextResponse.json({ error: rateLimitErr.message }, { status: 429 });
+    if (await isLoginRateLimited(identifier)) {
+      return NextResponse.json({ error: LOGIN_RATE_LIMIT_MESSAGE }, { status: 429 });
     }
 
     const user = await authenticateUser(identifier, password);
