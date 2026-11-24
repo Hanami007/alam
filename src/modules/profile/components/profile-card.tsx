@@ -10,6 +10,7 @@ import {
 import { LocationPicker } from '@/components/ui/location-picker';
 import { resizeImageToDataUrl } from '@/lib/image-resize';
 import { PrivacyToggle } from '@/components/ui/privacy-toggle';
+import { ChangePasswordCard } from './change-password-card';
 
 const PRESET_AVATARS = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
@@ -367,7 +368,7 @@ export function ProfileCard({
       <div className="bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/80 shadow-xs grid grid-cols-2 sm:grid-cols-4 gap-1.5">
         {[
           { id: 'overview' as const, label: 'ข้อมูลส่วนตัว', icon: UserIcon },
-          { id: 'privacy' as const, label: 'ความเป็นส่วนตัวแผนที่', icon: Shield },
+          { id: 'privacy' as const, label: 'ความเป็นส่วนตัว', icon: Shield },
           {
             id: 'gallery' as const,
             label: 'อัลบั้มของฉัน',
@@ -854,6 +855,8 @@ export function ProfileCard({
               </p>
             </div>
           </section>
+
+          {isOwner && <ChangePasswordCard />}
         </div>
       )}
 

@@ -634,14 +634,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                         โปรไฟล์ของฉัน
                       </Link>
                       <Link
-                        href="/settings"
-                        onClick={() => setAvatarOpen(false)}
-                        className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
-                      >
-                        <Settings className="h-4 w-4 text-slate-500" />
-                        การตั้งค่าความเป็นส่วนตัว
-                      </Link>
-                      <Link
                         href="/hall-of-fame"
                         onClick={() => setAvatarOpen(false)}
                         className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-foreground transition-colors hover:bg-primary-light hover:text-primary font-medium"
@@ -777,14 +769,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                     >
                       <User className="h-4 w-4 text-white" />
                       โปรไฟล์ของฉัน
-                    </Link>
-                    <Link
-                      href="/settings"
-                      onClick={() => setAvatarOpen(false)}
-                      className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-white hover:bg-white/20 transition-colors font-medium"
-                    >
-                      <Settings className="h-4 w-4 text-white/80" />
-                      การตั้งค่าความเป็นส่วนตัว
                     </Link>
                     <Link
                       href="/hall-of-fame"

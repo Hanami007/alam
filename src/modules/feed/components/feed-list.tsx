@@ -1405,10 +1405,14 @@ export function FeedList({
                           <button
                             key={item.emoji}
                             onClick={(e) => handleSelectEmojiReaction(post.id, item, e)}
-                            title={item.label}
-                            className="text-xl sm:text-2xl transition-transform hover:scale-135 hover:-translate-y-1 active:scale-100 p-1"
+                            aria-label={item.label}
+                            className="group/emoji relative text-xl sm:text-2xl transition-transform hover:scale-135 hover:-translate-y-1 active:scale-100 p-1"
                           >
                             {item.emoji}
+                            <span className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 translate-y-1 scale-75 whitespace-nowrap rounded-full bg-slate-800/95 px-2.5 py-1 text-[11px] font-bold leading-none text-white opacity-0 shadow-md transition-all duration-150 group-hover/emoji:translate-y-0 group-hover/emoji:scale-[0.75] group-hover/emoji:opacity-100">
+                              {item.label}
+                              <span className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-slate-800/95" />
+                            </span>
                           </button>
                         ))}
                       </div>
