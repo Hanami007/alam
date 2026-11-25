@@ -4,14 +4,17 @@ import {
   Briefcase, GraduationCap, ImageIcon, Sparkles, Mail, MapPin, BadgeCheck, Vote,
   MessageCircle, Star, Lock, Clock, X, AlertTriangle, CheckCircle2, Eye, User as UserIcon,
   Shield, Globe, EyeOff, Edit3, Camera, Upload, Building2, Layers, HeartHandshake, Loader2,
-  Quote, Link2, Phone, ChevronDown
+  Quote, Link2, Phone
 } from 'lucide-react';
 import { LocationPicker } from '@/components/ui/location-picker';
 import { resizeImageToDataUrl } from '@/lib/image-resize';
 import { PrivacyToggle } from '@/components/ui/privacy-toggle';
 import { ChangePasswordCard } from './change-password-card';
+import { SelectMenu } from '@/components/ui/select-menu';
 import { MyAlbum } from '@/modules/profile/components/my-album';
 import { ModalPortal } from '@/components/ui/modal-portal';
+import { FIELD_LIMITS } from '@/lib/field-limits';
+import { formatPhone, formatPhoneInput, PHONE_INPUT_MAX_LENGTH } from '@/lib/phone';
 
 const PRESET_AVATARS = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
@@ -201,7 +204,7 @@ export function ProfileCard({
       isAvailableForMentorship: Boolean(user.is_available_for_mentorship),
       facebookUrl: user.facebook_url || '',
       lineId: user.line_id || '',
-      phone: user.phone || '',
+      phone: formatPhone(user.phone),
       showContactOnMap: Boolean(user.show_contact_on_map),
     });
     setIsEditModalOpen(true);
@@ -1000,6 +1003,7 @@ export function ProfileCard({
                   <input
                     type="text"
                     required
+                    maxLength={FIELD_LIMITS.name}
                     value={editForm.name}
                     onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
@@ -1023,22 +1027,17 @@ export function ProfileCard({
                   <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
                     <GraduationCap className="h-3.5 w-3.5 text-indigo-500" /> รุ่นการศึกษา
                   </label>
-                  <div className="relative">
-                      <select
-                      value={editForm.generationOptionId}
-                      onChange={(e) => setEditForm((prev) => ({ ...prev, generationOptionId: e.target.value }))}
-                      disabled={Boolean(user.generation_option_id)}
-                      title={user.generation_option_id ? 'เปลี่ยนรุ่นได้โดยผู้ดูแลระบบเท่านั้น' : undefined}
-                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-white pl-4 pr-10 py-2.5 text-sm text-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
-                    >
-                      <option value="">ไม่ระบุ</option>
-                      {(lookupOptions?.generations || []).map((g) => (
-                        <option key={g.id} value={g.id}>{g.label}</option>
-                      ))}
-                    </select>
-                    {/* ลูกศรเดียวกับ LocationPicker — ลูกศรของ <select> เบราว์เซอร์วาดเองเป็นสีดำ */}
-                    <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  </div>
+                  <SelectMenu
+                    value={editForm.generationOptionId}
+                    onChange={(generationOptionId) => setEditForm((prev) => ({ ...prev, generationOptionId }))}
+                    options={[
+                      { value: '', label: 'ไม่ระบุ' },
+                      ...(lookupOptions?.generations || []).map((g) => ({ value: String(g.id), label: g.label })),
+                    ]}
+                    disabled={Boolean(user.generation_option_id)}
+                    title={user.generation_option_id ? 'เปลี่ยนรุ่นได้โดยผู้ดูแลระบบเท่านั้น' : undefined}
+                    triggerClassName="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 hover:border-indigo-300 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all disabled:bg-slate-100 disabled:text-slate-500 disabled:hover:border-slate-200"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
@@ -1087,20 +1086,15 @@ export function ProfileCard({
                   <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
                     <Layers className="h-3.5 w-3.5 text-purple-500" /> ประเภทสายงาน
                   </label>
-                  <div className="relative">
-                      <select
-                      value={editForm.careerOptionId}
-                      onChange={(e) => setEditForm((prev) => ({ ...prev, careerOptionId: e.target.value }))}
-                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-white pl-4 pr-10 py-2.5 text-sm text-slate-800 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100 transition-all"
-                    >
-                      <option value="">ไม่ระบุ</option>
-                      {(lookupOptions?.careerTypes || []).map((ct) => (
-                        <option key={ct.id} value={ct.id}>{ct.label}</option>
-                      ))}
-                    </select>
-                    {/* ลูกศรเดียวกับ LocationPicker — ลูกศรของ <select> เบราว์เซอร์วาดเองเป็นสีดำ */}
-                    <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  </div>
+                  <SelectMenu
+                    value={editForm.careerOptionId}
+                    onChange={(careerOptionId) => setEditForm((prev) => ({ ...prev, careerOptionId }))}
+                    options={[
+                      { value: '', label: 'ไม่ระบุ' },
+                      ...(lookupOptions?.careerTypes || []).map((ct) => ({ value: String(ct.id), label: ct.label })),
+                    ]}
+                    triggerClassName="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 hover:border-purple-300 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100 transition-all"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
@@ -1124,11 +1118,20 @@ export function ProfileCard({
                 </label>
                 <textarea
                   rows={3}
+                  maxLength={FIELD_LIMITS.bio}
                   value={editForm.bio}
                   onChange={(e) => setEditForm((prev) => ({ ...prev, bio: e.target.value }))}
                   placeholder="แนะนำตัวสั้นๆ หรือคติประจำใจ..."
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100 transition-all resize-none"
                 />
+                <p
+                  className={`text-right text-[11px] tabular-nums ${
+                    editForm.bio.length > FIELD_LIMITS.bio ? 'font-bold text-rose-600' : 'text-slate-400'
+                  }`}
+                >
+                  {editForm.bio.length}/{FIELD_LIMITS.bio}
+                  {editForm.bio.length > FIELD_LIMITS.bio && ' — ยาวเกิน กรุณาย่อให้สั้นลงก่อนบันทึก'}
+                </p>
               </div>
 
               {/* Facebook & LINE + toggle แสดงบนแผนที่ รวมอยู่การ์ดเดียวกัน เพื่อไม่ให้พลาดเปิดการแสดงผล */}
@@ -1148,6 +1151,7 @@ export function ProfileCard({
                     </label>
                     <input
                       type="text"
+                      maxLength={FIELD_LIMITS.facebookUrl}
                       value={editForm.facebookUrl}
                       onChange={(e) => setEditForm((prev) => ({ ...prev, facebookUrl: e.target.value }))}
                       placeholder="ลิงก์โปรไฟล์ หรือ ชื่อผู้ใช้ Facebook"
@@ -1160,6 +1164,7 @@ export function ProfileCard({
                     </label>
                     <input
                       type="text"
+                      maxLength={FIELD_LIMITS.lineId + 1}
                       value={editForm.lineId}
                       onChange={(e) => setEditForm((prev) => ({ ...prev, lineId: e.target.value }))}
                       placeholder="LINE ID ของคุณ"
@@ -1176,12 +1181,12 @@ export function ProfileCard({
                   </label>
                   <input
                     type="tel"
-                    inputMode="tel"
-                    autoComplete="tel"
-                    maxLength={20}
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    maxLength={PHONE_INPUT_MAX_LENGTH}
                     value={editForm.phone}
-                    onChange={(e) => setEditForm((prev) => ({ ...prev, phone: e.target.value }))}
-                    placeholder="เช่น 081-234-5678"
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, phone: formatPhoneInput(e.target.value) }))}
+                    placeholder="เช่น 064-779-8792"
                     className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
                   />
                 </div>

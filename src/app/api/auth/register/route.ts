@@ -5,6 +5,7 @@ import { publicErrorMessage } from '@/lib/api-error';
 import { checkLength } from '@/lib/field-limits';
 import { parseStudentId } from '@/lib/student-id';
 import { normalizePhone } from '@/lib/phone';
+import { normalizeFacebook, normalizeLineId } from '@/lib/contact-fields';
 import { normalizeAvatarInput } from '@/lib/upload-storage';
 import { NextResponse } from 'next/server';
 
@@ -74,11 +75,17 @@ export async function POST(req: Request) {
       checkLength(email, 'email', 'อีเมล') ||
       checkLength(company, 'company', 'ชื่อบริษัท/องค์กร') ||
       checkLength(position, 'position', 'ตำแหน่งงาน') ||
-      checkLength(bio, 'bio', 'คำแนะนำตัว') ||
-      checkLength(body.facebookUrl, 'facebookUrl', 'Facebook') ||
-      checkLength(body.lineId, 'lineId', 'LINE ID');
+      checkLength(bio, 'bio', 'คำแนะนำตัว');
     if (lengthError) {
       return NextResponse.json({ error: lengthError }, { status: 400 });
+    }
+
+    // ช่องทางติดต่อ: ตรวจทั้งความยาวและรูปแบบ (กันข้อความยาว/ขยะยัดลง DB ผ่านช่องเหล่านี้)
+    const facebook = normalizeFacebook(body.facebookUrl);
+    const line = normalizeLineId(body.lineId);
+    const contactError = facebook.error || line.error;
+    if (contactError) {
+      return NextResponse.json({ error: contactError }, { status: 400 });
     }
 
     // ตรวจสอบความซ้ำซ้อนของ student_id และ email
@@ -168,8 +175,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: e.message }, { status: 400 });
     }
     const cleanBirthDate = birthDate ? String(birthDate).trim() : null;
-    const cleanFacebookUrl = body.facebookUrl ? String(body.facebookUrl).trim() : null;
-    const cleanLineId = body.lineId ? String(body.lineId).trim() : null;
+    const cleanFacebookUrl = facebook.value;
+    const cleanLineId = line.value;
     // เบอร์โทร: สำหรับแอดมินติดต่อเท่านั้น ไม่เปิดเผยต่อสมาชิกคนอื่น
     const phone = normalizePhone(body.phone);
     if (phone.error) {

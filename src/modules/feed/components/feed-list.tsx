@@ -10,6 +10,7 @@ import { LeaderboardWidget } from './widgets/leaderboard-widget';
 import { ContentWarningModal, toContentWarning, type ContentWarning } from '@/components/ui/content-warning-modal';
 import { ReportContentDialog, type ReportTarget } from '@/components/ui/report-content-dialog';
 import { COMMENT_REACTION_EMOJIS, DEFAULT_COMMENT_EMOJI } from '@/lib/reactions';
+import { FIELD_LIMITS } from '@/lib/field-limits';
 
 function formatPostDateTime(dateStr: string) {
   if (!dateStr) return '';
@@ -243,6 +244,19 @@ export function FeedList({
 
   // Reaction Picker Popover State
   const [activeReactionPicker, setActiveReactionPicker] = useState<number | null>(null);
+  // หน่วงการปิดไว้ให้เลื่อนเมาส์จากปุ่มขึ้นไปที่แถบอีโมจิทัน (ระหว่างนั้นเมาส์อยู่นอกทั้งสองชิ้น)
+  const pickerCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openReactionPicker = (postId: number) => {
+    if (pickerCloseTimer.current) clearTimeout(pickerCloseTimer.current);
+    setActiveReactionPicker(postId);
+  };
+  const scheduleReactionPickerClose = () => {
+    if (pickerCloseTimer.current) clearTimeout(pickerCloseTimer.current);
+    pickerCloseTimer.current = setTimeout(() => setActiveReactionPicker(null), 300);
+  };
+  useEffect(() => () => {
+    if (pickerCloseTimer.current) clearTimeout(pickerCloseTimer.current);
+  }, []);
 
   // Birthday Wishes State
   const [wishedIds, setWishedIds] = useState<Record<number, boolean>>({});
@@ -1070,7 +1084,7 @@ export function FeedList({
                 <input
                   type="text"
                   required
-                  maxLength={100}
+                  maxLength={FIELD_LIMITS.memberPostTitle}
                   value={requestForm.title}
                   onChange={(e) =>
                     setRequestForm((f) => ({
@@ -1086,6 +1100,9 @@ export function FeedList({
                   }
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                 />
+                <p className="text-right text-xs tabular-nums text-slate-400 mt-1">
+                  {requestForm.title.length}/{FIELD_LIMITS.memberPostTitle}
+                </p>
               </div>
 
               {/* Poll Specific: Dynamic Options List */}
@@ -1172,7 +1189,7 @@ export function FeedList({
                 <textarea
                   required={requestForm.postType === 'normal'}
                   rows={requestForm.postType === 'poll' ? 2 : 4}
-                  maxLength={1000}
+                  maxLength={FIELD_LIMITS.memberPostContent}
                   value={requestForm.content}
                   onChange={(e) => setRequestForm((f) => ({ ...f, content: e.target.value }))}
                   placeholder={
@@ -1182,7 +1199,9 @@ export function FeedList({
                   }
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100 resize-none"
                 />
-                <p className="text-right text-xs text-slate-400 mt-1">{requestForm.content.length}/1000</p>
+                <p className="text-right text-xs tabular-nums text-slate-400 mt-1">
+                  {requestForm.content.length}/{FIELD_LIMITS.memberPostContent}
+                </p>
               </div>
 
               <PostImagePicker
@@ -1637,7 +1656,11 @@ export function FeedList({
 
                     {/* Cute Emoji Reaction Popup Picker */}
                     {activeReactionPicker === post.id && (
-                      <div className="absolute left-0 -top-14 z-20 flex items-center gap-1.5 sm:gap-2 rounded-full bg-white px-3 sm:px-4 py-1.5 sm:py-2 shadow-lg border border-pink-100 animate-fade-in">
+                      <div
+                        onMouseEnter={() => openReactionPicker(post.id)}
+                        onMouseLeave={scheduleReactionPickerClose}
+                        className="absolute left-0 -top-14 z-20 flex items-center gap-1.5 sm:gap-2 rounded-full bg-white px-3 sm:px-4 py-1.5 sm:py-2 shadow-lg border border-pink-100 animate-fade-in"
+                      >
                         {EMOJI_REACTIONS.map((item) => (
                           <button
                             key={item.emoji}
@@ -1658,7 +1681,8 @@ export function FeedList({
                     <div className="flex-1 relative">
                       <button
                         onClick={(e) => handleToggleLike(post.id, e)}
-                        onMouseEnter={() => setActiveReactionPicker(post.id)}
+                        onMouseEnter={() => openReactionPicker(post.id)}
+                        onMouseLeave={scheduleReactionPickerClose}
                         className={`w-full flex items-center justify-center gap-1.5 sm:gap-2 rounded-full py-2 sm:py-2.5 transition-all ${isLiked
                             ? 'bg-rose-50 text-rose-500 font-bold shadow-2xs'
                             : 'bg-slate-50 text-slate-600 hover:bg-rose-50/60 hover:text-rose-500'
@@ -1850,7 +1874,7 @@ export function FeedList({
                           <input
                             type="text"
                             value={commentInputs[post.id] || ''}
-                            maxLength={500}
+                            maxLength={FIELD_LIMITS.comment}
                             onChange={(e) =>
                               setCommentInputs((prev) => ({ ...prev, [post.id]: e.target.value }))
                             }

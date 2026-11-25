@@ -515,14 +515,14 @@ export class FeedDbService {
     await this.assertNotRateLimited(requestedBy);
 
     // จำกัดความยาวฝั่ง server ให้ตรงกับ maxLength ของฟอร์มจริง (feed-list.tsx: title/question
-    // 100 ตัวอักษร, เนื้อหา 1000, ตัวเลือกโพล 60) — เดิมมีแค่ maxLength ฝั่ง client เท่านั้น
+    // 50 ตัวอักษร, เนื้อหา 250, ตัวเลือกโพล 60 — ดู FIELD_LIMITS) — เดิมมีแค่ maxLength ฝั่ง client เท่านั้น
     // ยิง API ตรงๆ ข้าม UI ใส่ข้อความยาวเท่าไหร่ก็ได้ ไม่มีอะไรกันเลย
     if (!title || title.trim().length === 0) {
       throw new Error('กรุณาระบุหัวข้อโพสต์');
     }
     const lengthError =
-      checkLength(title, 'postTitle', 'หัวข้อโพสต์') ||
-      checkLength(content, 'postContent', 'เนื้อหาโพสต์') ||
+      checkLength(title, 'memberPostTitle', 'หัวข้อโพสต์') ||
+      checkLength(content, 'memberPostContent', 'เนื้อหาโพสต์') ||
       checkLength(category, 'postCategory', 'หมวดหมู่') ||
       (postType === 'poll' && pollData
         ? checkLength(pollData.question, 'pollQuestion', 'คำถามโพล') ||

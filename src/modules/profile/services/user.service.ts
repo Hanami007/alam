@@ -1,5 +1,6 @@
 import { pool } from '@/lib/db';
 import { normalizePhone } from '@/lib/phone';
+import { normalizeFacebook, normalizeLineId } from '@/lib/contact-fields';
 import { checkLength } from '@/lib/field-limits';
 import { deleteAvatarFile, normalizeAvatarInput } from '@/lib/upload-storage';
 import { leaderService } from '@/modules/member/services/leader.service';
@@ -244,10 +245,14 @@ export class UserDbService {
       checkLength(data.nickname, 'nickname', 'ชื่อเล่น') ||
       checkLength(data.position, 'position', 'ตำแหน่งงาน') ||
       checkLength(data.company, 'company', 'ชื่อบริษัท/องค์กร') ||
-      checkLength(data.bio, 'bio', 'คำแนะนำตัว') ||
-      checkLength(data.facebookUrl, 'facebookUrl', 'Facebook') ||
-      checkLength(data.lineId, 'lineId', 'LINE ID');
+      checkLength(data.bio, 'bio', 'คำแนะนำตัว');
     if (lengthError) throw new Error(lengthError);
+
+    // ช่องทางติดต่อ: ตรวจทั้งความยาวและรูปแบบ เหมือนตอนสมัคร (src/lib/contact-fields.ts)
+    const facebook = data.facebookUrl !== undefined ? normalizeFacebook(data.facebookUrl) : null;
+    const line = data.lineId !== undefined ? normalizeLineId(data.lineId) : null;
+    const contactError = facebook?.error || line?.error;
+    if (contactError) throw new Error(contactError);
 
     if (data.name !== undefined) {
       updates.push(`name = $${idx++}`);
@@ -291,13 +296,13 @@ export class UserDbService {
       updates.push(`yearbook_published = $${idx++}`);
       values.push(Boolean(data.yearbookPublished));
     }
-    if (data.facebookUrl !== undefined) {
+    if (facebook) {
       updates.push(`facebook_url = $${idx++}`);
-      values.push(data.facebookUrl || null);
+      values.push(facebook.value);
     }
-    if (data.lineId !== undefined) {
+    if (line) {
       updates.push(`line_id = $${idx++}`);
-      values.push(data.lineId || null);
+      values.push(line.value);
     }
     if (data.phone !== undefined) {
       const phone = normalizePhone(data.phone);

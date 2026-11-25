@@ -102,29 +102,29 @@ function transformCoords(
 // เพื่อให้หน้าตาแผนที่ 2D กับ 3D เหมือนกันเป๊ะไม่ว่าจะดูมุมมองไหน
 function getThaiProvinceFill(count: number, isSelected: boolean, isHovered: boolean) {
   if (isSelected) return '#EC4899';
-  if (isHovered) return '#E0F2FE';
-  if (count >= 5) return '#0369A1';
-  if (count >= 3) return '#0EA5E9';
-  if (count >= 1) return '#BAE6FD';
-  return '#FFFFFF';
+  if (isHovered) return '#CFFAFE';
+  if (count >= 5) return '#06B6D4';
+  if (count >= 3) return '#22D3EE';
+  if (count >= 1) return '#67E8F9';
+  return '#F8FAFC';
 }
 
 function getThaiProvinceStroke(count: number, isSelected: boolean) {
   if (isSelected) return '#FFFFFF';
-  if (count > 0) return '#0284C7';
+  if (count > 0) return '#0891B2';
   return '#CBD5E1';
 }
 
 function getCountryFill(hasCluster: boolean, isSelected: boolean, isHovered: boolean) {
-  if (!hasCluster) return isHovered ? '#F1F5F9' : '#FFFFFF';
-  if (isSelected) return '#BAE6FD';
-  return isHovered ? '#EEF2FF' : '#E0E7FF';
+  if (!hasCluster) return isHovered ? '#E2E8F0' : '#F1F5F9';
+  if (isSelected) return '#67E8F9';
+  return isHovered ? '#CFFAFE' : '#A5F3FC';
 }
 
 function getCountryStroke(hasCluster: boolean, isSelected: boolean) {
   if (!hasCluster) return '#CBD5E1';
-  if (isSelected) return '#0284C7';
-  return '#94A3B8';
+  if (isSelected) return '#0891B2';
+  return '#06B6D4';
 }
 
 // แปลงพิกัดภูมิศาสตร์ (lng, lat) เป็นตำแหน่ง x, y บนผืนผ้าใบ SVG แบบ Equirectangular
@@ -525,7 +525,7 @@ function World2DMap({
           setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top, containerWidth: rect.width });
         }}
       >
-        <rect x={-2000} y={-2000} width={4000} height={4000} fill="#EFF6FF" />
+        <rect x={-2000} y={-2000} width={4000} height={4000} fill="#DFE7FF" />
 
         {paths.map(({ key, feature, d }) => {
           const p = feature.properties || {};
@@ -1007,16 +1007,21 @@ export function GlobePanel({
     const update = () => {
       if (containerRef.current) {
         const w = containerRef.current.clientWidth;
+        // ลูกโลกเต็มความกว้างแล้ว — สูงตามจอ (เผื่อหัวหน้า ~140px) ไม่ต่ำกว่า 560 ไม่เกิน 900
         setDimensions({
           width: w,
-          height: Math.max(560, Math.min(Math.round(w * 0.85), 680)),
+          height: Math.max(560, Math.min(Math.round(w * 0.85), window.innerHeight - 140, 900)),
         });
       }
     };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(containerRef.current);
-    return () => ro.disconnect();
+    window.addEventListener('resize', update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', update);
+    };
   }, []);
 
   // ─── Dynamically Build Clusters from Thailand DB + International DB ─────────
@@ -1161,11 +1166,8 @@ export function GlobePanel({
 
   // Clean light material fallback
   const globeMaterial = useMemo(() => {
-    return new THREE.MeshStandardMaterial({
-      color: '#f8fafc',
-      roughness: 0.85,
-      metalness: 0.02,
-    });
+    // ทะเลไม่รับแสง (MeshBasic) — แบบมีแสงสีจะไล่จากขาวไปเทาม่วงหม่นตามมุม ให้สีเรียบเท่ากับแผนที่ 2D
+    return new THREE.MeshBasicMaterial({ color: '#dfe7ff' });
   }, []);
 
   // Globe ready callback
@@ -1572,13 +1574,13 @@ export function GlobePanel({
       </div>
 
       {/* ─── Globe + Side Panel ──────────────────────────────────────────────── */}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,30%)] items-start">
+      <div className="flex flex-col gap-6">
 
         {/* Globe Canvas Container */}
         <div
           ref={containerRef}
           className={`relative rounded-[32px] overflow-hidden shadow-hero w-full border ${
-            isDarkCanvas ? 'bg-[#020617] border-slate-800' : 'bg-white border-slate-200'
+            isDarkCanvas ? 'bg-[#020617] border-slate-800' : 'bg-gradient-to-b from-[#F8FAFF] to-[#EEF2FF] border-indigo-100'
           }`}
           style={{ height: dimensions.height }}
         >
@@ -1639,7 +1641,7 @@ export function GlobePanel({
               onGlobeReady={handleGlobeReady}
               width={dimensions.width}
               height={dimensions.height}
-              backgroundColor={isDarkCanvas ? '#020617' : '#ffffff'}
+              backgroundColor={isDarkCanvas ? '#020617' : 'rgba(0,0,0,0)'}
               globeImageUrl={
                 globeTheme === 'satellite'
                   ? '/textures/earth-blue-marble.jpg'
@@ -1676,27 +1678,27 @@ export function GlobePanel({
                     return '#ec4899'; // สีชมพูเน้นชัดเจนเมื่อเลือก
                   }
                   if (count >= 5) {
-                    return isDarkCanvas ? 'rgba(3, 105, 161, 0.85)' : '#0369a1'; // ฟ้าเข้ม (หนาแน่นมาก)
+                    return isDarkCanvas ? 'rgba(3, 105, 161, 0.85)' : '#06b6d4'; // ฟ้าเข้ม (หนาแน่นมาก)
                   }
                   if (count >= 3) {
-                    return isDarkCanvas ? 'rgba(14, 165, 233, 0.70)' : '#0ea5e9'; // ฟ้าสด (ปานกลาง)
+                    return isDarkCanvas ? 'rgba(14, 165, 233, 0.70)' : '#22d3ee'; // ฟ้าสด (ปานกลาง)
                   }
                   if (count >= 1) {
-                    return isDarkCanvas ? 'rgba(56, 189, 248, 0.45)' : '#bae6fd'; // ฟ้าอ่อน (น้อย)
+                    return isDarkCanvas ? 'rgba(56, 189, 248, 0.45)' : '#67e8f9'; // ฟ้าอ่อน (น้อย)
                   }
                   // จังหวัดที่ไม่มีคน: โชว์สีพื้นผิวสะอาด
                   return isMetro3D
-                    ? (isDarkCanvas ? 'rgba(15, 23, 42, 0.85)' : '#f0f9ff')
-                    : (isDarkCanvas ? 'rgba(255, 255, 255, 0.05)' : '#ffffff');
+                    ? (isDarkCanvas ? 'rgba(15, 23, 42, 0.85)' : '#f8fafc')
+                    : (isDarkCanvas ? 'rgba(255, 255, 255, 0.05)' : '#f8fafc');
                 }
 
                 // ประเทศอื่นๆ ในโลก
                 const c = getClusterForFeature(d, activeClusters);
-                if (!c) return isDarkCanvas ? 'rgba(255, 255, 255, 0.03)' : '#ffffff';
+                if (!c) return isDarkCanvas ? 'rgba(255, 255, 255, 0.03)' : '#f1f5f9';
                 if (selectedCluster?.country_code === c.country_code) {
-                  return isDarkCanvas ? 'rgba(2, 132, 199, 0.60)' : '#bae6fd';
+                  return isDarkCanvas ? 'rgba(2, 132, 199, 0.60)' : '#67e8f9';
                 }
-                return isDarkCanvas ? 'rgba(6, 182, 212, 0.22)' : '#e0e7ff';
+                return isDarkCanvas ? 'rgba(6, 182, 212, 0.22)' : '#a5f3fc';
               }}
               polygonSideColor={(d: any) => {
                 const p = d.properties || {};
@@ -1706,9 +1708,9 @@ export function GlobePanel({
                 }
                 if (p.isProvince) {
                   const isAreaSel = selectedArea?.city === p.name_th;
-                  return isAreaSel ? '#0284c7' : isDarkCanvas ? 'rgba(56, 189, 248, 0.3)' : '#cbd5e1';
+                  return isAreaSel ? '#0284c7' : isDarkCanvas ? 'rgba(56, 189, 248, 0.3)' : '#e2e8f0';
                 }
-                return isDarkCanvas ? 'rgba(99, 102, 241, 0.3)' : '#cbd5e1';
+                return isDarkCanvas ? 'rgba(99, 102, 241, 0.3)' : '#e2e8f0';
               }}
               polygonStrokeColor={(d: any) => {
                 const p = d.properties || {};
@@ -1727,7 +1729,7 @@ export function GlobePanel({
                   if (isAreaSel) return '#ffffff';
                   const clusterMatch = activeClusters.find((c) => c.country_code === 'TH' && c.city === provName);
                   if (clusterMatch && clusterMatch.count > 0) {
-                    return isDarkCanvas ? '#38bdf8' : '#0284c7';
+                    return isDarkCanvas ? '#38bdf8' : '#0891b2';
                   }
                   return isDarkCanvas ? 'rgba(255, 255, 255, 0.75)' : '#cbd5e1';
                 }
@@ -1738,7 +1740,7 @@ export function GlobePanel({
                 if (selectedCluster?.country_code === c.country_code) {
                   return '#0284c7';
                 }
-                return isDarkCanvas ? '#38bdf8' : '#94a3b8';
+                return isDarkCanvas ? '#38bdf8' : '#06b6d4';
               }}
               // ความสูงระนาบ 3D: ให้เขต 3D ขยาย ลอยตัวสูงขึ้นอย่างสวยงาม
               polygonAltitude={(d: any) => {
@@ -2052,8 +2054,8 @@ export function GlobePanel({
           )}
         </div>
 
-        {/* ─── Right: Country Detail / Specific Area Alumni List ────────────────── */}
-        <div className="flex flex-col gap-4">
+        {/* ─── Below Globe: Country Detail / Specific Area Alumni List ────────────── */}
+        <div className="space-y-4">
 
           {/* Active Zoomed Country / Area Details */}
           {selectedCluster && (
@@ -2199,6 +2201,7 @@ export function GlobePanel({
             </div>
           )}
 
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] items-start">
           {/* Country & Area Pins Directory */}
           <div className="rounded-[28px] bg-white border border-slate-200/90 shadow-card overflow-hidden">
             <div className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/50">
@@ -2274,6 +2277,7 @@ export function GlobePanel({
                 <span className="text-slate-700 font-semibold">Origin: ม.แม่โจ้</span>
               </div>
             </div>
+          </div>
           </div>
 
         </div>

@@ -5,7 +5,11 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { LocationPicker } from '@/components/ui/location-picker';
 import { PrivacyToggle } from '@/components/ui/privacy-toggle';
+import { DatePicker } from '@/components/ui/date-picker';
+import { SelectMenu } from '@/components/ui/select-menu';
 import { FIELD_LIMITS } from '@/lib/field-limits';
+import { formatPhoneInput, normalizePhone, PHONE_INPUT_MAX_LENGTH } from '@/lib/phone';
+import { normalizeFacebook, normalizeLineId } from '@/lib/contact-fields';
 import { resizeImageToDataUrl } from '@/lib/image-resize';
 import { isAlumniByEntryYear, parseStudentId, type StudentIdLength } from '@/lib/student-id';
 import {
@@ -289,6 +293,14 @@ export default function RegisterPage() {
     }
     if (!parseStudentId(studentId, studentIdLength)) {
       setError('รหัสนักศึกษานี้คำนวณรุ่นไม่ได้ กรุณาตรวจสอบเลข 2 หลักแรกอีกครั้ง');
+      return;
+    }
+
+    // ตรวจช่องทางติดต่อ/เบอร์โทรก่อนส่ง (ฝั่ง API ตรวจซ้ำด้วยกติกาเดียวกัน)
+    const contactError =
+      normalizePhone(phone).error || normalizeFacebook(facebookUrl).error || normalizeLineId(lineId).error;
+    if (contactError) {
+      setError(contactError);
       return;
     }
 
@@ -652,11 +664,12 @@ export default function RegisterPage() {
                         onChange={setVisibility('showBirthDate')}
                       />
                     </div>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={birthDate}
-                      onChange={(e) => setBirthDate(e.target.value)}
-                      className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-indigo-500 focus:bg-slate-950 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all [color-scheme:dark]"
+                      onChange={setBirthDate}
+                      placeholder="เลือกวันเกิด"
+                      disableFuture
+                      triggerClassName="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white focus:border-indigo-500 focus:bg-slate-950 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all"
                     />
                   </div>
 
@@ -816,6 +829,9 @@ export default function RegisterPage() {
                         placeholder="เช่น สนใจศึกษาด้าน Web Development, Cloud & AI ยินดีทำความรู้จักเพื่อนๆ พี่ๆ ครับ"
                         className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-indigo-500 focus:bg-slate-950 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all"
                       />
+                      <p className="text-right text-[11px] tabular-nums text-slate-500">
+                        {bio.length}/{FIELD_LIMITS.bio}
+                      </p>
                     </div>
                   )}
 
@@ -854,7 +870,7 @@ export default function RegisterPage() {
                       </div>
                       <input
                         type="text"
-                        maxLength={FIELD_LIMITS.lineId}
+                        maxLength={FIELD_LIMITS.lineId + 1}
                         value={lineId}
                         onChange={(e) => setLineId(e.target.value)}
                         placeholder="LINE ID ของคุณ"
@@ -871,12 +887,12 @@ export default function RegisterPage() {
                     </label>
                     <input
                       type="tel"
-                      inputMode="tel"
-                      autoComplete="tel"
-                      maxLength={FIELD_LIMITS.phone}
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                      maxLength={PHONE_INPUT_MAX_LENGTH}
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="เช่น 081-234-5678"
+                      onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
+                      placeholder="เช่น 064-779-8792"
                       className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-indigo-500 focus:bg-slate-950 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all"
                     />
                   </div>
@@ -942,21 +958,13 @@ export default function RegisterPage() {
                         <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                           <Layers className="h-3.5 w-3.5 text-amber-400" /> ประเภทสายงาน / ภาคส่วน
                         </label>
-                        <div className="relative">
-                          <select
-                            value={careerOptionId}
-                            onChange={(e) => setCareerOptionId(e.target.value)}
-                            className="w-full appearance-none rounded-2xl border border-white/10 bg-slate-950/80 pl-4 pr-10 py-2.5 text-sm text-white focus:border-amber-400 focus:outline-none focus:ring-4 focus:ring-amber-500/20 transition-all"
-                          >
-                            {careerTypes.map((ct) => (
-                              <option key={ct.id} value={ct.id} className="bg-slate-900 text-white">
-                                {ct.label}
-                              </option>
-                            ))}
-                          </select>
-                          {/* ลูกศรเดียวกับ LocationPicker (ลูกศรของ <select> เบราว์เซอร์วาดเอง สีไม่ตรงกัน) */}
-                          <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                        </div>
+                        <SelectMenu
+                          value={careerOptionId}
+                          onChange={setCareerOptionId}
+                          options={careerTypes.map((ct) => ({ value: String(ct.id), label: ct.label }))}
+                          placeholder="เลือกประเภทสายงาน"
+                          triggerClassName="rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-2.5 text-sm text-white hover:border-amber-400/50 focus:border-amber-400 focus:outline-none focus:ring-4 focus:ring-amber-500/20 transition-all"
+                        />
                       </div>
 
                       <div className="space-y-1.5">
@@ -988,6 +996,9 @@ export default function RegisterPage() {
                         placeholder="เช่น ศิษย์เก่า CS แม่โจ้ มีความเชี่ยวชาญด้าน Web & Cloud ยินดีให้คำปรึกษาแก่น้องๆ ในสาขา"
                         className="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none focus:ring-4 focus:ring-amber-500/20 transition-all resize-none"
                       />
+                      <p className="text-right text-[11px] tabular-nums text-slate-500">
+                        {bio.length}/{FIELD_LIMITS.bio}
+                      </p>
                     </div>
                     )}
                   </div>
