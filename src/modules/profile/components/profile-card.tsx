@@ -4,12 +4,13 @@ import {
   Briefcase, GraduationCap, ImageIcon, Sparkles, Mail, MapPin, BadgeCheck, Vote,
   MessageCircle, Star, Lock, Clock, X, AlertTriangle, CheckCircle2, Eye, User as UserIcon,
   Shield, Globe, EyeOff, Edit3, Camera, Upload, Building2, Layers, HeartHandshake, Loader2,
-  Quote, Link2, Phone, ChevronDown
+  Quote, Link2, Phone
 } from 'lucide-react';
 import { LocationPicker } from '@/components/ui/location-picker';
 import { resizeImageToDataUrl } from '@/lib/image-resize';
 import { PrivacyToggle } from '@/components/ui/privacy-toggle';
 import { ChangePasswordCard } from './change-password-card';
+import { SelectMenu } from '@/components/ui/select-menu';
 import { MyAlbum } from '@/modules/profile/components/my-album';
 import { ModalPortal } from '@/components/ui/modal-portal';
 
@@ -1023,22 +1024,17 @@ export function ProfileCard({
                   <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
                     <GraduationCap className="h-3.5 w-3.5 text-indigo-500" /> รุ่นการศึกษา
                   </label>
-                  <div className="relative">
-                      <select
-                      value={editForm.generationOptionId}
-                      onChange={(e) => setEditForm((prev) => ({ ...prev, generationOptionId: e.target.value }))}
-                      disabled={Boolean(user.generation_option_id)}
-                      title={user.generation_option_id ? 'เปลี่ยนรุ่นได้โดยผู้ดูแลระบบเท่านั้น' : undefined}
-                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-white pl-4 pr-10 py-2.5 text-sm text-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
-                    >
-                      <option value="">ไม่ระบุ</option>
-                      {(lookupOptions?.generations || []).map((g) => (
-                        <option key={g.id} value={g.id}>{g.label}</option>
-                      ))}
-                    </select>
-                    {/* ลูกศรเดียวกับ LocationPicker — ลูกศรของ <select> เบราว์เซอร์วาดเองเป็นสีดำ */}
-                    <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  </div>
+                  <SelectMenu
+                    value={editForm.generationOptionId}
+                    onChange={(generationOptionId) => setEditForm((prev) => ({ ...prev, generationOptionId }))}
+                    options={[
+                      { value: '', label: 'ไม่ระบุ' },
+                      ...(lookupOptions?.generations || []).map((g) => ({ value: String(g.id), label: g.label })),
+                    ]}
+                    disabled={Boolean(user.generation_option_id)}
+                    title={user.generation_option_id ? 'เปลี่ยนรุ่นได้โดยผู้ดูแลระบบเท่านั้น' : undefined}
+                    triggerClassName="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 hover:border-indigo-300 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all disabled:bg-slate-100 disabled:text-slate-500 disabled:hover:border-slate-200"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
@@ -1087,20 +1083,15 @@ export function ProfileCard({
                   <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
                     <Layers className="h-3.5 w-3.5 text-purple-500" /> ประเภทสายงาน
                   </label>
-                  <div className="relative">
-                      <select
-                      value={editForm.careerOptionId}
-                      onChange={(e) => setEditForm((prev) => ({ ...prev, careerOptionId: e.target.value }))}
-                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-white pl-4 pr-10 py-2.5 text-sm text-slate-800 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100 transition-all"
-                    >
-                      <option value="">ไม่ระบุ</option>
-                      {(lookupOptions?.careerTypes || []).map((ct) => (
-                        <option key={ct.id} value={ct.id}>{ct.label}</option>
-                      ))}
-                    </select>
-                    {/* ลูกศรเดียวกับ LocationPicker — ลูกศรของ <select> เบราว์เซอร์วาดเองเป็นสีดำ */}
-                    <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  </div>
+                  <SelectMenu
+                    value={editForm.careerOptionId}
+                    onChange={(careerOptionId) => setEditForm((prev) => ({ ...prev, careerOptionId }))}
+                    options={[
+                      { value: '', label: 'ไม่ระบุ' },
+                      ...(lookupOptions?.careerTypes || []).map((ct) => ({ value: String(ct.id), label: ct.label })),
+                    ]}
+                    triggerClassName="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 hover:border-purple-300 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100 transition-all"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">

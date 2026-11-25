@@ -240,6 +240,19 @@ export function FeedList({
 
   // Reaction Picker Popover State
   const [activeReactionPicker, setActiveReactionPicker] = useState<number | null>(null);
+  // หน่วงการปิดไว้ให้เลื่อนเมาส์จากปุ่มขึ้นไปที่แถบอีโมจิทัน (ระหว่างนั้นเมาส์อยู่นอกทั้งสองชิ้น)
+  const pickerCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openReactionPicker = (postId: number) => {
+    if (pickerCloseTimer.current) clearTimeout(pickerCloseTimer.current);
+    setActiveReactionPicker(postId);
+  };
+  const scheduleReactionPickerClose = () => {
+    if (pickerCloseTimer.current) clearTimeout(pickerCloseTimer.current);
+    pickerCloseTimer.current = setTimeout(() => setActiveReactionPicker(null), 300);
+  };
+  useEffect(() => () => {
+    if (pickerCloseTimer.current) clearTimeout(pickerCloseTimer.current);
+  }, []);
 
   // Birthday Wishes State
   const [wishedIds, setWishedIds] = useState<Record<number, boolean>>({});
@@ -1634,7 +1647,11 @@ export function FeedList({
 
                     {/* Cute Emoji Reaction Popup Picker */}
                     {activeReactionPicker === post.id && (
-                      <div className="absolute left-0 -top-14 z-20 flex items-center gap-1.5 sm:gap-2 rounded-full bg-white px-3 sm:px-4 py-1.5 sm:py-2 shadow-lg border border-pink-100 animate-fade-in">
+                      <div
+                        onMouseEnter={() => openReactionPicker(post.id)}
+                        onMouseLeave={scheduleReactionPickerClose}
+                        className="absolute left-0 -top-14 z-20 flex items-center gap-1.5 sm:gap-2 rounded-full bg-white px-3 sm:px-4 py-1.5 sm:py-2 shadow-lg border border-pink-100 animate-fade-in"
+                      >
                         {EMOJI_REACTIONS.map((item) => (
                           <button
                             key={item.emoji}
@@ -1655,7 +1672,8 @@ export function FeedList({
                     <div className="flex-1 relative">
                       <button
                         onClick={(e) => handleToggleLike(post.id, e)}
-                        onMouseEnter={() => setActiveReactionPicker(post.id)}
+                        onMouseEnter={() => openReactionPicker(post.id)}
+                        onMouseLeave={scheduleReactionPickerClose}
                         className={`w-full flex items-center justify-center gap-1.5 sm:gap-2 rounded-full py-2 sm:py-2.5 transition-all ${isLiked
                             ? 'bg-rose-50 text-rose-500 font-bold shadow-2xs'
                             : 'bg-slate-50 text-slate-600 hover:bg-rose-50/60 hover:text-rose-500'

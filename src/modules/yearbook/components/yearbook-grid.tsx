@@ -30,6 +30,7 @@ import {
 import { api } from '@/lib/api-client';
 import { resizeImageToDataUrl } from '@/lib/image-resize';
 import { ModalPortal } from '@/components/ui/modal-portal';
+import { DatePicker } from '@/components/ui/date-picker';
 
 export interface YearbookAlumnus {
   id: number | string;
@@ -78,6 +79,33 @@ export function YearbookGrid() {
   // รุ่นที่มีข้อมูลจริงในระบบเท่านั้น (ดึงจาก lookup_options) ใช้เป็นตัวเลือกในฟอร์มแก้ไขของฉัน
   // — เลือกได้แค่รุ่นที่มีอยู่จริง กันปัญหาเลือกรุ่นที่ไม่มีในระบบแล้วบันทึกไม่ติด
   const [realGenerationOptions, setRealGenerationOptions] = useState<string[]>([]);
+  const sortedGenerationOptions = useMemo(
+    () =>
+      [...realGenerationOptions].sort(
+        (a, b) => (parseInt(a.replace(/\D/g, ''), 10) || 0) - (parseInt(b.replace(/\D/g, ''), 10) || 0)
+      ),
+    [realGenerationOptions]
+  );
+  const [isGenSelectOpen, setIsGenSelectOpen] = useState(false);
+  const genSelectRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isGenSelectOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (genSelectRef.current && !genSelectRef.current.contains(e.target as Node)) setIsGenSelectOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsGenSelectOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    // เลื่อนให้เห็นรุ่นที่เลือกอยู่ทันทีที่เปิด
+    genSelectRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isGenSelectOpen]);
   // รุ่นที่มีโฟลเดอร์จริงอยู่บน NAS เท่านั้น (ไม่รวมรุ่นสาธิต/ทดสอบใน lookup_options ที่ไม่มีโฟลเดอร์จริง)
   // ใช้เป็นตัวเลือกในดรอปดาวน์กรองของหน้าหนังสือรุ่นโดยเฉพาะ ตามที่ผู้ใช้ระบุให้อิงตามข้อมูลจริงจาก NAS
   const [nasGenerationNumbers, setNasGenerationNumbers] = useState<number[]>([]);
@@ -853,17 +881,49 @@ export function YearbookGrid() {
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
                     <GraduationCap className="h-3.5 w-3.5 text-indigo-600" /> รุ่น (Generation) *
                   </label>
-                  <select
-                    value={myEntryForm.generation}
-                    onChange={(e) => setMyEntryForm({ ...myEntryForm, generation: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-none cursor-pointer"
-                  >
-                    {realGenerationOptions.map((gen) => (
-                      <option key={gen} value={gen}>
-                        {gen}
-                      </option>
-                    ))}
-                  </select>
+                  <div ref={genSelectRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsGenSelectOpen((v) => !v)}
+                      aria-haspopup="listbox"
+                      aria-expanded={isGenSelectOpen}
+                      className={`w-full flex items-center justify-between rounded-xl border bg-white p-2.5 text-xs font-bold text-slate-900 transition-colors cursor-pointer ${
+                        isGenSelectOpen ? 'border-indigo-500 ring-2 ring-indigo-100' : 'border-slate-200 hover:border-indigo-300'
+                      }`}
+                    >
+                      <span>{myEntryForm.generation || 'เลือกรุ่น'}</span>
+                      <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform duration-200 ${isGenSelectOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {isGenSelectOpen && (
+                      <div
+                        role="listbox"
+                        className="absolute left-0 right-0 top-full z-30 mt-1.5 max-h-56 overflow-y-auto rounded-2xl border border-slate-100 bg-white p-1.5 shadow-xl animate-fade-in"
+                      >
+                        {sortedGenerationOptions.map((gen) => {
+                          const isSelected = gen === myEntryForm.generation;
+                          return (
+                            <button
+                              key={gen}
+                              type="button"
+                              role="option"
+                              aria-selected={isSelected}
+                              onClick={() => {
+                                setMyEntryForm({ ...myEntryForm, generation: gen });
+                                setIsGenSelectOpen(false);
+                              }}
+                              className={`w-full flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold text-left transition-colors cursor-pointer ${
+                                isSelected ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              {gen}
+                              {isSelected && <CheckCircle2 className="h-4 w-4 text-indigo-500" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* วันเกิด (ใช้แสดงในวิดเจ็ต "สุขสันต์วันเกิด" หน้าฟีดเมื่อถึงวันจริง) */}
@@ -871,11 +931,12 @@ export function YearbookGrid() {
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
                     <CalendarDays className="h-3.5 w-3.5 text-pink-500" /> วันเกิด
                   </label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={myEntryForm.birthDate}
-                    onChange={(e) => setMyEntryForm({ ...myEntryForm, birthDate: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none"
+                    onChange={(birthDate) => setMyEntryForm({ ...myEntryForm, birthDate })}
+                    placeholder="เลือกวันเกิด"
+                    disableFuture
+                    triggerClassName="rounded-xl border border-slate-200 bg-white p-2.5 text-xs font-bold text-slate-900 hover:border-indigo-300 focus:border-indigo-500 focus:outline-none"
                   />
                   <p className="mt-1 text-[11px] text-slate-400">
                     ระบบจะแสดงคุณในวิดเจ็ต &ldquo;สุขสันต์วันเกิด&rdquo; หน้าฟีดเมื่อถึงวันเกิดจริงของคุณ

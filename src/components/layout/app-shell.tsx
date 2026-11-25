@@ -537,7 +537,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Floating Glassmorphism Sidebar */}
       <aside
-        className={`fixed top-3 bottom-3 left-3 z-40 flex flex-col rounded-3xl border border-border/80 bg-card/85 backdrop-blur-xl shadow-hero transition-all duration-300 ${sidebarWidth} ${
+        className={`group/sidebar fixed top-3 bottom-3 left-3 z-40 flex flex-col rounded-3xl border border-border/80 bg-card/85 backdrop-blur-xl shadow-hero transition-all duration-300 ${sidebarWidth} ${
           collapsed ? 'px-2 py-4' : 'p-4'
         } ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
@@ -826,7 +826,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           onClick={() => setCollapsed((v) => !v)}
           title={collapsed ? 'ขยายเมนู' : 'ย่อเมนู'}
           aria-label={collapsed ? 'ขยายเมนู' : 'ย่อเมนู'}
-          className={`absolute ${collapsed ? '-right-7' : '-right-4'} top-5 z-50 hidden h-8 w-8 items-center justify-center rounded-full border border-indigo-100 bg-white text-indigo-500 shadow-[0_4px_14px_-2px_rgba(99,102,241,0.25)] ring-4 ring-background transition-colors duration-200 hover:border-transparent hover:bg-gradient-to-br hover:from-indigo-500 hover:to-purple-500 hover:text-white focus-visible:outline-none focus-visible:ring-indigo-200 lg:flex`}
+          className={`absolute ${
+            collapsed
+              ? '-right-7 opacity-0 pointer-events-none group-hover/sidebar:opacity-100 group-hover/sidebar:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto'
+              : '-right-4'
+          } top-5 z-50 hidden h-8 w-8 items-center justify-center rounded-full border border-indigo-100 bg-white text-indigo-500 shadow-[0_4px_14px_-2px_rgba(99,102,241,0.25)] ring-4 ring-background transition-[color,background-color,border-color,opacity] duration-200 hover:border-transparent hover:bg-gradient-to-br hover:from-indigo-500 hover:to-purple-500 hover:text-white focus-visible:outline-none focus-visible:ring-indigo-200 lg:flex`}
         >
           <ChevronLeft
             className={`h-4 w-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`}
