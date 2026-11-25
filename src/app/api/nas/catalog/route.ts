@@ -1,6 +1,7 @@
 import { nasCatalogService } from '@/services/nas/catalog.service';
 import { leaderService } from '@/modules/member/services/leader.service';
 import { publicErrorMessage } from '@/lib/api-error';
+import { pool } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
 export async function GET(req: Request) {
@@ -32,9 +33,17 @@ export async function GET(req: Request) {
     }
 
     if (query) {
+      // ค้นด้วยชื่อจริง: หาสมาชิกที่ชื่อ/ชื่อเล่นตรง แล้วจับคู่กับรหัสในชื่อไฟล์
+      // (เดิมสุ่มชื่อปลอมจากรายชื่อ 24 ชื่อใส่ให้ทุกรูป ค้นชื่อปลอมแล้วเจอรูปของคนอื่น)
+      const { rows } = await pool.query(
+        `SELECT student_id FROM users
+         WHERE status = 'approved' AND student_id IS NOT NULL AND (name ILIKE $1 OR nickname ILIKE $1)`,
+        [`%${query}%`]
+      );
+      const matchedIds = new Set(rows.map((r) => String(r.student_id)));
       filtered = filtered.filter(
         (p) =>
-          p.studentName.toLowerCase().includes(query) ||
+          matchedIds.has(p.studentId) ||
           p.studentId.includes(query) ||
           p.personCode.includes(query) ||
           p.filename.toLowerCase().includes(query)

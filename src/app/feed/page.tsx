@@ -10,7 +10,10 @@ export default function FeedPage() {
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
-  const [latestPhotos, setLatestPhotos] = useState<any[]>([]);
+  const [gallery, setGallery] = useState<{ unlockedGenerations: string[]; userGeneration: string | null }>({
+    unlockedGenerations: [],
+    userGeneration: null,
+  });
   const [featuredAlumni, setFeaturedAlumni] = useState<any[]>([]);
   const [wallWidgets, setWallWidgets] = useState<{ fortunes: any[]; birthdays: any[]; leaderboard: any[] }>({
     fortunes: [],
@@ -27,7 +30,7 @@ export default function FeedPage() {
         const [meRes, feedRes, photosRes, alumniRes, overviewRes, wallRes] = await Promise.allSettled([
           api.auth.me(),
           api.feed.getPosts(),
-          api.gallery.getItems(),
+          fetch('/api/gallery/unlocked-generations').then((r) => (r.ok ? r.json() : null)),
           api.alumni.getList(),
           api.admin.getOverview(),
           api.wall.getWidgets(),
@@ -44,8 +47,11 @@ export default function FeedPage() {
           setPosts(feedRes.value);
         }
 
-        if (photosRes.status === 'fulfilled' && Array.isArray(photosRes.value)) {
-          setLatestPhotos(photosRes.value.slice(0, 2));
+        if (photosRes.status === 'fulfilled' && photosRes.value?.success) {
+          setGallery({
+            unlockedGenerations: photosRes.value.unlockedGenerations || [],
+            userGeneration: photosRes.value.userGeneration || null,
+          });
         }
 
         if (alumniRes.status === 'fulfilled' && Array.isArray(alumniRes.value)) {
@@ -96,7 +102,8 @@ export default function FeedPage() {
         <FeedList
           posts={posts}
           stats={stats}
-          latestPhotos={latestPhotos}
+          unlockedGenerations={gallery.unlockedGenerations}
+          userGeneration={gallery.userGeneration}
           featuredAlumni={featuredAlumni}
           fortunes={wallWidgets.fortunes}
           birthdays={wallWidgets.birthdays}

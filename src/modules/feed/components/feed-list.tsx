@@ -157,7 +157,9 @@ interface WallLeaderboardEntry {
 interface FeedListProps {
   posts: Post[];
   stats: any;
-  latestPhotos?: any[];
+  /** รุ่นที่ปลดล็อกคลังภาพแล้ว + รุ่นของผู้ใช้ (วิดเจ็ตคลังภาพ) */
+  unlockedGenerations?: string[];
+  userGeneration?: string | null;
   featuredAlumni?: any[];
   fortunes?: WallFortune[];
   birthdays?: WallBirthday[];
@@ -194,7 +196,8 @@ interface BurstParticle {
 export function FeedList({
   posts = [],
   stats,
-  latestPhotos = [],
+  unlockedGenerations = [],
+  userGeneration = null,
   featuredAlumni = [],
   fortunes = [],
   birthdays = [],
@@ -1893,7 +1896,7 @@ export function FeedList({
           totalAlumni={stats?.totalAlumni ?? stats?.approvedUsers ?? 0}
           outstandingAlumni={stats?.outstandingAlumni ?? 0}
         />
-        <GalleryWidget latestPhotos={latestPhotos} />
+        <GalleryWidget unlockedGenerations={unlockedGenerations} userGeneration={userGeneration} />
         <BirthdayWidget alumni={birthdayAlumni} wishedIds={wishedIds} onSendWish={handleSendWish} />
         <LeaderboardWidget entries={leaderboard} />
       </aside>

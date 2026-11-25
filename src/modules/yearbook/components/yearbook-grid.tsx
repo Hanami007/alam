@@ -30,6 +30,7 @@ import {
 import { api } from '@/lib/api-client';
 import { resizeImageToDataUrl } from '@/lib/image-resize';
 import { ModalPortal } from '@/components/ui/modal-portal';
+import { DEFAULT_AVATAR } from '@/lib/default-avatar';
 
 export interface YearbookAlumnus {
   id: number | string;
@@ -52,19 +53,6 @@ export interface YearbookAlumnus {
   likesCount?: number;
   isAvailableForMentorship?: boolean;
 }
-
-const FUNNY_SENIOR_QUOTES = [
-  'I spent 4 years learning Computer Science just to realize the solution was restarting the computer 💻',
-  'เรียน 4 ปี ได้ความรู้ 10% อีก 90% อยู่ใน Stack Overflow กับ ChatGPT 🤖',
-  'อย่าเอาเกรดเฉลี่ยมาตัดสินเรา เพราะเกรด 2.01 ก็เขียนบั๊กได้เนียนพอๆ กับเกรด 4.0 🐛',
-  'I don\'t always test my code, but when I do, I do it directly in production 🔥',
-  'เรียนคอมเพราะคิดว่าได้เล่นเกม พอจบมาได้เล่นเป็นตัวประกอบในกิลด์ Stack Overflow 🎮',
-  'นอน 3 ชั่วโมงไม่ตายหรอก... แต่คอมไพล์ไม่ผ่านอาจทำให้หัวร้อนตายได้ ☕',
-  'คอมไพล์ผ่านในครั้งแรก = สัญญาณเตือนภัยระดับรุนแรงที่สุด ⚠️',
-  'Life is like a NullPointerException. Unexpected and breaks everything 💔',
-  'อย่าเรียกว่าแก้บั๊ก ให้เรียกว่าสร้างฟีเจอร์ใหม่ที่ไม่พึงประสงค์ ✨',
-  'อาจารย์บอกวิชานี้ง่าย... ง่ายที่ไหน! 😭',
-];
 
 export function YearbookGrid() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -112,7 +100,7 @@ export function YearbookGrid() {
     name: '',
     nickname: '',
     avatarUrl: '',
-    generation: 'รุ่น 43',
+    generation: '',
     quote: '',
     isAvailableForMentorship: false,
     birthDate: '',
@@ -129,18 +117,17 @@ export function YearbookGrid() {
         const data = await api.admin.getYearbookList().catch(() => null);
         if (Array.isArray(data)) {
           const formatted: YearbookAlumnus[] = data.map((item: any, idx: number) => {
-            const fallbackQuote = FUNNY_SENIOR_QUOTES[idx % FUNNY_SENIOR_QUOTES.length];
-            const generationLabel = item.generation || 'รุ่น 43';
+            const generationLabel = item.generation || '';
             // API ส่งมาแค่ label ("รุ่น 43") ไม่มี generationNumber แยกมาให้ ต้องแกะเลขรุ่นจาก label เอง
             // (เดิมใช้ item.generationNumber ตรงๆ ซึ่งไม่มีจริง เลย fallback เป็น 43 ทุกคน ทำให้กรองรุ่นไม่ได้ผล)
             const parsedGenNumber = parseInt(String(generationLabel).replace(/\D/g, ''), 10);
             return {
               id: item.id || `mju-${idx}`,
-              studentId: item.studentId || `600100${idx + 10}`,
+              studentId: item.studentId || '',
               name: item.name,
               nickname: item.nickname || item.name.split(' ')[0] || 'เพื่อน',
               generation: generationLabel,
-              generationNumber: item.generationNumber || (isNaN(parsedGenNumber) ? 43 : parsedGenNumber),
+              generationNumber: item.generationNumber || (isNaN(parsedGenNumber) ? 0 : parsedGenNumber),
               // expected_graduation_year เก็บเป็น พ.ศ. (ดู /api/auth/register)
               gradYear: item.expectedGraduationYear ? String(item.expectedGraduationYear) : '',
               studentStatus: item.studentStatus === 'studying' ? 'studying' : 'alumni',
@@ -149,9 +136,9 @@ export function YearbookGrid() {
               company: item.company || '',
               careerType: item.careerType || '',
               province: item.province || '',
-              avatarUrl: item.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80',
-              quote: item.quote ? item.quote : fallbackQuote,
-              bio: item.quote || 'ศิษย์เก่าภาควิชาวิทยาการคอมพิวเตอร์ มหาวิทยาลัยแม่โจ้',
+              avatarUrl: item.avatarUrl || DEFAULT_AVATAR,
+              quote: item.quote || '',
+              bio: item.quote || '',
               skills: ['CS MJU'],
               likesCount: item.likeCount ?? 0,
               isAvailableForMentorship: Boolean(item.isAvailableForMentorship),
@@ -241,7 +228,7 @@ export function YearbookGrid() {
         name: myExistingEntry.name || currentUser?.name || '',
         nickname: myExistingEntry.nickname || '',
         avatarUrl: myExistingEntry.avatarUrl || currentUser?.avatar_url || '',
-        generation: myExistingEntry.generation || 'รุ่น 43',
+        generation: myExistingEntry.generation || '',
         quote: myExistingEntry.quote || '',
         isAvailableForMentorship: isMentor,
         birthDate: birthDateValue,
@@ -250,8 +237,8 @@ export function YearbookGrid() {
       setMyEntryForm({
         name: currentUser?.name || '',
         nickname: currentUser?.name ? currentUser.name.split(' ')[0] : '',
-        avatarUrl: currentUser?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80',
-        generation: currentUser?.generation || 'รุ่น 43',
+        avatarUrl: currentUser?.avatar_url || '',
+        generation: currentUser?.generation || '',
         quote: currentUser?.bio || '',
         isAvailableForMentorship: isMentor,
         birthDate: birthDateValue,
@@ -300,7 +287,7 @@ export function YearbookGrid() {
         birth_date: myEntryForm.birthDate || null,
       }));
 
-      const genNum = parseInt(myEntryForm.generation.replace(/\D/g, '')) || 43;
+      const genNum = parseInt(myEntryForm.generation.replace(/\D/g, '')) || 0;
 
       setAlumniList((prevList) => {
         const existingIdx = prevList.findIndex(
@@ -324,7 +311,7 @@ export function YearbookGrid() {
         } else {
           const newEntry: YearbookAlumnus = {
             id: currentUser.id || `user-${Date.now()}`,
-            studentId: currentUser.student_id || '60010001',
+            studentId: currentUser.student_id || '',
             name: myEntryForm.name.trim(),
             nickname: myEntryForm.nickname.trim() || myEntryForm.name.trim().split(' ')[0],
             generation: myEntryForm.generation,
@@ -335,7 +322,7 @@ export function YearbookGrid() {
             company: currentUser.company || '',
             careerType: currentUser.career_type || '',
             province: currentUser.province || '',
-            avatarUrl: myEntryForm.avatarUrl.trim() || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80',
+            avatarUrl: myEntryForm.avatarUrl.trim() || DEFAULT_AVATAR,
             quote: myEntryForm.quote.trim(),
             bio: myEntryForm.quote.trim(),
             skills: ['CS MJU'],
@@ -670,9 +657,11 @@ export function YearbookGrid() {
                   </h3>
 
                   {/* 4. คำคม */}
-                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed line-clamp-2 italic">
-                    &ldquo;{alumnus.quote}&rdquo;
-                  </p>
+                  {alumnus.quote && (
+                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed line-clamp-2 italic">
+                      &ldquo;{alumnus.quote}&rdquo;
+                    </p>
+                  )}
 
                   {/* 5. ปุ่มกดใจ */}
                   <button
@@ -744,9 +733,11 @@ export function YearbookGrid() {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs sm:text-sm text-slate-600 italic mt-0.5 truncate max-w-xs sm:max-w-md leading-relaxed">
-                      &ldquo;{alumnus.quote}&rdquo;
-                    </p>
+                    {alumnus.quote && (
+                      <p className="text-xs sm:text-sm text-slate-600 italic mt-0.5 truncate max-w-xs sm:max-w-md leading-relaxed">
+                        &ldquo;{alumnus.quote}&rdquo;
+                      </p>
+                    )}
                   </div>
                 </div>
 

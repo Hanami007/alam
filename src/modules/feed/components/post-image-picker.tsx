@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { ImagePlus, Loader2, X } from 'lucide-react';
+import { resizeImageToDataUrl } from '@/lib/image-resize';
 
 /**
  * เลือกรูปแนบโพสต์ (สูงสุด 4 รูป) — ย่อรูปในเบราว์เซอร์ก่อนส่ง (ด้านยาว 1600px, JPEG)
@@ -14,22 +15,6 @@ const MAX_SIDE = 1600;
 const MAX_ORIGINAL_BYTES = 20 * 1024 * 1024;
 const MAX_RESULT_BYTES = 5 * 1024 * 1024;
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp'];
-
-async function compressImage(file: File): Promise<string> {
-  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('canvas');
-  // พื้นขาวกันส่วนโปร่งใสของ PNG กลายเป็นสีดำตอนแปลงเป็น JPEG
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  return canvas.toDataURL('image/jpeg', 0.85);
-}
 
 export function PostImagePicker({
   images,
@@ -65,7 +50,7 @@ export function PostImagePicker({
         continue;
       }
       try {
-        const dataUrl = await compressImage(file);
+        const dataUrl = await resizeImageToDataUrl(file, MAX_SIDE, 0.85);
         // base64 ใหญ่กว่าไฟล์จริงราว 4/3 เท่า
         if ((dataUrl.length * 3) / 4 > MAX_RESULT_BYTES) {
           problems.push(`${file.name}: ย่อแล้วยังใหญ่เกิน 5MB`);

@@ -13,9 +13,6 @@ export interface ParsedNasPhoto {
   personCode: string;        // "302"
   subfolder: string;         // "ธรรมเนียบ"
   photoUrl: string;          // "/api/nas/image/..."
-  studentName: string;
-  degree?: string;
-  company?: string;
   /** รูปตัวอย่างตอนต่อ NAS ไม่ได้ (ไม่มีไฟล์จริง) — ห้ามแท็ก */
   isPlaceholder?: boolean;
 }
@@ -29,17 +26,6 @@ export interface GenerationSummary {
   subfolders: string[];
   quiz: string;
 }
-
-const DEFAULT_NAMES = [
-  'กานดา วัฒนวิทย์', 'นพวรรณ รัตนไพศาล', 'พงษ์ศกร สุขเกษม',
-  'ธีรภัทร ชาญวิทย์', 'อภิสิทธิ์ ศรีสวัสดิ์', 'วรรณภา มณีโชติ',
-  'กิตติศักดิ์ พรหมมินทร์', 'ศิริพร วงศ์สว่าง', 'ณัฐพล ไชยวงค์',
-  'ชุติมา ประเสริฐ', 'วรวุฒิ สิทธิชัย', 'ปิยะมาศ จันทร์เรือง',
-  'ธนากร บัวแก้ว', 'สุรีย์พร แก้วมณี', 'อนุชา ทองหล่อ',
-  'พิชญาภา อินทวงศ์', 'ชนาธิป ธรรมรัตน์', 'สุดารัตน์ พุ่มไม้',
-  'ศุภกร เจริญสุข', 'รพีภัทร ศรีคำ', 'เบญจวรรณ พัฒนกิจ',
-  'กิตติพงษ์ ยิ้มแย้ม', 'ปัทมา สดใส', 'ธนาคาร วัฒนสุข',
-];
 
 export class NasCatalogService {
   /**
@@ -174,9 +160,6 @@ export class NasCatalogService {
           personCode,
           subfolder: item.subfolder,
           photoUrl,
-          studentName: DEFAULT_NAMES[parseInt(personCode || '301', 10) % DEFAULT_NAMES.length],
-          degree: 'วท.บ. วิทยาการคอมพิวเตอร์ แม่โจ้',
-          company: 'วิทยาการคอมพิวเตอร์ มหาวิทยาลัยแม่โจ้',
         });
       }
 
@@ -203,9 +186,6 @@ export class NasCatalogService {
         subfolder: selectedSubfolder,
         photoUrl: `/api/nas/image/${encodeURIComponent(`รุ่น ${genNumber}`)}/${sId}?v=syno`,
         isPlaceholder: true,
-        studentName: DEFAULT_NAMES[i % DEFAULT_NAMES.length],
-        degree: 'วท.บ. วิทยาการคอมพิวเตอร์ แม่โจ้',
-        company: 'วิทยาการคอมพิวเตอร์ มหาวิทยาลัยแม่โจ้',
       });
     }
 
