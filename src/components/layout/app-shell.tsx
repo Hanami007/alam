@@ -825,9 +825,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         <button
           onClick={() => setCollapsed((v) => !v)}
           title={collapsed ? 'ขยายเมนู' : 'ย่อเมนู'}
-          className="absolute -right-3.5 top-6 hidden h-7 w-7 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-card transition-all duration-200 hover:scale-115 hover:border-primary hover:text-primary hover:shadow-blue-glow lg:flex z-50"
+          aria-label={collapsed ? 'ขยายเมนู' : 'ย่อเมนู'}
+          className={`absolute ${collapsed ? '-right-7' : '-right-4'} top-5 z-50 hidden h-8 w-8 items-center justify-center rounded-full border border-indigo-100 bg-white text-indigo-500 shadow-[0_4px_14px_-2px_rgba(99,102,241,0.25)] ring-4 ring-background transition-colors duration-200 hover:border-transparent hover:bg-gradient-to-br hover:from-indigo-500 hover:to-purple-500 hover:text-white focus-visible:outline-none focus-visible:ring-indigo-200 lg:flex`}
         >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          <ChevronLeft
+            className={`h-4 w-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`}
+            strokeWidth={2.5}
+          />
         </button>
       </aside>
 
