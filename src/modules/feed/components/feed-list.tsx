@@ -10,6 +10,7 @@ import { LeaderboardWidget } from './widgets/leaderboard-widget';
 import { ContentWarningModal, toContentWarning, type ContentWarning } from '@/components/ui/content-warning-modal';
 import { ReportContentDialog, type ReportTarget } from '@/components/ui/report-content-dialog';
 import { COMMENT_REACTION_EMOJIS, DEFAULT_COMMENT_EMOJI } from '@/lib/reactions';
+import { FIELD_LIMITS } from '@/lib/field-limits';
 
 function formatPostDateTime(dateStr: string) {
   if (!dateStr) return '';
@@ -1067,7 +1068,7 @@ export function FeedList({
                 <input
                   type="text"
                   required
-                  maxLength={100}
+                  maxLength={FIELD_LIMITS.memberPostTitle}
                   value={requestForm.title}
                   onChange={(e) =>
                     setRequestForm((f) => ({
@@ -1083,6 +1084,9 @@ export function FeedList({
                   }
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                 />
+                <p className="text-right text-xs tabular-nums text-slate-400 mt-1">
+                  {requestForm.title.length}/{FIELD_LIMITS.memberPostTitle}
+                </p>
               </div>
 
               {/* Poll Specific: Dynamic Options List */}
@@ -1169,7 +1173,7 @@ export function FeedList({
                 <textarea
                   required={requestForm.postType === 'normal'}
                   rows={requestForm.postType === 'poll' ? 2 : 4}
-                  maxLength={1000}
+                  maxLength={FIELD_LIMITS.memberPostContent}
                   value={requestForm.content}
                   onChange={(e) => setRequestForm((f) => ({ ...f, content: e.target.value }))}
                   placeholder={
@@ -1179,7 +1183,9 @@ export function FeedList({
                   }
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100 resize-none"
                 />
-                <p className="text-right text-xs text-slate-400 mt-1">{requestForm.content.length}/1000</p>
+                <p className="text-right text-xs tabular-nums text-slate-400 mt-1">
+                  {requestForm.content.length}/{FIELD_LIMITS.memberPostContent}
+                </p>
               </div>
 
               <PostImagePicker
@@ -1847,7 +1853,7 @@ export function FeedList({
                           <input
                             type="text"
                             value={commentInputs[post.id] || ''}
-                            maxLength={500}
+                            maxLength={FIELD_LIMITS.comment}
                             onChange={(e) =>
                               setCommentInputs((prev) => ({ ...prev, [post.id]: e.target.value }))
                             }

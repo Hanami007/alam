@@ -12,6 +12,8 @@ import { PrivacyToggle } from '@/components/ui/privacy-toggle';
 import { ChangePasswordCard } from './change-password-card';
 import { MyAlbum } from '@/modules/profile/components/my-album';
 import { ModalPortal } from '@/components/ui/modal-portal';
+import { FIELD_LIMITS } from '@/lib/field-limits';
+import { formatPhone, formatPhoneInput, PHONE_INPUT_MAX_LENGTH } from '@/lib/phone';
 
 const PRESET_AVATARS = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
@@ -201,7 +203,7 @@ export function ProfileCard({
       isAvailableForMentorship: Boolean(user.is_available_for_mentorship),
       facebookUrl: user.facebook_url || '',
       lineId: user.line_id || '',
-      phone: user.phone || '',
+      phone: formatPhone(user.phone),
       showContactOnMap: Boolean(user.show_contact_on_map),
     });
     setIsEditModalOpen(true);
@@ -1000,6 +1002,7 @@ export function ProfileCard({
                   <input
                     type="text"
                     required
+                    maxLength={FIELD_LIMITS.name}
                     value={editForm.name}
                     onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
@@ -1124,11 +1127,20 @@ export function ProfileCard({
                 </label>
                 <textarea
                   rows={3}
+                  maxLength={FIELD_LIMITS.bio}
                   value={editForm.bio}
                   onChange={(e) => setEditForm((prev) => ({ ...prev, bio: e.target.value }))}
                   placeholder="แนะนำตัวสั้นๆ หรือคติประจำใจ..."
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100 transition-all resize-none"
                 />
+                <p
+                  className={`text-right text-[11px] tabular-nums ${
+                    editForm.bio.length > FIELD_LIMITS.bio ? 'font-bold text-rose-600' : 'text-slate-400'
+                  }`}
+                >
+                  {editForm.bio.length}/{FIELD_LIMITS.bio}
+                  {editForm.bio.length > FIELD_LIMITS.bio && ' — ยาวเกิน กรุณาย่อให้สั้นลงก่อนบันทึก'}
+                </p>
               </div>
 
               {/* Facebook & LINE + toggle แสดงบนแผนที่ รวมอยู่การ์ดเดียวกัน เพื่อไม่ให้พลาดเปิดการแสดงผล */}
@@ -1148,6 +1160,7 @@ export function ProfileCard({
                     </label>
                     <input
                       type="text"
+                      maxLength={FIELD_LIMITS.facebookUrl}
                       value={editForm.facebookUrl}
                       onChange={(e) => setEditForm((prev) => ({ ...prev, facebookUrl: e.target.value }))}
                       placeholder="ลิงก์โปรไฟล์ หรือ ชื่อผู้ใช้ Facebook"
@@ -1160,6 +1173,7 @@ export function ProfileCard({
                     </label>
                     <input
                       type="text"
+                      maxLength={FIELD_LIMITS.lineId + 1}
                       value={editForm.lineId}
                       onChange={(e) => setEditForm((prev) => ({ ...prev, lineId: e.target.value }))}
                       placeholder="LINE ID ของคุณ"
@@ -1176,12 +1190,12 @@ export function ProfileCard({
                   </label>
                   <input
                     type="tel"
-                    inputMode="tel"
-                    autoComplete="tel"
-                    maxLength={20}
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    maxLength={PHONE_INPUT_MAX_LENGTH}
                     value={editForm.phone}
-                    onChange={(e) => setEditForm((prev) => ({ ...prev, phone: e.target.value }))}
-                    placeholder="เช่น 081-234-5678"
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, phone: formatPhoneInput(e.target.value) }))}
+                    placeholder="เช่น 064-779-8792"
                     className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
                   />
                 </div>

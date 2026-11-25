@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import { resizeImageToDataUrl } from '@/lib/image-resize';
+import { FIELD_LIMITS } from '@/lib/field-limits';
 import { ModalPortal } from '@/components/ui/modal-portal';
 
 export interface YearbookAlumnus {
@@ -827,6 +828,7 @@ export function YearbookGrid() {
                     <input
                       type="text"
                       required
+                      maxLength={FIELD_LIMITS.name}
                       value={myEntryForm.name}
                       onChange={(e) => setMyEntryForm({ ...myEntryForm, name: e.target.value })}
                       placeholder="เช่น สมชาย ใจดี"

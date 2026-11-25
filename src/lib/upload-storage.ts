@@ -107,7 +107,8 @@ export const POST_IMAGE_URL_PREFIX = '/api/uploads/posts/';
 const POST_IMAGE_DIR = path.join(UPLOAD_ROOT, 'posts');
 const POST_IMAGE_FILE_RE = /^[a-f0-9-]{36}\.webp$/;
 export const MAX_POST_IMAGES = 4;
-const MAX_POST_IMAGE_BYTES = 5 * 1024 * 1024;
+// หน้าเว็บย่อรูปเหลือ ≤800KB ก่อนส่ง (post-image-picker.tsx) — เผื่อไว้ 1MB สำหรับคนที่ยิง API ตรง
+const MAX_POST_IMAGE_BYTES = 1 * 1024 * 1024;
 const POST_IMAGE_MAX_SIDE = 1600;
 
 export function isPostImageFileName(name: string): boolean {
@@ -121,7 +122,7 @@ export async function savePostImageFromDataUrl(dataUrl: string): Promise<string>
 
   const buffer = Buffer.from(match[2], 'base64');
   if (buffer.length === 0) throw new Error('ไฟล์รูปภาพว่างเปล่า');
-  if (buffer.length > MAX_POST_IMAGE_BYTES) throw new Error('รูปในโพสต์ต้องมีขนาดไม่เกิน 5MB ต่อรูป');
+  if (buffer.length > MAX_POST_IMAGE_BYTES) throw new Error('รูปในโพสต์ต้องมีขนาดไม่เกิน 1MB ต่อรูป (หลังย่อ)');
 
   let output: Buffer;
   try {
