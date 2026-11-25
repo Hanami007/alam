@@ -14,7 +14,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       unlockedGenerations: unlockedGens,
-      userGeneration: user.generation || 'รุ่น 25',
+      userGeneration: user.generation || null,
     });
   } catch (err: any) {
     console.error('Error fetching unlocked generations:', err);

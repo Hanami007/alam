@@ -74,11 +74,13 @@ export class FeedDbService {
       const { rows: posts } = await pool.query(`
         SELECT
           p.id, p.category, p.title, p.content as body, p.pinned, p.created_at, p.status,
-          COALESCE(admin.id, req.id, 1) as author_id,
-          COALESCE(admin.name, req.name, 'ผู้ดูแลระบบ') as author_name,
-          COALESCE(admin.avatar_url, req.avatar_url) as author_avatar,
-          COALESCE(admin.role, req.role, 'admin') as author_role,
-          COALESCE(admin.is_available_for_mentorship, req.is_available_for_mentorship, false) as is_available_for_mentorship,
+          -- ผู้เขียน = คนขอโพสต์ (requested_by) ก่อน ถ้าไม่มีแปลว่าแอดมินโพสต์เอง (published_by)
+          -- เดิมเอา published_by ขึ้นก่อน โพสต์ของสมาชิกที่แอดมินกดอนุมัติจึงขึ้นชื่อแอดมินเป็นคนเขียน
+          COALESCE(req.id, admin.id, 1) as author_id,
+          COALESCE(req.name, admin.name, 'ผู้ดูแลระบบ') as author_name,
+          COALESCE(req.avatar_url, admin.avatar_url) as author_avatar,
+          COALESCE(req.role, admin.role, 'admin') as author_role,
+          COALESCE(req.is_available_for_mentorship, admin.is_available_for_mentorship, false) as is_available_for_mentorship,
           COALESCE(like_stat.like_count, 0)::int as like_count,
           COALESCE(comment_stat.comment_count, 0)::int as comment_count,
           ${currentUserId ? `EXISTS(SELECT 1 FROM post_interactions WHERE post_id = p.id AND user_id = ${Number(currentUserId)} AND type = 'reaction') as is_liked` : 'false as is_liked'}
@@ -269,7 +271,7 @@ export class FeedDbService {
     const { rows } = await pool.query(
       `SELECT p.id, p.category, p.title, p.content, p.pinned,
               p.status, p.post_type, p.created_at, p.published_at,
-              COALESCE(a.name, r.name) AS author
+              COALESCE(r.name, a.name) AS author
        FROM posts p
        LEFT JOIN users a ON a.id = p.published_by
        LEFT JOIN users r ON r.id = p.requested_by

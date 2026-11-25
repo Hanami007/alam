@@ -10,14 +10,20 @@
  * creation (FeedDbService.assertNotRateLimited).
  */
 
+// ifNotExists: DB บนเซิร์ฟเวอร์จริงมีตาราง login_attempts อยู่แล้วก่อนรัน migration นี้ (สร้างนอก
+// migration) ทำให้ CREATE TABLE ล้ม — ข้ามถ้ามีแล้ว เครื่องที่รันไฟล์นี้ไปแล้วไม่ได้รับผลกระทบ
 exports.up = (pgm) => {
-  pgm.createTable('login_attempts', {
-    id: { type: 'serial', primaryKey: true },
-    identifier: { type: 'text', notNull: true },
-    success: { type: 'boolean', notNull: true },
-    created_at: { type: 'timestamptz', notNull: true, default: pgm.func('now()') },
-  });
-  pgm.createIndex('login_attempts', ['identifier', 'created_at']);
+  pgm.createTable(
+    'login_attempts',
+    {
+      id: { type: 'serial', primaryKey: true },
+      identifier: { type: 'text', notNull: true },
+      success: { type: 'boolean', notNull: true },
+      created_at: { type: 'timestamptz', notNull: true, default: pgm.func('now()') },
+    },
+    { ifNotExists: true }
+  );
+  pgm.createIndex('login_attempts', ['identifier', 'created_at'], { ifNotExists: true });
 };
 
 exports.down = (pgm) => {
