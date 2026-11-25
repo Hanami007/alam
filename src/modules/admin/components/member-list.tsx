@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { formatPhone } from '@/lib/phone';
 import {
   Search,
   Users,
@@ -674,7 +675,7 @@ export function MemberList({ members, onDelete, onChangeStudentStatus, onToggleG
                     <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">เบอร์โทรศัพท์ (แอดมินเท่านั้น)</p>
                     {selectedMember.phone ? (
                       <a href={`tel:${selectedMember.phone}`} className="text-sm font-extrabold text-slate-800 hover:text-indigo-600">
-                        {selectedMember.phone}
+                        {formatPhone(selectedMember.phone)}
                       </a>
                     ) : (
                       <p className="text-sm font-medium text-slate-400">ไม่ได้กรอก</p>

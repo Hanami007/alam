@@ -8,6 +8,8 @@ import { PrivacyToggle } from '@/components/ui/privacy-toggle';
 import { DatePicker } from '@/components/ui/date-picker';
 import { SelectMenu } from '@/components/ui/select-menu';
 import { FIELD_LIMITS } from '@/lib/field-limits';
+import { formatPhoneInput, normalizePhone, PHONE_INPUT_MAX_LENGTH } from '@/lib/phone';
+import { normalizeFacebook, normalizeLineId } from '@/lib/contact-fields';
 import { resizeImageToDataUrl } from '@/lib/image-resize';
 import { isAlumniByEntryYear, parseStudentId, type StudentIdLength } from '@/lib/student-id';
 import {
@@ -291,6 +293,14 @@ export default function RegisterPage() {
     }
     if (!parseStudentId(studentId, studentIdLength)) {
       setError('รหัสนักศึกษานี้คำนวณรุ่นไม่ได้ กรุณาตรวจสอบเลข 2 หลักแรกอีกครั้ง');
+      return;
+    }
+
+    // ตรวจช่องทางติดต่อ/เบอร์โทรก่อนส่ง (ฝั่ง API ตรวจซ้ำด้วยกติกาเดียวกัน)
+    const contactError =
+      normalizePhone(phone).error || normalizeFacebook(facebookUrl).error || normalizeLineId(lineId).error;
+    if (contactError) {
+      setError(contactError);
       return;
     }
 
@@ -819,6 +829,9 @@ export default function RegisterPage() {
                         placeholder="เช่น สนใจศึกษาด้าน Web Development, Cloud & AI ยินดีทำความรู้จักเพื่อนๆ พี่ๆ ครับ"
                         className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-indigo-500 focus:bg-slate-950 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all"
                       />
+                      <p className="text-right text-[11px] tabular-nums text-slate-500">
+                        {bio.length}/{FIELD_LIMITS.bio}
+                      </p>
                     </div>
                   )}
 
@@ -857,7 +870,7 @@ export default function RegisterPage() {
                       </div>
                       <input
                         type="text"
-                        maxLength={FIELD_LIMITS.lineId}
+                        maxLength={FIELD_LIMITS.lineId + 1}
                         value={lineId}
                         onChange={(e) => setLineId(e.target.value)}
                         placeholder="LINE ID ของคุณ"
@@ -874,12 +887,12 @@ export default function RegisterPage() {
                     </label>
                     <input
                       type="tel"
-                      inputMode="tel"
-                      autoComplete="tel"
-                      maxLength={FIELD_LIMITS.phone}
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                      maxLength={PHONE_INPUT_MAX_LENGTH}
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="เช่น 081-234-5678"
+                      onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
+                      placeholder="เช่น 064-779-8792"
                       className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-indigo-500 focus:bg-slate-950 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all"
                     />
                   </div>
@@ -983,6 +996,9 @@ export default function RegisterPage() {
                         placeholder="เช่น ศิษย์เก่า CS แม่โจ้ มีความเชี่ยวชาญด้าน Web & Cloud ยินดีให้คำปรึกษาแก่น้องๆ ในสาขา"
                         className="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-amber-400 focus:outline-none focus:ring-4 focus:ring-amber-500/20 transition-all resize-none"
                       />
+                      <p className="text-right text-[11px] tabular-nums text-slate-500">
+                        {bio.length}/{FIELD_LIMITS.bio}
+                      </p>
                     </div>
                     )}
                   </div>
