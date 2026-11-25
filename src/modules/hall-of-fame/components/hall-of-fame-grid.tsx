@@ -288,7 +288,7 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
       {/* ╔══════════════════════════════════════════╗
           ║  1. HERO BANNER - SOFT PASTEL THEME      ║
           ╚══════════════════════════════════════════╝ */}
-      <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-violet-100 via-pink-50 to-amber-100 border border-pink-200/60 p-6 sm:p-8 shadow-sm">
+      <div className="relative overflow-hidden rounded-[28px] sm:rounded-[32px] bg-gradient-to-br from-violet-100 via-pink-50 to-amber-100 border border-pink-200/60 p-5 sm:p-8 shadow-sm">
         {/* Soft pastel decorative glow circles */}
         <div className="absolute -top-12 -right-12 h-56 w-56 rounded-full bg-rose-200/40 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-12 left-1/4 h-48 w-48 rounded-full bg-violet-200/40 blur-2xl pointer-events-none" />
@@ -314,7 +314,7 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 via-pink-500 to-amber-500 font-extrabold">
                 Hall of Fame
               </span>
-              <span className="text-2xl">✨</span>
+              <span className="hidden sm:inline text-2xl">✨</span>
             </h1>
 
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
@@ -419,25 +419,25 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
       {top1 && top2 && top3 && (
         <section
           ref={podiumRef}
-          className="relative rounded-[36px] border border-violet-100 bg-gradient-to-b from-white via-violet-50/30 to-pink-50/20 p-8 sm:p-10 shadow-xs overflow-hidden"
+          className="relative rounded-[36px] border border-violet-100 bg-gradient-to-b from-white via-violet-50/30 to-pink-50/20 px-3 py-6 sm:p-10 shadow-xs overflow-hidden"
         >
           {/* Subtle background pastel glow aura */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-72 w-96 rounded-full bg-gradient-to-r from-amber-100/60 via-pink-100/50 to-violet-100/60 blur-3xl pointer-events-none" />
 
           {/* Section Header */}
-          <div className="relative z-10 text-center mb-6 space-y-1.5">
+          <div className="relative z-10 text-center mb-4 sm:mb-6 space-y-1.5">
             <div className="inline-flex items-center gap-1.5 rounded-full bg-white/90 border border-amber-200/80 px-3 py-1 text-xs font-bold text-amber-700 shadow-2xs">
               <Sparkles className="h-3.5 w-3.5 text-amber-500 fill-amber-400" />
               <span>TOP 3 LEADERBOARD</span>
             </div>
-            <h2 className="text-3xl sm:text-4xl font-black text-slate-800 flex items-center justify-center gap-1.5">
+            <h2 className="text-2xl sm:text-4xl font-black text-slate-800 flex items-center justify-center gap-1.5">
               <span>ผู้นำคะแนนโหวต</span>
               <span>🏆</span>
             </h2>
           </div>
 
           {/* Floating Circular Top 3 Cards (2nd | 1st | 3rd) */}
-          <div className="relative z-10 grid grid-cols-3 gap-6 sm:gap-7 items-end">
+          <div className="relative z-10 grid grid-cols-3 gap-2 sm:gap-7 items-end">
             
             {/* 🥈 Rank 2 (Left / Floating Pastel Sky-Lavender) */}
             <FloatingTopCard
@@ -654,48 +654,26 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
                   key={c.id}
                   id={`hof-row-${c.id}`}
                   onClick={() => setSelectedCandidate(c)}
-                  className="group p-3 sm:px-3.5 sm:py-2.5 transition-colors duration-150 hover:bg-violet-50/40 cursor-pointer flex flex-col md:flex-row gap-2.5 md:gap-2 md:items-center"
+                  className="group flex items-center gap-2.5 sm:gap-2 px-3 py-2.5 sm:px-3.5 transition-colors duration-150 hover:bg-violet-50/40 cursor-pointer"
                 >
-                  {/* Rank (Mobile & Desktop) */}
-                  <div className="flex items-center justify-between md:justify-center md:w-8 md:shrink-0">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`inline-flex items-center justify-center font-black rounded-lg text-xs ${
-                          displayRank <= 3
-                            ? 'h-7 w-7 bg-amber-50 text-amber-800 border border-amber-200/80 shadow-2xs'
-                            : 'h-6 w-6 sm:h-7 sm:w-7 bg-slate-100 text-slate-600 border border-slate-200/80'
-                        }`}
-                      >
-                        {displayRank}
-                      </span>
-                      {displayRank === 4 && (
-                        <span className="md:hidden inline-flex items-center gap-1 text-[11px] font-bold text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full border border-pink-200/70">
-                          <Flame className="h-3 w-3 fill-pink-500 text-pink-500" />
-                          กำลังมาแรง
-                        </span>
-                      )}
-                    </div>
+                  {/* อันดับ */}
+                  <span
+                    className={`inline-flex h-7 w-7 shrink-0 items-center justify-center font-black rounded-lg text-xs md:mx-0.5 ${
+                      displayRank <= 3
+                        ? 'bg-amber-50 text-amber-800 border border-amber-200/80 shadow-2xs'
+                        : 'bg-slate-100 text-slate-600 border border-slate-200/80'
+                    }`}
+                  >
+                    {displayRank}
+                  </span>
 
-                    {/* Mobile Vote button (Top Right on Mobile) */}
-                    {isVotingOpen && (
-                      <div className="md:hidden">
-                        <VoteButton
-                          voted={voted}
-                          isVoting={isVoting}
-                          animating={animating}
-                          onVote={(e) => handleVote(e, c.id)}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Alumni Info with Circular Avatar */}
-                  <div className="flex items-center gap-2.5 min-w-0 md:flex-1">
+                  {/* รูป + ชื่อ */}
+                  <div className="flex flex-1 items-center gap-2.5 min-w-0">
                     <div className="relative shrink-0">
                       <CandidateAvatar
                         src={c.avatar_url}
                         name={c.name}
-                        className="h-9 w-9 sm:h-10 sm:w-10 rounded-full object-cover ring-2 ring-violet-100 group-hover:ring-violet-300 transition-all shadow-2xs text-sm"
+                        className="h-10 w-10 rounded-full object-cover ring-2 ring-violet-100 group-hover:ring-violet-300 transition-all shadow-2xs text-sm"
                       />
                       {voted && (
                         <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white rounded-full p-0.5 shadow-xs">
@@ -705,40 +683,35 @@ export function HallOfFameGrid({ initialCandidates = [], campaignStatus = 'close
                     </div>
 
                     <div className="min-w-0">
-                      <h4 className="font-extrabold text-slate-800 text-sm leading-snug group-hover:text-violet-700 transition-colors truncate">
-                        {c.name}
+                      <h4 className="flex items-center gap-1 font-extrabold text-slate-800 text-sm leading-snug group-hover:text-violet-700 transition-colors">
+                        <span className="truncate">{c.name}</span>
+                        {displayRank === 4 && (
+                          <Flame aria-label="กำลังมาแรง" className="md:hidden h-3.5 w-3.5 shrink-0 fill-pink-500 text-pink-500" />
+                        )}
                       </h4>
 
                       {(c.generation_label || c.studentId) && (
                         <p className="flex gap-1.5 text-[11px] font-mono text-slate-400 mt-0.5 truncate">
                           {c.generation_label && <span>{c.generation_label}</span>}
-                          {c.studentId && <span>รหัส: {c.studentId}</span>}
+                          {c.studentId && <span className="truncate">รหัส: {c.studentId}</span>}
                         </p>
                       )}
                     </div>
                   </div>
 
-                  {/* Vote Count & Action (Desktop & Mobile) */}
-                  <div className="flex items-center justify-between gap-2 self-start md:self-auto md:w-[80px] md:shrink-0">
-                    {/* Vote Count */}
-                    <div className="text-left md:text-right">
-                      <span className="text-[11px] text-slate-400 font-medium md:hidden">คะแนน</span>
-                      <span className="text-sm font-black text-slate-800 whitespace-nowrap">
-                        {c.votes || 0} <span className="text-[10px] font-normal text-slate-400">โหวต</span>
-                      </span>
-                    </div>
-
-                    {/* Desktop Vote Button */}
+                  {/* คะแนน + ปุ่มโหวต */}
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="text-sm font-black text-slate-800 whitespace-nowrap text-right">
+                      {c.votes || 0} <span className="text-[10px] font-normal text-slate-400">โหวต</span>
+                    </span>
                     {isVotingOpen && (
-                      <div className="hidden md:block shrink-0">
-                        <VoteButton
-                          iconOnly
-                          voted={voted}
-                          isVoting={isVoting}
-                          animating={animating}
-                          onVote={(e) => handleVote(e, c.id)}
-                        />
-                      </div>
+                      <VoteButton
+                        iconOnly
+                        voted={voted}
+                        isVoting={isVoting}
+                        animating={animating}
+                        onVote={(e) => handleVote(e, c.id)}
+                      />
                     )}
                   </div>
                 </div>
@@ -1026,7 +999,7 @@ function FloatingTopCard({
         {/* Circular Avatar Container — ขนาดเป็น % ของความกว้างการ์ด ปรับตามพื้นที่จริงเสมอ (กันแตกที่จอแคบ/การ์ดแคบ) */}
         <div
           onClick={onSelect}
-          className={`relative cursor-pointer transition-transform duration-300 group-hover:-translate-y-1 ${THEME_CONFIG.avatarSize}`}
+          className={`relative min-h-0 cursor-pointer transition-transform duration-300 group-hover:-translate-y-1 ${THEME_CONFIG.avatarSize}`}
         >
           {/* Floating Halo Glow Circle */}
           <div
@@ -1051,24 +1024,24 @@ function FloatingTopCard({
       {/* ─── 2. SOFT PASTEL CARD CONTENT ─── */}
       <div
         onClick={onSelect}
-        className={`w-full rounded-2xl border ${THEME_CONFIG.cardBg} ${THEME_CONFIG.cardBorder} px-3 py-3.5 sm:px-5 sm:py-5 text-center transition-all duration-200 hover:-translate-y-1 hover:shadow-lg cursor-pointer backdrop-blur-xs`}
+        className={`w-full rounded-2xl border ${THEME_CONFIG.cardBg} ${THEME_CONFIG.cardBorder} px-2 py-3 sm:px-5 sm:py-5 text-center transition-all duration-200 hover:-translate-y-1 hover:shadow-lg cursor-pointer backdrop-blur-xs`}
       >
         {/* Name */}
         <h3
           className={`font-black text-slate-800 leading-tight line-clamp-2 break-words group-hover:text-violet-700 transition-colors ${
-            isChampion ? 'text-base sm:text-xl' : 'text-sm sm:text-lg'
+            isChampion ? 'text-[13px] sm:text-xl' : 'text-xs sm:text-lg'
           }`}
           title={candidate.name}
         >
           {candidate.name}
         </h3>
 
-        <p className="text-xs sm:text-base text-slate-500 font-medium mt-0.5 truncate" title={candidate.position}>
+        <p className="text-[11px] sm:text-base text-slate-500 font-medium mt-0.5 truncate" title={candidate.position}>
           {candidate.position}
         </p>
 
-        {/* Progress Bar */}
-        <div className="mt-2.5 sm:mt-4">
+        {/* Progress Bar — มือถือการ์ดแคบ แถบจะดูเป็นแถบเทาว่างๆ */}
+        <div className="hidden sm:block mt-4">
           <div className="h-2 sm:h-3.5 bg-slate-100 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full bg-gradient-to-r ${THEME_CONFIG.voteBar} transition-all duration-700`}

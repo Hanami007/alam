@@ -444,7 +444,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div
           ref={notifPopoverRef}
           onClick={(e) => e.stopPropagation()}
-          className="animate-popover-down fixed right-4 sm:right-6 top-14 sm:top-16 z-50 w-80 sm:w-96 overflow-hidden rounded-2xl border border-border bg-card shadow-hero"
+          className="animate-popover-down fixed left-3 right-3 sm:left-auto sm:right-6 top-14 sm:top-16 z-50 sm:w-96 overflow-hidden rounded-2xl border border-border bg-card shadow-hero"
         >
           <div className="flex items-center justify-between border-b border-border px-4 py-3 bg-card">
             <div className="flex items-center gap-2">
@@ -540,7 +540,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         className={`group/sidebar fixed top-3 bottom-3 left-3 z-40 flex flex-col rounded-3xl border border-border/80 bg-card/85 backdrop-blur-xl shadow-hero transition-all duration-300 ${sidebarWidth} ${
           collapsed ? 'px-2 py-4' : 'p-4'
         } ${
-          mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          // แถบเมนูอยู่ห่างขอบ left-3 + มีเงา — เลื่อนออกแค่ 100% จะยังโผล่ขอบขาวที่ซ้ายจอบนมือถือ
+          mobileOpen ? 'translate-x-0' : '-translate-x-[calc(100%+3rem)] lg:translate-x-0'
         }`}
       >
         {/* Brand Header */}

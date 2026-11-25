@@ -77,6 +77,7 @@ export function YearbookGrid() {
 
   const [selectedAlumnus, setSelectedAlumnus] = useState<YearbookAlumnus | null>(null);
   const [alumniList, setAlumniList] = useState<YearbookAlumnus[]>([]);
+  const [isListLoading, setIsListLoading] = useState(true);
   // รุ่นที่มีข้อมูลจริงในระบบเท่านั้น (ดึงจาก lookup_options) ใช้เป็นตัวเลือกในฟอร์มแก้ไขของฉัน
   // — เลือกได้แค่รุ่นที่มีอยู่จริง กันปัญหาเลือกรุ่นที่ไม่มีในระบบแล้วบันทึกไม่ติด
   const [realGenerationOptions, setRealGenerationOptions] = useState<string[]>([]);
@@ -189,6 +190,7 @@ export function YearbookGrid() {
           setAlumniList(formatted);
           setLikedIds(new Set(data.filter((item: any) => item.likedByMe).map((item: any) => String(item.id))));
         }
+        setIsListLoading(false);
 
         // ดึงรายชื่อรุ่นที่มีข้อมูลจริงในระบบ (แหล่งเดียวกับหน้าสมัครสมาชิก) มาใช้เป็นตัวเลือก
         // ในฟอร์มแก้ไขข้อมูลของฉัน แทนเลข 1-48 ที่ตั้งไว้ตายตัว
@@ -207,6 +209,8 @@ export function YearbookGrid() {
         }
       } catch (err) {
         console.error('Error fetching yearbook data:', err);
+      } finally {
+        setIsListLoading(false);
       }
     }
 
@@ -507,17 +511,17 @@ export function YearbookGrid() {
       </div>
 
       {/* ─── ACTION BUTTONS BAR ────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-2">
         {/* ปุ่มสำหรับกดเลือกรุ่น (คลิกแล้วเป็นดรอปดาวน์) */}
-        <div className="relative" ref={genDropdownWrapRef}>
+        <div className="relative min-w-0" ref={genDropdownWrapRef}>
           <button
             onClick={() => setIsGenModalOpen((v) => !v)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-white border border-violet-200 text-violet-800 text-xs sm:text-sm font-bold hover:bg-violet-50 hover:border-violet-400 hover:shadow-md transition-all shadow-sm cursor-pointer active:scale-95"
+            className="inline-flex max-w-full items-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-full bg-white border border-violet-200 text-violet-800 text-xs sm:text-sm font-bold hover:bg-violet-50 hover:border-violet-400 hover:shadow-md transition-all shadow-sm cursor-pointer active:scale-95"
           >
-            <GraduationCap className="h-4 w-4 text-violet-500" />
-            <span>
+            <GraduationCap className="h-4 w-4 shrink-0 text-violet-500" />
+            <span className="truncate">
               {selectedGeneration === 'all'
-                ? '🎓 เลือกรุ่น (ทุกรุ่น)'
+                ? 'เลือกรุ่น (ทุกรุ่น)'
                 : `กำลังดู: รุ่น ${selectedGeneration}`}
             </span>
             <ChevronDown
@@ -602,11 +606,11 @@ export function YearbookGrid() {
         {/* ปุ่มเพิ่ม / แก้ไขข้อมูลหนังสือรุ่นของฉัน */}
         <button
           onClick={handleOpenMyModal}
-          className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-violet-500 to-pink-500 text-white px-5 py-2.5 text-xs sm:text-sm font-bold hover:opacity-90 hover:shadow-lg transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
+          className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-violet-500 to-pink-500 text-white px-3 py-2 sm:px-5 sm:py-2.5 text-xs sm:text-sm font-bold whitespace-nowrap hover:opacity-90 hover:shadow-lg transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
         >
-          <Edit3 className="h-4 w-4" />
+          <Edit3 className="h-4 w-4 shrink-0" />
           <span>
-            {myExistingEntry ? '✏️ แก้ไขข้อมูลของฉัน' : '✨ เพิ่มข้อมูลหนังสือรุ่น'}
+            {myExistingEntry ? 'แก้ไขข้อมูลของฉัน' : 'เพิ่มข้อมูลหนังสือรุ่น'}
           </span>
         </button>
       </div>
@@ -614,7 +618,12 @@ export function YearbookGrid() {
 
 
       {/* ─── ALUMNI DISPLAY CONTAINER ─────────────────────────────────── */}
-      {filteredAlumni.length === 0 ? (
+      {isListLoading ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-3xl border border-slate-100 bg-white/70 p-14 text-slate-400">
+          <Loader2 className="h-7 w-7 animate-spin text-violet-400" />
+          <p className="text-sm font-medium">กำลังโหลดหนังสือรุ่น...</p>
+        </div>
+      ) : filteredAlumni.length === 0 ? (
         <div className="bg-gradient-to-br from-violet-50 to-pink-50 rounded-3xl border border-pink-200/60 p-14 text-center space-y-4 shadow-xs">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm mx-auto">
             <BookOpen className="h-8 w-8 text-violet-400" />
@@ -651,13 +660,6 @@ export function YearbookGrid() {
                 {/* Decorative blob */}
                 <div className="absolute -right-6 -bottom-6 h-20 w-20 rounded-full bg-white/40 blur-xl pointer-events-none" />
 
-                {/* Own Card Badge */}
-                {isMe && (
-                  <div className="absolute top-2 right-2 z-10 bg-amber-400 text-amber-900 text-[10px] sm:text-xs font-extrabold px-2.5 py-0.5 rounded-full shadow-xs border border-amber-300">
-                    ✨ ของฉัน
-                  </div>
-                )}
-
                 {/* 1. รูปภาพสี่เหลี่ยม (ด้านซ้าย ยืดเต็มความสูง มี rounded ซ้ายตามการ์ด) */}
                 <div className="relative shrink-0 w-[96px] sm:w-[110px] overflow-hidden rounded-l-2xl">
                   <img
@@ -688,6 +690,11 @@ export function YearbookGrid() {
                     {alumnus.isGenerationLeader && (
                       <span className="inline-block text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
                         👑 หัวหน้ารุ่น
+                      </span>
+                    )}
+                    {isMe && (
+                      <span className="inline-block text-[10px] sm:text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-amber-400 text-amber-900 border border-amber-300">
+                        ✨ ของฉัน
                       </span>
                     )}
                   </div>

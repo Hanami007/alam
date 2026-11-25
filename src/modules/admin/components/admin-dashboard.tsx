@@ -52,6 +52,8 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
       .catch(() => {});
   }, []);
   const [loading, setLoading] = useState(true);
+  // แยกจาก loading — ตอนกดรีเฟรชไม่ต้องล้างตัวเลขเดิมเป็น "กำลังโหลด"
+  const [hasLoadedStats, setHasLoadedStats] = useState(false);
   const [stats, setStats] = useState<any>({
     totalAlumni: 0,
     totalGenerations: 0,
@@ -108,6 +110,7 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
       console.error('[AdminDashboard] Error loading data:', err);
     } finally {
       setLoading(false);
+      setHasLoadedStats(true);
     }
   }
 
@@ -146,6 +149,7 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
         setHofCampaign(hofRes.value.campaign);
       }
       setLoading(false);
+      setHasLoadedStats(true);
     });
 
     return () => {
@@ -273,7 +277,7 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
       )}
 
       {/* สถิติภาพรวม — การ์ดที่กดได้ (คำขอรออนุมัติ/สมาชิก/HOF) จะพาไปแท็บที่เกี่ยวข้องทันที */}
-      <section className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:gap-5 xl:grid-cols-4">
         {[
           {
             label: 'ศิษย์เก่าอนุมัติแล้ว',
@@ -311,15 +315,21 @@ export function AdminDashboard({ adminId = 1 }: AdminDashboardProps) {
           <div
             key={item.label}
             onClick={item.onClick}
-            className={`rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-xs transition-all ${
+            className={`rounded-3xl sm:rounded-[28px] border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs transition-all ${
               item.onClick ? 'hover:shadow-md hover:border-indigo-200 cursor-pointer active:scale-[0.98]' : ''
             }`}
           >
-            <div className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl ${item.color}`}>
-              <item.icon className="h-5 w-5" />
+            <div className={`inline-flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-2xl ${item.color}`}>
+              <item.icon className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <p className="mt-3 text-xs font-semibold text-slate-500">{item.label}</p>
-            <p className="mt-1 text-2xl font-extrabold tabular-nums text-slate-900">{item.value}</p>
+            <p className="mt-2 sm:mt-3 text-[11px] sm:text-xs font-semibold leading-snug text-slate-500">{item.label}</p>
+            {hasLoadedStats ? (
+              <p className="mt-1 text-2xl font-extrabold tabular-nums text-slate-900">{item.value}</p>
+            ) : (
+              <p className="mt-2.5 flex items-center gap-1.5 text-xs font-medium text-slate-400">
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" /> กำลังโหลด…
+              </p>
+            )}
           </div>
         ))}
       </section>

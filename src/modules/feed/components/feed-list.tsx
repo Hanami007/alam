@@ -1287,7 +1287,8 @@ export function FeedList({
             </button>
 
             {showCategoryFilter && (
-              <div className="flex flex-wrap gap-2 border-t border-slate-100 px-4 py-3">
+              // มือถือ: แถวเดียวปัดซ้ายขวา (ตัดบรรทัดแล้วชิปเรียงซ้อนลงมาหลายแถว) ขอบขวาจางบอกว่ายังมีต่อ
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide border-t border-slate-100 px-4 py-3 pr-10 [mask-image:linear-gradient(to_right,black_80%,transparent)] sm:flex-wrap sm:overflow-visible sm:pr-4 sm:[mask-image:none]">
                 {[{ category: null as string | null, count: categories.reduce((sum, c) => sum + c.count, 0) }, ...categories].map(
                   ({ category, count }) => {
                     const isActive = selectedCategory === category;
@@ -1298,7 +1299,7 @@ export function FeedList({
                         aria-pressed={isActive}
                         disabled={isFilteringFeed}
                         onClick={() => handleSelectCategory(category)}
-                        className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                        className={`shrink-0 whitespace-nowrap rounded-lg border px-3 py-1.5 text-sm transition-colors ${
                           isActive
                             ? 'border-slate-900 bg-slate-900 text-white'
                             : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'

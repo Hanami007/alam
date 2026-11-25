@@ -339,6 +339,7 @@ export function ProfileCard({
           {
             id: 'gallery' as const,
             label: 'อัลบั้มของฉัน',
+            shortLabel: 'อัลบั้ม',
             icon: ImageIcon,
             badge: `${albumCounts.tagged}`,
             ownerOnly: true,
@@ -346,6 +347,7 @@ export function ProfileCard({
           {
             id: 'activity' as const,
             label: 'กิจกรรม & แต้ม',
+            shortLabel: 'กิจกรรม',
             icon: Sparkles,
             badge: `${user.total_points ?? 0}`,
           },
@@ -360,14 +362,16 @@ export function ProfileCard({
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer text-center ${
+              className={`flex min-w-0 items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer text-center ${
                 isActive
                   ? 'bg-white text-indigo-900 shadow-sm shadow-indigo-950/5 scale-[1.01]'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
             >
               <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
-              <span className="truncate">{tab.label}</span>
+              {/* ชื่อเต็มยาวเกินช่องบนมือถือ (2 คอลัมน์) จนถูกตัดเป็น "อัลบั้มของ…" — ใช้ชื่อสั้นแทน */}
+              <span className="truncate sm:hidden">{'shortLabel' in tab ? tab.shortLabel : tab.label}</span>
+              <span className="truncate hidden sm:inline">{tab.label}</span>
               {tab.badge && (
                 <span
                   className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ${

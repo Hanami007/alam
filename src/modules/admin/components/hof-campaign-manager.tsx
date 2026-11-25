@@ -7,6 +7,7 @@ import {
   Medal, Crown, History, Eye, EyeOff, Copy, AlertTriangle,
 } from 'lucide-react';
 import { ModalPortal } from '@/components/ui/modal-portal';
+import { DatePicker } from '@/components/ui/date-picker';
 
 interface HofResult {
   id: number;
@@ -293,6 +294,14 @@ function NewCampaignForm({ onCreated }: { onCreated: () => void }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.period_start || !form.period_end) {
+      alert('กรุณาเลือกวันเริ่มและวันสิ้นสุดของรอบ');
+      return;
+    }
+    if (form.period_end < form.period_start) {
+      alert('วันสิ้นสุดต้องไม่ก่อนวันเริ่ม');
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch('/api/admin/hof-campaign/new', {
@@ -354,20 +363,23 @@ function NewCampaignForm({ onCreated }: { onCreated: () => void }) {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1.5">วันเริ่ม *</label>
-                    <input
-                      required type="date"
+                    <DatePicker
                       value={form.period_start}
-                      onChange={(e) => setForm((f) => ({ ...f, period_start: e.target.value }))}
-                      className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                      onChange={(period_start) => setForm((f) => ({ ...f, period_start }))}
+                      placeholder="เลือกวันเริ่ม"
+                      minYear={new Date().getFullYear() - 1}
+                      triggerClassName="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm hover:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1.5">วันสิ้นสุด *</label>
-                    <input
-                      required type="date"
+                    <DatePicker
                       value={form.period_end}
-                      onChange={(e) => setForm((f) => ({ ...f, period_end: e.target.value }))}
-                      className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                      onChange={(period_end) => setForm((f) => ({ ...f, period_end }))}
+                      placeholder="เลือกวันสิ้นสุด"
+                      minYear={new Date().getFullYear() - 1}
+                      align="right"
+                      triggerClassName="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm hover:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                     />
                   </div>
                 </div>

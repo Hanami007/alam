@@ -33,6 +33,8 @@ interface DatePickerProps {
   minYear?: number;
   /** ไม่ให้เลือกวันที่หลังวันนี้ (เช่น วันเกิด) */
   disableFuture?: boolean;
+  /** ช่องที่อยู่ชิดขวาของฟอร์มให้ปฏิทินชิดขวา จะได้ไม่ล้นขอบ */
+  align?: 'left' | 'right';
 }
 
 export function DatePicker({
@@ -42,6 +44,7 @@ export function DatePicker({
   placeholder = 'เลือกวันที่',
   minYear = 1950,
   disableFuture = false,
+  align = 'left',
 }: DatePickerProps) {
   const selected = parseDate(value);
   const today = useMemo(() => new Date(), []);
@@ -132,7 +135,7 @@ export function DatePicker({
         <div
           role="dialog"
           aria-label="เลือกวันที่"
-          className={`absolute left-0 z-40 w-[296px] rounded-2xl border border-slate-100 bg-white p-3 text-slate-800 shadow-xl animate-fade-in ${
+          className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} z-40 w-[296px] rounded-2xl border border-slate-100 bg-white p-3 text-slate-800 shadow-xl animate-fade-in ${
             openUpward ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
           }`}
         >
